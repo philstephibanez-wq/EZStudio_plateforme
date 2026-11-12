@@ -7,7 +7,7 @@ $directory = 'H:\FRANKENPHP\services\EZS_FrankenPHP_DEV'
 $wrapper = Join-Path $directory ($serviceName + '.exe')
 $xmlPath = Join-Path $directory ($serviceName + '.xml')
 $php = 'H:\FRANKENPHP\bin\frankenphp.exe'
-$root = 'H:\EZS_orchestrator'
+$root = (Resolve-Path "$PSScriptRoot\..").Path
 function Get-ServiceRecord { @(Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction Stop) }
 function Assert-Safe {
     if (!(Test-Path -LiteralPath $php -PathType Leaf)) { throw 'FRANKENPHP_BINARY_MISSING' }
@@ -18,7 +18,7 @@ function Assert-Safe {
     if (!(Test-Path -LiteralPath $xmlPath -PathType Leaf)) { throw 'SERVICE_XML_MISSING' }
     [xml]$config = Get-Content -LiteralPath $xmlPath -Raw -Encoding UTF8
     if ($config.service.id -ne $serviceName -or $config.service.executable -ne $php -or
-        $config.service.arguments -ne 'php-server --listen 127.0.0.1:8790 --root H:\EZS_orchestrator\public' -or
+        $config.service.arguments -ne 'php-server --listen 127.0.0.1:8790 --root $(Resolve-Path "$PSScriptRoot\..")\public' -or
         $config.service.startmode -ne 'Manual') { throw 'SERVICE_XML_CONTRACT_MISMATCH' }
     $sha = (Get-FileHash -LiteralPath $wrapper -Algorithm SHA256).Hash
     Write-Host "WINSW_SHA256=$sha"

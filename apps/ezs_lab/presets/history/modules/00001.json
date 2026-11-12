@@ -1,0 +1,34 @@
+{
+  "composition": {
+    "device": null,
+    "engine": {
+      "name": "librosa",
+      "version": "0.11.0"
+    },
+    "family": "rhythm",
+    "id": "rhythm.librosa-beat",
+    "implementation": {
+      "callable": "genes.rhythm_librosa.run",
+      "source_sha256": "43afd34a7ce096dc538d73f5204b0b63416c7a8d138f4e2ac0bb547b8d77c272"
+    },
+    "model": {
+      "id": null,
+      "path": null
+    },
+    "name": "Librosa Beat Tracker",
+    "order": 10,
+    "parameters": {
+      "analysis_sample_rate": 22050,
+      "mono": true
+    },
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-09T20:17:26+00:00",
+  "fingerprint": "10c5c915218c9d7e2f8aeeecbf700937dff64710585dbbf6f546173ee7763d6a",
+  "id": 1,
+  "module_key": "rhythm.librosa-beat",
+  "revision_number": 1,
+  "revision_ref": "rhythm.librosa-beat.r1",
+  "schema": "ezstudio.preset.export.module.v1"
+}

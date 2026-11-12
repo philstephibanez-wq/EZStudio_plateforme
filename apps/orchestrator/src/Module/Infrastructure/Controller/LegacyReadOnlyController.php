@@ -51,7 +51,7 @@ final class LegacyReadOnlyController
 
     private function loopback(Request $request): bool
     {
-        return in_array($request->getHost(), ['127.0.0.1', 'localhost'], true)
+        return in_array($request->getHost(), ['127.0.0.1', 'localhost', 'orchestrator.ezstudio.local'], true)
             && in_array($request->getClientIp(), ['127.0.0.1', '::1'], true);
     }
 }

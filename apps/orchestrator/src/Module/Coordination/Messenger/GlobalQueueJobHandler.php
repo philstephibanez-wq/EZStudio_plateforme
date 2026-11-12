@@ -29,7 +29,7 @@ final class GlobalQueueJobHandler
             throw new \DomainException('job_no_longer_eligible');
         }
         // No user-supplied path, shell or command: only the trusted canonical LAB CLI.
-        $lab = 'H:/EZStudio_lab';
+        $lab = dirname(__DIR__, 4) . '/apps/ezs_lab';
         if (!is_file($lab.'/bin/console')) throw new \RuntimeException('lab_console_missing');
         $process = new Process([PHP_BINARY, 'bin/console', 'lab:queue:execute-profile', $match[1]], $lab);
         $process->setTimeout(null);

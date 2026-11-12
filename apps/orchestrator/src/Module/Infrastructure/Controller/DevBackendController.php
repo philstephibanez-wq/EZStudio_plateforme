@@ -13,7 +13,7 @@ final class DevBackendController
     public function index(Request $request, DevBackendOwnership $ownership): JsonResponse
     {
         if (($_SERVER['APP_ENV'] ?? getenv('APP_ENV') ?: '') !== 'dev' ||
-            !in_array($request->getHost(), ['127.0.0.1','localhost'], true) ||
+            !in_array($request->getHost(), ['127.0.0.1', 'localhost', 'orchestrator.ezstudio.local'], true) ||
             !in_array($request->getClientIp(), ['127.0.0.1','::1'], true)) {
             return new JsonResponse(['error'=>'forbidden'],403);
         }

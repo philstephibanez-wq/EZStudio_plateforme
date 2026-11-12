@@ -1,0 +1,224 @@
+{% extends 'base.html.twig' %}
+{% block title %}STEMS · EZStudio_lab{% endblock %}
+
+{% block styles %}
+.stems-player{display:grid;gap:14px}
+.transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px;background:#f5f6f7;border:1px solid var(--line);border-radius:6px}
+.transport button{min-width:92px}
+.transport-time{font:13px Consolas,monospace;min-width:150px}
+.transport input[type=range]{min-width:280px;flex:1;padding:0}
+.stem-group{border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:12px}
+.stem-group h3{margin:0;padding:9px 12px;background:#f1f3f5;font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+.stem-track{display:grid;grid-template-columns:minmax(180px,1.3fr) 86px 86px minmax(180px,1fr) 72px 72px;gap:9px;align-items:center;padding:9px 12px;border-top:1px solid var(--line)}
+.stem-track:first-of-type{border-top:0}
+.track-name strong{display:block}
+.track-name code{font-size:10px;color:#68707c}
+.track-confidence{font-size:11px;color:#68707c}
+.track-btn{padding:6px 8px;background:#fff;color:#222;border-color:#aaa}
+.track-btn.active{background:#222;color:#fff;border-color:#111}
+.track-volume{display:flex;align-items:center;gap:7px}
+.track-volume input{width:100%;padding:0}
+.selection-head,.selection-row{display:grid;grid-template-columns:minmax(220px,1fr) 140px 170px;gap:10px;align-items:center}
+.selection-head{font-size:12px;color:#68707c;font-weight:bold;padding:7px 0;border-bottom:1px solid var(--line)}
+.selection-row{padding:7px 0;border-bottom:1px solid #eef0f2}
+.selection-row label{display:flex;flex-direction:row;align-items:center;gap:7px}
+.run-state{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.player-empty{padding:18px;border:1px dashed #aaa;background:#fafafa}
+@media(max-width:900px){
+ .stem-track{grid-template-columns:1fr 70px 70px}
+ .track-volume{grid-column:1/-1}
+ .selection-head,.selection-row{grid-template-columns:1fr 110px 130px}
+}
+{% endblock %}
+
+{% block body %}
+<div class="card hero">
+  <div>
+    <h1>STEMS</h1>
+    <div class="meta">Lecteur multipiste scientifique · mixage synchronisé · sélection CHORDS / NO-CHORD.</div>
+  </div>
+</div>
+
+{% include 'workbench/_song_selector.html.twig' %}
+
+{% if selected_song %}
+<div class="item-tabs">
+  <a href="#result">Résultats</a>
+  <a href="#diagnostics">Diagnostics</a>
+  <a href="#comparison">Comparaisons</a>
+  <a href="#logs">Logs</a>
+  <a href="#artifacts">Artefacts</a>
+</div>
+
+<section class="card" id="result">
+  <div class="hero">
+    <div>
+      <h2>{{ selected_song.title }}{% if selected_song.artist %} — {{ selected_song.artist }}{% endif %}</h2>
+      <p class="meta">Le lecteur consomme uniquement les artefacts STEMS enregistrés dans le registre scientifique. Aucun stem caché du benchmark n'est utilisé.</p>
+    </div>
+    <a class="button secondary" href="{{ path('lab_stems',{song:selected_song.id}) }}">Nouvelle analyse STEMS</a>
+  </div>
+
+  {% if stems_runs %}
+  <form method="get" action="{{ path('workbench_stems') }}" class="row" style="margin-top:12px">
+    <input type="hidden" name="song" value="{{ selected_song.id }}">
+    <label>Run STEMS
+      <select name="run" onchange="this.form.submit()">
+      {% for sr in stems_runs %}
+        <option value="{{ sr.id }}" {{ selected_stems_run and sr.id == selected_stems_run.id ? 'selected' : '' }}>
+          {{ sr.public_id }} · {{ sr.state }} · {{ sr.engine_name ?: 'STEMS' }} · {{ sr.created_at }}
+        </option>
+      {% endfor %}
+      </select>
+    </label>
+  </form>
+  {% endif %}
+
+  {% if selected_stems_run %}
+    <div class="run-state" style="margin-top:12px">
+      <span class="badge {{ selected_stems_run.state == 'done' ? 'ok' : 'warn' }}">{{ selected_stems_run.state }}</span>
+      <code>{{ selected_stems_run.public_id }}</code>
+      <span class="meta">{{ selected_stems_run.audio_artifacts|length }} piste(s) audio</span>
+      <a href="{{ path('scientific_run',{id:selected_stems_run.id}) }}">Preset</a>
+    </div>
+
+    {% if selected_stems_run.state == 'done' and selected_stems_run.audio_artifacts %}
+      <div id="stems-player" class="stems-player" style="margin-top:16px"
+           data-master-url="{{ path('workbench_stems_master_audio',{songId:selected_song.id}) }}"
+           data-chords-url="{{ path('lab_chords_experiment',{song:selected_song.id}) }}"
+           data-run-id="{{ selected_stems_run.id }}">
+
+        <div class="transport">
+          <button type="button" id="stems-play">▶ Lire</button>
+          <button type="button" id="stems-stop">■ Stop</button>
+          <span class="transport-time" id="stems-time">00:00.000 / 00:00.000</span>
+          <input type="range" id="stems-seek" min="0" max="1000" value="0" aria-label="Position">
+          <label style="display:flex;flex-direction:row;align-items:center;gap:6px">
+            <input type="checkbox" id="master-enabled" checked>
+            Master
+          </label>
+          <label class="track-volume" style="min-width:180px">
+            <span>Master</span>
+            <input type="range" id="master-volume" min="0" max="100" value="70">
+            <span id="master-volume-value">70%</span>
+          </label>
+        </div>
+
+        <audio id="stems-master" preload="metadata" src="{{ path('workbench_stems_master_audio',{songId:selected_song.id}) }}"></audio>
+
+        {% set current_group = null %}
+        {% for a in selected_stems_run.audio_artifacts %}
+          {% if current_group != a.group %}
+            {% if current_group is not null %}</div>{% endif %}
+            {% set current_group = a.group %}
+            <div class="stem-group" data-group="{{ a.group }}">
+              <h3>{{ a.group }}</h3>
+          {% endif %}
+
+          <div class="stem-track"
+               data-track
+               data-artifact-id="{{ a.artifact_id }}"
+               data-role="{{ a.role }}"
+               data-group="{{ a.group }}"
+               data-harmonic-default="{{ a.harmonic_default ? '1' : '0' }}">
+            <div class="track-name">
+              <strong>{{ a.display_label }}</strong>
+              <code>{{ a.role }} · {{ a.artifact_id }}</code>
+              {% if a.confidence is not null %}
+                <div class="track-confidence">classification {{ (a.confidence * 100)|number_format(1) }}%</div>
+              {% endif %}
+            </div>
+            <button type="button" class="track-btn" data-mute>Mute</button>
+            <button type="button" class="track-btn" data-solo>Solo</button>
+            <label class="track-volume">
+              <input type="range" min="0" max="100" value="100" data-volume>
+              <span data-volume-value>100%</span>
+            </label>
+            <label title="Entrée pour la reconnaissance d'accords">
+              <input type="checkbox" data-chord-input {{ a.harmonic_default ? 'checked' : '' }}>
+              CHORDS
+            </label>
+            <label title="Preuve harmonique pour NO-CHORD">
+              <input type="checkbox" data-no-chord-input {{ a.harmonic_default ? 'checked' : '' }}>
+              N
+            </label>
+            <audio data-audio preload="metadata"
+                   src="{{ path('workbench_stems_artifact_audio',{artifactId:a.artifact_id}) }}"></audio>
+          </div>
+        {% endfor %}
+        {% if current_group is not null %}</div>{% endif %}
+
+        <div class="card" style="margin:0;background:#fafafa">
+          <h3 style="margin-top:0">Sélection scientifique pour CHORDS</h3>
+          <div class="selection-head">
+            <div>Artefact</div><div>CHORDS</div><div>Preuve NO-CHORD</div>
+          </div>
+          <div id="selection-summary"></div>
+          <p class="meta" style="margin-top:10px">
+            Les voix et percussions restent disponibles à l'écoute mais sont exclues par défaut de la preuve harmonique.
+            Les rôles futurs (male/female vocal, organ, saxophone, strings, etc.) apparaîtront automatiquement si le moteur les publie comme artefacts.
+          </p>
+          <a class="button" id="prepare-chords"
+             href="{{ path('lab_chords_experiment',{song:selected_song.id}) }}">
+             Préparer CHORDS avec ce run STEMS
+          </a>
+        </div>
+      </div>
+    {% else %}
+      <div class="player-empty" style="margin-top:14px">
+        Ce run ne possède pas encore d'artefacts audio STEMS utilisables. Le lecteur reste volontairement vide plutôt que d'utiliser les stems cachés du benchmark.
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="player-empty" style="margin-top:14px">
+      Aucun run STEMS scientifique. Lance d'abord STEMS ; CHORDS ne doit pas être alimenté par un cache de benchmark implicite.
+    </div>
+  {% endif %}
+</section>
+
+<section class="card" id="diagnostics">
+  <h2>Diagnostics</h2>
+  {% if selected_stems_run and selected_stems_run.diagnostics %}
+    <pre class="log">{{ selected_stems_run.diagnostics|json_encode(constant('JSON_PRETTY_PRINT')) }}</pre>
+  {% else %}
+    <p class="meta">Les diagnostics STEMS restent attachés au run scientifique.</p>
+  {% endif %}
+</section>
+
+<section class="card" id="comparison">
+  <h2>Comparaisons</h2>
+  <p class="meta">Comparaison multi-runs/moteurs STEMS. Le lecteur permet déjà de basculer entre les runs sans écraser leur historique.</p>
+</section>
+
+<section class="card" id="logs">
+  <h2>Logs</h2>
+  <p class="meta">Les logs d'exécution restent attachés au run technique/scientifique.</p>
+</section>
+
+<section class="card" id="artifacts">
+  <h2>Artefacts</h2>
+  {% if selected_stems_run %}
+  <table>
+    <thead><tr><th>Groupe</th><th>Rôle</th><th>ID</th><th>SHA-256</th><th>Octets</th></tr></thead>
+    <tbody>
+    {% for a in selected_stems_run.audio_artifacts %}
+      <tr>
+        <td>{{ a.group }}</td>
+        <td>{{ a.display_label }}<div class="meta">{{ a.role }}</div></td>
+        <td><code>{{ a.artifact_id }}</code></td>
+        <td><code>{{ a.sha256 }}</code></td>
+        <td>{{ a.metadata.bytes ?? '—' }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5">Aucun artefact audio.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="meta">Aucun run STEMS sélectionné.</p>
+  {% endif %}
+</section>
+
+<script src="/js/stems-mixer-r3b7.js?v=3b7"></script>
+{% endif %}
+{% endblock %}

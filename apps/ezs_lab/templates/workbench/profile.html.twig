@@ -1,0 +1,950 @@
+{% extends 'base.html.twig' %}
+{% block title %}PROFILE · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero"><div><h1>PROFILE</h1><div class="meta">Phase PROFILE de la chaîne : caractérisation globale du master avant STEMS.</div></div></div>
+{% include 'workbench/_song_selector.html.twig' %}
+
+{% if app.request.query.get('oneshot') == 'started' %}<div class="card"><strong>Analyse PROFILE demandée.</strong> Le traitement est inscrit dans la file locale. La progression et le résultat s’affichent automatiquement.</div>{% endif %}
+<section class="card" id="profile-report-publication" style="margin-bottom:12px">
+    <label for="profile-report-publication-enabled">
+        <input
+            type="checkbox"
+            id="profile-report-publication-enabled"
+            {% if profile_report_publication_enabled %}checked{% endif %}
+        >
+        Publier automatiquement sur GitHub après une analyse ou une expertise PROFILE
+    </label>
+    <p class="meta">Décoché : aucun rapport ni journal de publication généré, aucun commit/push.</p>
+    <p id="profile-report-publication-status" role="status" aria-live="polite"></p>
+</section>
+<script>
+(function () {
+    const checkbox = document.getElementById('profile-report-publication-enabled');
+    const status = document.getElementById('profile-report-publication-status');
+    if (!checkbox || !status) return;
+    checkbox.addEventListener('change', async function () {
+        const wanted = checkbox.checked;
+        checkbox.disabled = true;
+        status.textContent = 'Enregistrement…';
+        try {
+            const body = new FormData();
+            body.append('enabled', wanted ? '1' : '0');
+            const response = await fetch('{{ path('profile_report_publication') }}', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-EZS-Reports-Settings': 'save' },
+                body
+            });
+            const result = await response.json();
+            if (!response.ok || result.ok !== true || result.enabled !== wanted) {
+                throw new Error('enregistrement_refusé');
+            }
+            status.textContent = wanted ? 'Publication activée.' : 'Publication désactivée.';
+        } catch (_) {
+            checkbox.checked = !wanted;
+            status.textContent = 'Échec de l’enregistrement ; réglage conservé.';
+        } finally {
+            checkbox.disabled = false;
+        }
+    });
+}());
+</script>
+{% if selected_song %}
+<div class="card">
+<div class="hero">
+<div><h2>{{ selected_song.title }}{% if selected_song.artist %} — {{ selected_song.artist }}{% endif %}</h2><div class="meta">PROFILE ne lance jamais STEMS automatiquement.</div></div>
+<form method="post" action="{{ path('profile_analyze') }}"><input type="hidden" name="song" value="{{ selected_song.id }}"><button type="submit">Analyser le profil</button></form>
+</div>
+</div>
+
+{# Un observateur par chanson, sans rechargement pendant le calcul. #}
+{% if selected_song %}
+<div class="card profile-step-observer" id="profile-step-observer" hidden aria-live="polite">
+  <h2>Progression scientifique PROFILE</h2>
+  <div class="meta" id="profile-step-state">Recherche de l’exécution active…</div>
+  <progress id="profile-step-progress" value="0" max="100" style="width:100%;height:18px">0%</progress>
+  <div class="meta" id="profile-step-current">Étape courante non encore observée.</div>
+  <ol id="profile-step-history" style="margin-top:10px;line-height:1.6"></ol>
+  <button type="button" class="secondary" id="profile-live-cancel" hidden>Annuler cette analyse</button>
+  <div class="meta" id="profile-cancel-response" role="status"></div>
+  <dialog id="profile-cancel-modal" aria-labelledby="profile-cancel-modal-title">
+    <h3 id="profile-cancel-modal-title">Confirmer l’annulation PROFILE</h3>
+    <p id="profile-cancel-modal-detail">Annuler uniquement l’analyse sélectionnée ?</p>
+    <div class="row" style="gap:8px;justify-content:flex-end">
+      <button type="button" class="secondary" id="profile-cancel-dismiss">Conserver l’analyse</button>
+      <button type="button" id="profile-cancel-confirm">Confirmer l’annulation</button>
+    </div>
+  </dialog>
+</div>
+<script>
+(function () {
+  'use strict';
+  const panel=document.getElementById('profile-step-observer');
+  if (!panel) return;
+  const state=document.getElementById('profile-step-state');
+  const bar=document.getElementById('profile-step-progress');
+  const current=document.getElementById('profile-step-current');
+  const history=document.getElementById('profile-step-history');
+  const cancel=document.getElementById('profile-live-cancel');
+  const cancelStatus=document.getElementById('profile-cancel-response');
+  const modal=document.getElementById('profile-cancel-modal');
+  const dismiss=document.getElementById('profile-cancel-dismiss');
+  const confirm=document.getElementById('profile-cancel-confirm');
+  const modalDetail=document.getElementById('profile-cancel-modal-detail');
+  const statusUrl={{ path('profile_oneshot_status',{id:selected_song.id})|json_encode|raw }};
+  const cancellationPattern={{ path('profile_once_cancel',{id:999999999})|json_encode|raw }};
+  const resultUrl={{ path('workbench_profile',{song:selected_song.id})|json_encode|raw }};
+  const requested={{ (app.request.query.get('oneshot') == 'started')|json_encode|raw }};
+  const minimumJob=Number({{ (app.request.query.get('after_job') ?? 0)|json_encode|raw }})||0;
+  let jobId=0, stages=new Set(), hadActive=false, awaitingCancel=false;
+  if (requested) {panel.hidden=false;state.textContent='Lancement demandé ; attente du job LAB.';}
+  function showStage(data) {
+    if (typeof data.stage !== 'string' || !data.stage.trim()) return;
+    current.textContent='Module courant : '+data.stage;
+    const key=data.stage;
+    if (stages.has(key)) return;
+    stages.add(key);
+    const li=document.createElement('li');
+    li.textContent=String(data.progress)+' % · '+key;
+    history.appendChild(li);
+  }
+  async function poll() {
+    try {
+      const response=await fetch(statusUrl,{credentials:'same-origin',cache:'no-store'});
+      if (!response.ok) throw new Error('HTTP '+response.status);
+      const data=await response.json();
+      const newer=Boolean(data.available && Number(data.job_id)>minimumJob);
+      const active=Boolean(data.available && ['queued','running','cancelling'].includes(data.job_status)
+        && (data.state==='queued' || data.state==='running' || data.state==='created'));
+      if (active || (requested && newer) || hadActive) {
+        panel.hidden=false;
+      } else if (!requested) {
+        panel.hidden=true;
+      }
+      if (data.available && (active || requested && newer || hadActive)) {
+        if (Number(data.job_id)!==jobId) {
+          jobId=Number(data.job_id);stages=new Set();history.replaceChildren();
+          awaitingCancel=false;cancel.disabled=false;
+        }
+        hadActive=hadActive||active;
+        bar.value=Math.max(0,Math.min(100,Number(data.progress)||0));
+        state.textContent='Job LAB #'+jobId+' · run #'+Number(data.run_id)+' · '
+          +data.job_status+' · '+bar.value+' %';
+        if (data.job_status==='queued') current.textContent='En attente dans la file locale.';
+        else showStage(data);
+        cancel.hidden=!active || !['queued','running'].includes(data.job_status) || awaitingCancel;
+        if (data.job_status==='cancelling') {
+          cancel.hidden=true;cancelStatus.textContent='Annulation demandée ; attente de l’arrêt confirmé.';
+        }
+        if (['completed','cancelled','failed'].includes(data.job_status) || ['done','error','cancelled'].includes(data.state)) {
+          cancel.hidden=true;
+          const runId=Number(data.run_id);
+          const validRun=Number.isSafeInteger(runId) && runId>0;
+          const destination=validRun ? resultUrl+(resultUrl.includes('?')?'&':'?')+'run='+encodeURIComponent(String(runId)) : '';
+          // Navigate once to the completed run; never redirect an error or cancellation.
+          // The result URL has no 'oneshot=started' flag, preventing a navigation loop.
+          if (data.job_status==='completed' && data.state==='done' && bar.value===100
+              && validRun && (hadActive || (requested && newer))) {
+            state.textContent='Analyse terminée. Affichage du résultat PROFILE…';
+            window.location.assign(destination);
+            return;
+          }
+          if (validRun && !panel.querySelector('a')) {
+            const a=document.createElement('a');
+            a.href=destination;
+            a.textContent='Consulter le run #'+runId;
+            panel.appendChild(a);
+          }
+          if (data.job_status==='cancelled') cancelStatus.textContent='Annulation confirmée.';
+          return;
+        }
+      } else if (requested && !newer) {
+        state.textContent='Lancement demandé, mais aucun nouveau job LAB attesté.';
+      }
+    } catch (error) {
+      panel.hidden=false;
+      state.textContent='Observation indisponible : '+error.message;
+    }
+    window.setTimeout(poll,2000);
+  }
+  cancel.addEventListener('click',function () {
+    if (!jobId || awaitingCancel) return;
+    modalDetail.textContent='Annuler uniquement le job LAB #'+jobId+' ?';
+    modal.showModal();
+  });
+  dismiss.addEventListener('click',function () { modal.close(); });
+  confirm.addEventListener('click',async function () {
+    if (!jobId || awaitingCancel) return;
+    modal.close();
+    awaitingCancel=true;cancel.disabled=true;
+    cancelStatus.textContent='Transmission de la demande…';
+    try {
+      const url=cancellationPattern.replace('999999999',String(jobId));
+      const response=await fetch(url,{
+        method:'POST',credentials:'same-origin',
+        headers:{'X-EZS-Profile-Cancel':'request'}
+      });
+      const data=await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.reason||'HTTP '+response.status);
+      cancelStatus.textContent=data.message||'Demande transmise.';
+      cancel.hidden=true;
+    } catch (error) {
+      cancelStatus.textContent='Annulation refusée : '+error.message;
+      awaitingCancel=false;cancel.disabled=false;
+      cancel.textContent='Annuler cette analyse';
+    }
+  });
+  poll();
+})();
+</script>
+{% endif %}
+<details class="card" style="margin-top:10px">
+<summary style="cursor:pointer;font-weight:600">Corriger le titre et l’interprète</summary>
+<form id="song-identity-form" action="{{ path('profile_song_identity', {id: selected_song.id}) }}" method="post" style="margin-top:12px">
+<div class="row" style="gap:12px;align-items:end;flex-wrap:wrap">
+<label>Titre<input name="title" type="text" maxlength="250" required value="{{ selected_song.title }}" style="min-width:260px"></label>
+<label>Interprète<input name="artist" type="text" maxlength="250" required value="{{ selected_song.artist }}" style="min-width:260px"></label>
+<button type="submit">Enregistrer</button>
+</div>
+<p class="meta" style="margin-top:8px">Corrige les métadonnées du morceau, sans relancer PROFILE ni modifier les analyses.</p>
+<p id="song-identity-message" role="status" aria-live="polite"></p>
+</form>
+</details>
+<script>
+document.getElementById('song-identity-form')?.addEventListener('submit', async function(event) {
+  event.preventDefault();
+  const button = this.querySelector('button[type="submit"]');
+  const status = document.getElementById('song-identity-message');
+  button.disabled = true;
+  status.textContent = 'Enregistrement…';
+  try {
+    const response = await fetch(this.action, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'X-EZS-Song-Identity': 'save'},
+      body: new FormData(this)
+    });
+    if (!response.ok) throw new Error((await response.text()).slice(0,240));
+    window.location.reload();
+  } catch (error) {
+    status.textContent = 'Échec : ' + error.message;
+    button.disabled = false;
+  }
+});
+</script>
+
+{% if profile_runs %}
+<div class="card"><form method="get" action="{{ path('workbench_profile') }}" class="row"><input type="hidden" name="song" value="{{ selected_song.id }}"><label>Run PROFILE<select name="run" onchange="this.form.submit()">{% for r in profile_runs %}<option value="{{ r.id }}" {{ selected_profile_run and r.id == selected_profile_run.id ? 'selected' : '' }}>{{ r.public_id }} · {{ r.state }} · {{ r.created_at }}</option>{% endfor %}</select></label></form></div>
+{% endif %}
+
+{% if selected_profile_run %}
+
+  {% set job_status = selected_profile_run.state in ['done','error','running'] ? selected_profile_run.state : (profile_job and profile_job.status is defined ? profile_job.status : selected_profile_run.state) %}
+  {% set profile_percent = selected_profile_run.state in ['done','running'] ? (selected_profile_run.labels.progress ?? 0) : (profile_job and profile_job.progress is defined ? profile_job.progress : (selected_profile_run.labels.progress ?? 0)) %}
+  {% set profile_active = selected_profile_run.state not in ['done','error'] and (job_status in ['queued','running','cancel_requested'] or selected_profile_run.state in ['queued','running']) %}
+
+  {% if job_status == 'queued' %}
+    <div class="card">
+      <h2>PROFILE en attente (historique)</h2>
+      <div class="meta">Job #{{ profile_job.id ?? '—' }} · en attente (analyse historique, aucune FIFO active) · {{ profile_percent }}%</div>
+      <progress value="{{ profile_percent }}" max="100" style="width:100%;height:18px">{{ profile_percent }}%</progress>
+    </div>
+  {% elseif job_status in ['running','cancel_requested'] and not (profile_job and profile_job.dispatch_owner == 'lab') %}
+    <div class="card">
+      <h2>Progression PROFILE</h2>
+      <div class="meta" style="margin-bottom:5px">Job #{{ profile_job.id ?? '—' }} · {{ job_status }} · {{ profile_percent }}%</div>
+      <progress value="{{ profile_percent }}" max="100" style="width:100%;height:18px">{{ profile_percent }}%</progress>
+    </div>
+  {% elseif job_status in ['failed','cancelled'] or selected_profile_run.state == 'error' %}
+    <div class="card">
+      <h2>PROFILE en erreur</h2>
+      <div class="meta">{{ profile_job.error ?? selected_profile_run.labels.last_error ?? 'Erreur non détaillée.' }}</div>
+    </div>
+  {% endif %}
+
+  {# L’observateur local assure le suivi de la progression. #}
+{% if selected_profile_run.state == 'done' %}
+{% set completed_modules = selected_profile_run.diagnostics.module_registry.modules ?? [] %}
+{% if completed_modules is not empty %}
+<div class="card" id="profile-modules-termines">
+  <h2>Étapes scientifiques terminées — run #{{ selected_profile_run.id }}</h2>
+  <ol style="line-height:1.7">
+  {% for m in completed_modules %}
+    <li>
+      <strong>{{ m.display_name ?? m.name ?? m.module_id ?? m.id ?? m.family ?? 'Module' }}</strong>
+      {% if m.device is defined %}<span class="meta">· {{ m.device }}</span>{% endif %}
+      {% if m.timing.elapsed_seconds is defined %}
+        <span class="meta">· {{ m.timing.elapsed_seconds|number_format(2) }} s</span>
+      {% endif %}
+    </li>
+  {% endfor %}
+  </ol>
+  <p class="meta">Modules issus du résultat scientifique enregistré ; aucun état inventé.</p>
+</div>
+{% endif %}
+{% endif %}
+{% set p = selected_profile_run.metrics %}
+{% set t = selected_profile_run.diagnostics.tagging ?? {} %}
+<div class="card"><h2>Caractéristiques</h2><div class="kv">
+<div>État</div><div><span class="badge {{ selected_profile_run.state == 'done' ? 'ok' : (selected_profile_run.state == 'error' ? 'warn' : '') }}">{{ selected_profile_run.state }}</span></div>
+<div>Tempo</div><div>{% if p.tempo.bpm is defined %}{{ p.tempo.bpm|number_format(2) }} BPM{% else %}—{% endif %}</div>
+<div>Signature</div><div>{% if p.time_signature.label is defined and p.time_signature.label %}{{ p.time_signature.label }} · {{ (p.time_signature.confidence * 100)|number_format(0) }}%{% elseif p.time_signature.suggested_label is defined and p.time_signature.suggested_label %}Indéterminée · suggestion {{ p.time_signature.suggested_label }} · {{ (p.time_signature.confidence * 100)|number_format(0) }}%{% else %}Indéterminée{% endif %}</div>
+<div>Tonalité</div><div>{% if p.key.label is defined and p.key.label %}{{ p.key.label }} · {{ (p.key.confidence * 100)|number_format(0) }}%{% else %}—{% endif %}</div>
+<div>Durée</div><div>{% if p.duration_seconds is defined %}{{ p.duration_seconds|number_format(1) }} s{% else %}—{% endif %}</div>
+</div></div>
+
+{% if profile_summary %}
+<div class="card profile-summary">
+  <h2>Résumé du profil</h2>
+  <p style="font-size:14px;line-height:1.55;margin:0 0 12px">{{ profile_summary.text }}</p>
+  <div class="summary-grid">
+    <div><span>Tempo</span><strong>{% if profile_summary.tempo_bpm is not null %}{{ profile_summary.tempo_bpm|number_format(0) }} BPM · {{ profile_summary.tempo_qualifier }}{% else %}—{% endif %}</strong></div>
+    <div><span>Signature</span><strong>{{ profile_summary.meter ?? '—' }}</strong></div>
+    <div><span>Tonalité</span><strong>{{ profile_summary.key ?? '—' }}</strong></div>
+    <div><span>AudioSet retenu</span><strong>{{ profile_summary.audioset_accepted ? profile_summary.audioset_accepted|join(', ') : '—' }}</strong></div>
+  </div>
+  {% if profile_summary.genres %}<div class="summary-line"><strong>Genres suggérés</strong> · {% for x in profile_summary.genres %}{{ x.label }} ({{ (x.score*100)|number_format(1) }} %){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+  {% if profile_summary.moods %}<div class="summary-line"><strong>Ambiances</strong> · {% for x in profile_summary.moods %}{{ x.label }} ({{ (x.score*100)|number_format(1) }} %){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+  {% if profile_summary.instrumentation %}<div class="summary-line"><strong>Instrumentation probable</strong> · {% for x in profile_summary.instrumentation %}{{ x.label }} ({% if x.score is not null %}{{ (x.score*100)|number_format(1) }} %{% else %}score non calibré{% endif %}){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+  {% if profile_summary.voice %}<div class="summary-line"><strong>Voix</strong> · {% for x in profile_summary.voice %}{{ x.label }} ({{ (x.score*100)|number_format(1) }} %){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+  {% if profile_summary.audioset_contextual %}<div class="summary-line"><strong>Autres éléments sonores conservés dans le résultat d’analyse</strong> · {{ profile_summary.audioset_contextual|join(', ') }}</div>{% endif %}
+  <div class="meta" style="margin-top:10px">{{ profile_summary.notice }}</div>
+</div>
+<style>
+.profile-summary .summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}.profile-summary .summary-grid>div{background:#1d2935;color:#ecf3fa;border:1px solid var(--line);border-radius:5px;padding:8px 10px}.profile-summary .summary-grid span{display:block;font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em}.profile-summary .summary-grid strong{font-size:13px;color:#ecf3fa;overflow-wrap:anywhere}.profile-summary p{overflow-wrap:anywhere;white-space:normal}.profile-summary{min-width:0;overflow-wrap:anywhere}.profile-summary .summary-line{font-size:12px;line-height:1.55;padding:4px 0}@media(max-width:900px){.profile-summary .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+{% endif %}
+
+{# PROFILE_R3D_AI_REVIEW — consultation, aucune promotion de preset #}
+{% if selected_profile_run.state == 'done' %}
+    <div class="card profile-ai-review" id="profile-ai-revisions">
+        {% include 'workbench/profile_ai_button.html.twig' %}
+<h2>Révision IA du profil</h2>
+        <p class="meta">
+            Avis consultatif de l’Assistant, distinct des mesures scientifiques.
+            Une inférence terminée ne constitue pas une validation externe.
+        </p>
+        {% if profile_external_revisions is empty %}
+            <p>
+                Aucune révision IA enregistrée pour cette analyse.
+                La publication de l’Assistant est nécessaire pour afficher ses conclusions.
+            </p>
+        {% else %}
+            {% for revision in profile_external_revisions %}
+                {% if loop.index == 2 %}
+                    <details class="profile-ai-history">
+                        <summary>Historique des révisions ({{ profile_external_revisions|length - 1 }})</summary>
+                {% endif %}
+                {% set ai = revision.consensus.assistant_ai ?? {} %}
+                {% set comparison = revision.comparison.assistant_ai ?? {} %}
+                {% set dimensions = comparison.dimensions ?? {} %}
+                {% set external = revision.comparison.external_validation ?? {} %}
+                <section class="profile-ai-revision" id="profile-ai-revision-{{ revision.id }}">
+                    <div class="row">
+                        <strong>
+                            Révision #{{ revision.id }} ·
+                            {{ revision.status == 'completed' ? 'Terminée' : 'Brouillon' }}
+                        </strong>
+                        <span class="meta">
+                            {{ revision.reviewer }} · {{ revision.updated_at }} ·
+                            {% if (ai.provider ?? '') != 'independent-evidence-verifier' %}confiance historique {{ (revision.confidence * 100)|number_format(0) }} %{% else %}vérification indépendante{% endif %}
+                        </span>
+                    </div>
+                    <p class="meta">
+                        {% if (ai.provider ?? '') == 'independent-evidence-verifier' %}
+                            Vérificateur indépendant · résultats documentaires uniquement
+                        {% else %}
+                            IA historique : {{ ai.status ?? 'non renseigné' }} ·
+                            {{ ai.provider ?? 'inconnu' }} ·
+                            {{ ai.model ?? 'modèle non renseigné' }}
+                        {% endif %}
+                    </p>
+                    {% if not (external.available ?? false) %}
+                        <p class="meta">
+                            <strong>Non révisé sur preuves externes :</strong>
+                            aucune validation indépendante établie.
+                        </p>
+                    {% else %}
+                        <p class="meta">
+                            Comparaison externe indiquée : examiner les références avant validation.
+                        </p>
+                    {% endif %}
+                    {# Consultative documentary catalogue metadata: never an authoritative LAB edit. #}
+                    {% set documentary = revision.comparison.documentary_catalogue_suggestions ?? {} %}
+                    {% if documentary is not empty %}
+                        <section class="profile-documentary-suggestions">
+                            <h3>Identité musicale et crédits proposés par l’Assistant</h3>
+                            <p class="meta">Données documentaires consultatives. À confirmer avant toute modification du catalogue.</p>
+                            {% set document_title = documentary.work.full_title ?? {} %}
+                            <p><strong>Titre complet :</strong> {{ document_title.value ?? 'Non documenté' }}
+                                <span class="meta">({{ document_title.status ?? 'inconnu' }})</span></p>
+                            {% set document_performers = documentary.recording.performers ?? [] %}
+                            <p><strong>Interprète(s) :</strong>
+                                {% if document_performers is empty %}Non documenté{% else %}
+                                    {% for person in document_performers %}
+                                        {{ person.value ?? 'Non documenté' }} ({{ person.status ?? 'inconnu' }}){{ not loop.last ? ', ' : '' }}
+                                    {% endfor %}
+                                {% endif %}
+                            </p>
+                            {% for group in [
+                                {'label':'Paroliers / auteurs','values': documentary.work.lyricists ?? []},
+                                {'label':'Compositeurs','values': documentary.work.composers ?? []},
+                                {'label':'Arrangeurs','values': documentary.recording.arrangers ?? []}
+                            ] %}
+                                <p><strong>{{ group.label }} :</strong>
+                                {% if group.values is empty %}Non documenté{% else %}
+                                    {% for person in group.values %}
+                                        {{ person.value ?? 'Non documenté' }} ({{ person.status ?? 'inconnu' }}){{ not loop.last ? ', ' : '' }}
+                                    {% endfor %}
+                                {% endif %}
+                                </p>
+                            {% endfor %}
+                            {% set musician_credits = documentary.recording.musician_credits ?? [] %}
+                            {% if musician_credits is not empty %}
+                                <p><strong>Musiciens crédités pour l’enregistrement :</strong></p>
+                                <ul>
+                                {% for credit in musician_credits %}
+                                    <li>{{ credit.name }} — {{ credit.role }} ({{ credit.status ?? 'candidat' }})</li>
+                                {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% set source_links = documentary.consulted_identity_sources ?? [] %}
+                            {% if source_links is not empty %}
+                                <p><strong>Références consultées :</strong></p>
+                                <ul>
+                                    {% for url in source_links %}
+                                        {% if url starts with 'https://' %}
+                                            <li><a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ url }}</a></li>
+                                        {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </section>
+                    {% endif %}
+                    {# LAB values are ALWAYS rendered; verification may be absent on historical revisions. #}
+                    {% set pv_music = selected_profile_run.diagnostics.profile_view ?? {} %}
+                    {% set voice_music = pv_music.vocal_profile.dimensions ?? {} %}
+                    {% set verified_rows = revision.comparison.final_verification.assertions ?? [] %}
+                    {% set web_investigation = revision.comparison.final_verification.web_investigation ?? {} %}
+                    {% set web_items = web_investigation.items ?? [] %}
+                    {% set lab_rows = [
+                        {'key':'duration','label':'Durée','value':p.duration_seconds is defined and p.duration_seconds is not null and p.duration_seconds > 0 ? (p.duration_seconds / 60)|round(0, 'floor') ~ ':' ~ '%02d'|format((p.duration_seconds % 60)|round(0, 'floor')) : null},
+                        {'key':'tempo','label':'Tempo','value':p.tempo.bpm is defined and p.tempo.bpm is not null ? p.tempo.bpm|number_format(1) ~ ' BPM' : null},
+                        {'key':'meter','label':'Mesure','value':p.time_signature.label ?? p.time_signature.suggested_label ?? null},
+                        {'key':'key','label':'Tonalité','value':pv_music.tonal.label ?? p.key.label ?? null},
+                        {'key':'genre','label':'Genre musical','value':pv_music.genre_hierarchy.primary.genre ?? null}
+                    ] %}
+                    {% set instrument_labels = [] %}
+                    {% for instrument in pv_music.instrumentation.candidates ?? [] %}
+                        {% if instrument.label ?? '' %}
+                            {% set instrument_labels = instrument_labels|merge([instrument.label]) %}
+                        {% endif %}
+                    {% endfor %}
+                    {% for instrument_label in instrument_labels %}
+                        {% set lab_rows = lab_rows|merge([{'key':'instrument:' ~ loop.index0,'label':'Instrument ' ~ loop.index,'value':instrument_label}]) %}
+                    {% endfor %}
+                    {% set lab_rows = lab_rows|merge([
+                        {'key':'lead_vocal','label':'Voix principale','value':(voice_music.lead_vocal.decision ?? '') in ['present','detected'] ? 'Présente' : ((voice_music.lead_vocal.decision ?? '') == 'absent' ? 'Absente' : null)},
+                        {'key':'backing_vocals','label':'Voix d’accompagnement','value':(voice_music.backing_vocals.decision ?? '') in ['present','detected'] ? 'Présentes' : ((voice_music.backing_vocals.decision ?? '') == 'absent' ? 'Absentes' : null)},
+                        {'key':'vocal_harmonies','label':'Harmonies vocales','value':(voice_music.vocal_harmonies.decision ?? '') in ['present','detected'] ? 'Présentes' : ((voice_music.vocal_harmonies.decision ?? '') == 'absent' ? 'Absentes' : null)},
+                        {'key':'choir','label':'Chœurs','value':(voice_music.choir.decision ?? pv_music.choirs.decision ?? '') in ['present','detected'] ? 'Présents' : ((voice_music.choir.decision ?? pv_music.choirs.decision ?? '') == 'absent' ? 'Absents' : null)}
+                    ]) %}
+                    <p class="meta">Analyse #{{ selected_profile_run.public_id ?? selected_profile_run.id }} · Preset #{{ selected_profile_run.config.preset_id ?? selected_profile_run.config.preset_number ?? 'non renseigné' }} · Interprète et titre déclarés (à confirmer)</p>
+                    <h3>Résultats musicaux PROFILE</h3>
+                    <p class="meta">Chaque proposition musicale LAB est vérifiée séparément. BON ou FAUX exigent une source indépendante du même enregistrement ; sinon NON TROUVÉ. Aucun pourcentage non calibré.</p>
+                    {% if web_investigation is not empty and (web_investigation.status ?? '') != 'completed' %}
+                        <p class="meta"><strong>Recherche Internet indisponible</strong> — {{ web_investigation.reason ?? 'fournisseur Web non opérationnel' }}. Aucun résultat documentaire n'a été produit par cette étape.</p>
+                    {% elseif web_investigation is empty %}
+                        <p class="meta"><strong>Recherche Internet non exécutée</strong> pour cette révision (historique ou worker antérieur).</p>
+                    {% endif %}
+                    <style>
+                    .profile-verdict {font-weight:700;display:inline-block;padding:3px 9px;border-radius:5px}
+                    .profile-verdict--good {color:#93edb9;background:#173a2b;border:1px solid #327e58}
+                    .profile-verdict--bad {color:#ffb3b3;background:#46232a;border:1px solid #aa4855}
+                    .profile-verdict--unknown {color:#c8d0db;background:#303842;border:1px solid #657181}
+                    .profile-verdict--match {color:#a0d6ff;background:#1b3852;border:1px solid #467faa}
+                    .profile-verdict--conflict {color:#ffd596;background:#4b321a;border:1px solid #a77a3d}
+                    </style>
+                    <table class="profile-results-simple">
+                        <thead><tr><th>Caractéristique</th><th>LAB : valeur</th><th>ASSISTANT : résultat</th></tr></thead>
+                        <tbody>
+                        {% for lab_row in lab_rows %}
+                            {% set verdict_row = {} %}
+                            {% for candidate in verified_rows %}
+                                {% if (candidate.key ?? '') == lab_row.key and (
+                                    ((candidate.value ?? '')|lower == (lab_row.value ?? '')|lower)
+                                    or (lab_row.key in ['lead_vocal','backing_vocals','vocal_harmonies','choir']
+                                        and (((candidate.value ?? '') == 'présent' and (lab_row.value ?? '') in ['Présente','Présentes','Présents'])
+                                          or ((candidate.value ?? '') == 'absent' and (lab_row.value ?? '') in ['Absente','Absentes','Absents'])))
+                                ) %}
+                                    {% set verdict_row = candidate %}
+                                {% endif %}
+                            {% endfor %}
+                            {% set web_item = {} %}
+                            {% for web_candidate in web_items %}
+                                {% if (web_candidate.key ?? '') == lab_row.key %}
+                                    {% set web_item = web_candidate %}
+                                {% endif %}
+                            {% endfor %}
+                            <tr>
+                                <td><strong>{{ lab_row.label }}</strong></td>
+                                <td>{{ lab_row.value ?? '—' }}</td>
+                                <td>
+                                    {% if lab_row.value is null %}
+                                        <span class="meta">SANS VALEUR LAB — aucune proposition à vérifier</span>
+                                    {% elseif (web_item.status ?? '') == 'error' %}
+                                        <strong>ERREUR TECHNIQUE</strong>
+                                        <p class="meta">{{ web_item.reason ?? 'Recherche Internet impossible' }}</p>
+                                    {% elseif verdict_row is empty %}
+                                        <span class="meta">NON TROUVÉ — aucune preuve externe admissible pour cette valeur</span>
+                                    {% else %}
+                                        {% set verdict = verdict_row.verdict ?? 'non_trouve' %}
+                                        <span class="profile-verdict {{ verdict == 'bon' ? 'profile-verdict--good' : (verdict == 'faux' ? 'profile-verdict--bad' : 'profile-verdict--unknown') }}">{{ verdict == 'bon' ? 'BON' : (verdict == 'faux' ? 'FAUX' : (verdict == 'sans_valeur_lab' ? 'SANS VALEUR LAB' : 'NON TROUVÉ')) }}</span>
+                                        {% if verdict in ['bon','faux'] and verdict_row.confidence_pct is defined and verdict_row.confidence_pct is not null %}
+                                            · {{ verdict_row.confidence_pct|number_format(0) }} %
+                                        {% endif %}
+                                        {% if verdict in ['bon','faux'] %}
+                                            {% for source in verdict_row.sources ?? [] %}
+                                                {% if source.url is defined and source.url starts with 'https://' %}
+                                                    · <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer">{{ source.title ?? 'Source' }}</a>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if verdict_row.reason ?? '' %}
+                                        <p class="meta">Motif du verdict : {{ verdict_row.reason }}</p>
+                                    {% elseif verdict_row is empty and lab_row.value is not null and (web_item.reason ?? '') %}
+                                        <p class="meta">Motif documentaire : {{ web_item.reason }}</p>
+                                    {% endif %}
+                                    {% set observation = verdict_row.documentary_observation ?? {} %}
+                                    {% if observation is not empty %}
+                                        <div class="profile-documentary-observation">
+                                            <span class="profile-verdict {{ observation.comparison == 'concordant' ? 'profile-verdict--match' : (observation.comparison == 'discordant' ? 'profile-verdict--conflict' : 'profile-verdict--unknown') }}">Comparaison documentaire : {{ observation.comparison == 'concordant' ? 'CONCORDANTE' : (observation.comparison == 'discordant' ? 'DISCORDANTE' : 'INDÉTERMINÉE') }}</span>
+                                            {% if observation.reference_value ?? '' %}
+                                                <p>Valeur documentaire : {{ observation.reference_value }}</p>
+                                            {% endif %}
+                                            <p class="meta">Enregistrement exact non confirmé · conclusion scientifique inchangée.</p>
+                                            {% for url in observation.citations ?? [] %}
+                                                {% if url starts with 'https://' %}
+                                                    <a href="{{ url }}" target="_blank" rel="noopener noreferrer">Source {{ loop.index }}</a>{{ not loop.last ? ' · ' : '' }}
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    {% if web_item is not empty %}
+                                        <details class="profile-web-evidence">
+                                            <summary>Recherche Internet — {{ (web_item.status ?? '') == 'discovered' ? 'sources repérées' : ((web_item.status ?? '') == 'error' ? 'erreur' : 'aucune preuve scientifique validée') }}</summary>
+                                            <p class="meta">Références documentaires consultées, mais non admissibles à elles seules comme preuve scientifique. Elles peuvent étayer une concordance ou une discordance provisoire.</p>
+                                            {% set live_evidence = web_item.evidence_review ?? {} %}
+                                            {% if live_evidence is not empty %}
+                                                <p><strong>Évaluation des documents lus : {{ (live_evidence.verdict ?? 'non_trouve')|upper }}</strong> — {{ live_evidence.reason ?? '' }}</p>
+                                                {% if live_evidence.reference_value ?? '' %}
+                                                    <p>Valeur externe explicite : {{ live_evidence.reference_value }}</p>
+                                                {% endif %}
+                                                {% for reference in live_evidence.references ?? [] %}
+                                                    {% if (reference.url ?? '') starts with 'https://' %}
+                                                        <p><a href="{{ reference.url }}" target="_blank" rel="noopener noreferrer">{{ reference.url }}</a> : {{ reference.reference_value ?? '' }}</p>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                <p class="meta">Évaluation documentaire distincte du verdict PROFILE définitif ; version musicale exacte à confirmer.</p>
+                                            {% endif %}
+                                            {% set assessment = web_item.assessment ?? {} %}
+                                            {% if assessment.status_of_verdict ?? '' == 'advisory_only_pending_source_authentication' %}
+                                                <p><strong>Avis de recherche (non validé) : {{ assessment.proposed_verdict ?? 'NON TROUVE' }}</strong>
+                                                {% if assessment.reference_value ?? '' %} · Valeur externe proposée : {{ assessment.reference_value }}{% endif %}</p>
+                                                {% if assessment.reasoning ?? '' %}<p class="meta">{{ assessment.reasoning }}</p>{% endif %}
+                                                {% for reference in assessment.references ?? [] %}
+                                                    {% if reference.url is defined and reference.url starts with 'https://' %}
+                                                        <p class="meta">Référence citée : <a href="{{ reference.url }}" target="_blank" rel="noopener noreferrer">{{ reference.url }}</a>
+                                                        · {{ reference.reference_value ?? '' }} · {{ reference.trust_rationale ?? '' }}</p>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endif %}
+                                            {% if (web_item.citation_urls ?? []) is not empty %}
+                                                <ul>
+                                                    {% for source_url in web_item.citation_urls %}
+                                                        {% if source_url starts with 'https://' %}
+                                                            <li><a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">{{ source_url }}</a></li>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <p class="meta">Aucune référence Web citée pour cet item.</p>
+                                            {% endif %}
+                                            {% if web_item.investigator_text ?? '' %}
+                                                <p class="meta">{{ web_item.investigator_text }}</p>
+                                            {% endif %}
+                                            {% if web_item.reason ?? '' %}
+                                                <p class="meta">Diagnostic : {{ web_item.reason }}</p>
+                                            {% endif %}
+                                        </details>
+                                    {% elseif web_investigation is not empty %}
+                                        <span class="meta"> · Recherche Internet non disponible pour cet item</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    <details class="profile-ai-technical">
+                        <summary>Analyse transversale, validation et diagnostics (détails)</summary>
+                    {# Separate consultative musical interpretation from external proof/scoring. #}
+                    {% set musical_dimensions = revision.comparison.dimension_advisories.dimensions ?? {} %}
+                                        <table>
+                        <thead>
+                            <tr>
+                                <th>Dimension</th>
+                                <th>Observation LAB</th><th>Avis Qwen</th><th>Validation externe</th>
+                                <th>Confiance IA</th>
+                                <th>Indices LAB / références</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key, label in {
+                                'genre': 'Genre',
+                                'instrumentation': 'Instrumentation',
+                                'lead_vocal': 'Voix principale',
+                                'backing_vocals': 'Voix d’accompagnement',
+                                'choir': 'Chœurs'
+                            } %}
+                                {% set item = attribute(dimensions, key) ?? (key == 'lead_vocal' ? (dimensions.lead_vocals ?? {}) : {}) %}
+                                <tr>
+                                    <td><strong>{{ label }}</strong></td>
+                                    <td>{% if key == 'genre' %}{{ selected_profile_run.diagnostics.profile_view.genre_hierarchy.primary.genre ?? '—' }}{% elseif key == 'instrumentation' %}{% for ins in selected_profile_run.diagnostics.profile_view.instrumentation.candidates ?? [] %}{{ ins.label ?? '—' }}{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}{% else %}{{ attribute(selected_profile_run.diagnostics.profile_view.vocal_profile.dimensions ?? {}, key).decision ?? '—' }}{% endif %}</td><td>{% if item.advisory is defined and item.advisory %}
+<strong>{{ item.advisory }}</strong>
+<div class="meta">Certitude consultative : {{ item.certainty ?? 'indéterminée' }} (non calibrée)</div>
+{% if item.recommendation is defined and item.recommendation %}<div class="meta">À examiner : {{ item.recommendation }}</div>{% endif %}
+{% elseif item.rationale is defined and item.rationale|trim is not empty %}
+{{ item.rationale }}
+{% else %}
+{% set musical_advice = attribute(musical_dimensions, key) ?? {} %}
+{% if musical_advice.advisory ?? '' %}
+    <div>{{ musical_advice.advisory }}</div>
+    <div class="meta">Incertitude : {{ musical_advice.uncertainty ?? 'non précisée' }}</div>
+    <div class="meta">Moteurs consultés : {{ (musical_advice.contributors ?? [])|join(', ') ?: 'aucun' }} · avis non validé</div>
+{% else %}
+    <span class="meta">Synthèse musicale indisponible pour cette révision. Consulter les modules ci-dessous.</span>
+{% endif %}
+{% endif %}</td><td>{{ item.decision ?? 'Non évalué' }}{% if item.reason is defined and item.reason|trim is not empty %}<div class="meta">Motif : {{ item.reason }}</div>{% endif %}</td>
+                                    <td>
+                                        {% if item.confidence is defined and item.confidence is not null %}
+                                            {{ (item.confidence * 100)|number_format(0) }} %
+                                        {% else %}
+                                            Non calibrée
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.evidence is defined and item.evidence %}
+                                            <details>
+                                                <summary>Consulter les indices</summary>
+                                                {% if item.evidence is iterable %}
+                                                    <ul>
+                                                        {% for evidence in item.evidence %}
+                                                            <li>
+                                                                {% if evidence is iterable %}
+                                                                    {{ evidence.label ?? evidence.module ?? 'Indice' }}
+                                                                    {% if evidence.module is defined %}
+                                                                        · {{ evidence.module }}
+                                                                    {% endif %}
+                                                                    {% if evidence.score is defined %}
+                                                                        · score relatif {{ evidence.score }}
+                                                                    {% endif %}
+                                                                {% else %}
+                                                                    {{ evidence }}
+                                                                {% endif %}
+                                                            </li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                {% else %}
+                                                    {{ item.evidence }}
+                                                {% endif %}
+                                            </details>
+                                        {% else %}
+                                            {% if key == 'genre' %}Observation LAB : {{ selected_profile_run.diagnostics.profile_view.genre_hierarchy.primary.genre ?? 'non renseignée' }} ; aucune preuve externe retenue
+{% elseif key == 'instrumentation' %}Candidats LAB : {% for ins in selected_profile_run.diagnostics.profile_view.instrumentation.candidates ?? [] %}{{ ins.label ?? '?' }}{% if ins.source_count is defined %} ({{ ins.source_count }} moteurs){% endif %}{% if not loop.last %}, {% endif %}{% else %}aucun{% endfor %} ; aucune preuve externe retenue
+{% else %}Observation LAB : {{ attribute(selected_profile_run.diagnostics.profile_view.vocal_profile.dimensions ?? {}, key).decision ?? 'non renseignée' }} ; aucune preuve externe retenue{% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% set module_review = revision.comparison.module_consultations ?? {} %}
+                    {% set module_results = module_review.results ?? [] %}
+                    {% if module_results is not empty %}
+                        <details class="profile-ai-modules" {% if loop.first %}open{% endif %}>
+                            <summary>Consultations Qwen par module — {{ module_review.examined ?? module_results|length }}/{{ module_review.item_total ?? '?' }} · {{ (module_review.complete ?? false) ? 'couverture complète' : 'couverture partielle' }} · avis non validés</summary>
+                            <p class="meta">Les résumés ci-dessous sont des hypothèses IA issues des sorties scientifiques, pas une écoute de l'audio ni une validation documentaire. Les contradictions absentes ne prouvent pas un consensus.</p>
+                            <table>
+                                <thead><tr><th>Module</th><th>Statut / durée</th><th>Avis Qwen consultatif</th><th>Incertitude et indices</th></tr></thead>
+                                <tbody>
+                                {% for module in module_results %}
+                                    {% set opinion = module.assessment ?? {} %}
+                                    <tr>
+                                        <td><strong>{{ module.index ?? loop.index }}. {{ module.item_id ?? 'Module inconnu' }}</strong><div class="meta">Source SHA-256 : {{ module.source_sha256 ?? 'non fournie' }}</div></td>
+                                        <td>{{ module.status ?? 'inconnu' }}<div class="meta">{{ module.duration_ms ?? '?' }} ms</div></td>
+                                        <td>{{ opinion.summary ?? 'Avis non fourni' }}</td>
+                                        <td>
+                                            <strong>Incertitude :</strong> {{ opinion.uncertainty ?? 'non renseignée' }}
+                                            {% if opinion.supporting_evidence ?? [] %}
+                                                <details><summary>Indices invoqués ({{ opinion.supporting_evidence|length }})</summary>
+                                                    <ul>{% for evidence in opinion.supporting_evidence %}<li>{{ evidence is iterable ? (evidence|json_encode) : evidence }}</li>{% endfor %}</ul>
+                                                </details>
+                                            {% endif %}
+                                            {% if opinion.conflicting_evidence ?? [] %}
+                                                <details><summary>Contradictions signalées ({{ opinion.conflicting_evidence|length }})</summary>
+                                                    <ul>{% for evidence in opinion.conflicting_evidence %}<li>{{ evidence is iterable ? (evidence|json_encode) : evidence }}</li>{% endfor %}</ul>
+                                                </details>
+                                            {% else %}<div class="meta">Aucune contradiction signalée par Qwen (non vérifié).</div>{% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </details>
+                    {% endif %}
+                    </details>
+                    {% if revision.sources is empty %}<p class="meta">Références Assistant : aucune URL enregistrée pour cette révision.</p>{% else %}
+                        <details>
+                            <summary>
+                                Sources publiques déclarées ({{ revision.sources|length }})
+                            </summary>
+                            <ul>
+                                {% for source in revision.sources %}
+                                    <li>
+                                        {{ source.title ?? source.name ?? source.url ?? 'Source sans titre' }} · {{ (source.evidence_accepted ?? false) ? 'preuve externe acceptée' : ((source.identity_relevant ?? false) ? 'source pertinente, sans preuve validée' : 'source consultée, non validée') }}
+                                        {% if source.url is defined %}
+                                            · <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer">Consulter</a>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+                    {% endif %}
+                    <p class="meta">
+                        Révision conservée en base · aucune modification de preset.
+                    </p>
+                </section>
+            {% endfor %}
+            {% if profile_external_revisions|length > 1 %}
+                </details>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% if profile_validation_subjects %}
+        <details class="card profile-human-optional">
+            <summary>
+                <strong>Corriger ou commenter (facultatif)</strong>
+                · {{ profile_validation_stats.reviewed }} annotation(s) conservée(s)
+            </summary>
+            <p class="meta">
+                Intervention humaine non obligatoire. Les annotations restent indépendantes
+                des résultats scientifiques.
+            </p>
+            <form method="post" action="{{ path('profile_validate', {id: selected_profile_run.id}) }}">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Élément</th>
+                            <th>Résultat LAB</th>
+                            <th>Observation</th>
+                            <th>Correction facultative</th>
+                            <th>Commentaire</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for subject in profile_validation_subjects %}
+                            {% set saved = profile_validations[subject.subject_key] ?? null %}
+                            <tr>
+                                <td>
+                                    <strong>{{ subject.label }}</strong>
+                                    <input
+                                        type="hidden"
+                                        name="annotations[{{ loop.index0 }}][subject]"
+                                        value="{{ subject.subject_key }}"
+                                    >
+                                </td>
+                                <td>{{ subject.predicted_text }}</td>
+                                <td>
+                                    <select name="annotations[{{ loop.index0 }}][verdict]">
+                                        <option value="">Ne pas modifier</option>
+                                        <option value="ok">Correct</option>
+                                        <option value="ko">Incorrect</option>
+                                        <option value="unknown">Incertain</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input
+                                        type="hidden"
+                                        name="annotations[{{ loop.index0 }}][reviewer_certainty]"
+                                        value="{{ saved ? saved.reviewer_certainty : '' }}"
+                                    >
+                                    <input
+                                        type="hidden"
+                                        name="annotations[{{ loop.index0 }}][missing_expected]"
+                                        value="{{ saved ? saved.missing_expected_text : '' }}"
+                                    >
+                                    <input
+                                        type="text"
+                                        name="annotations[{{ loop.index0 }}][human_value]"
+                                        maxlength="500"
+                                        value="{{ saved ? saved.human_value : '' }}"
+                                        placeholder="Correction"
+                                    >
+                                </td>
+                                <td>
+                                    <input
+                                        type="text"
+                                        name="annotations[{{ loop.index0 }}][comment]"
+                                        maxlength="2000"
+                                        value="{{ saved ? saved.comment : '' }}"
+                                        placeholder="Commentaire facultatif"
+                                    >
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="submit">Enregistrer les observations renseignées</button>
+            </form>
+        </details>
+    {% endif %}
+{% endif %}
+
+{% set pv = selected_profile_run.diagnostics.profile_view ?? {} %}
+{% set pc = pv.counts ?? {} %}
+{% set legacy_module_key = 'ped' ~ 'als' %}
+{% set modules = pv.modules is defined ? pv.modules : (attribute(pv, legacy_module_key) ?? []) %}
+{% set pi = pv.instrumentation ?? {} %}
+<div class="card">
+  <h2>Instruments détectés</h2>
+  <div class="meta">Résultat expérimental sur le mix complet. Il ne pilote pas encore STEMS.</div>
+  {% if pi.candidates is defined and pi.candidates %}
+    <div style="margin-top:8px">
+    {% for x in pi.candidates %}
+      <span class="badge ok" style="margin:0 5px 5px 0">{{ x.label }} · {{ x.support }}/3 moteurs</span>
+    {% endfor %}
+    </div>
+  {% else %}
+    <p>Aucun instrument n’est suffisamment confirmé pour l’instant.</p>
+  {% endif %}
+  {% if pi.weak is defined and pi.weak %}
+    <details style="margin-top:8px"><summary>Hypothèses plus faibles</summary>
+      <div class="meta" style="margin-top:6px">{% for x in pi.weak|slice(0,10) %}{{ x.label }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+    </details>
+  {% endif %}
+</div>
+
+{% set choir = pv.choirs ?? {} %}
+<div class="card">
+  <h2>Chœurs / voix d’accompagnement</h2>
+  {% if choir.decision is defined and choir.decision == 'detected' %}
+    <p><strong>Chœurs détectés</strong></p>
+    <div class="meta">Plusieurs analyses vont dans le même sens. À confirmer avec votre écoute.</div>
+  {% elseif choir.decision is defined and choir.decision == 'possible' %}
+    <p><strong>Chœurs possibles</strong></p>
+    <div class="meta">Il y a des indices, mais PROFILE préfère rester prudent.</div>
+  {% else %}
+    <p><strong>Pas de conclusion fiable</strong></p>
+    <div class="meta">PROFILE s’abstient plutôt que d’affirmer qu’il n’y a pas de chœurs.</div>
+  {% endif %}
+</div>
+
+<details class="card profile-preset-technical">
+<summary><strong>Preset PROFILE — réglages et diagnostics</strong></summary>
+<p class="meta">Informations techniques du preset ; sans incidence sur les résultats affichés.</p>
+<div class="card">
+  <h3>Modules du preset PROFILE</h3>
+  <div class="meta">{{ pc.ok ?? 0 }} module(s) OK · {{ pc.skipped ?? 0 }} ignoré(s) · {{ pc.error ?? 0 }} en erreur</div>
+  {% if modules %}
+  <table><thead><tr><th>Module</th><th>Famille</th><th>État</th><th>Device</th><th>Temps</th></tr></thead><tbody>
+  {% for e in modules %}
+    <tr>
+      <td>{{ e.name ?? e.id }}{% if e.error %}<div class="meta">{{ e.error }}</div>{% endif %}</td>
+      <td>{{ e.family ?? '—' }}</td>
+      <td><span class="badge {{ e.status == 'ok' ? 'ok' : (e.status == 'error' ? 'warn' : '') }}">{{ e.status }}</span></td>
+      <td>{{ e.device ?? '—' }}</td>
+      <td>{% if e.elapsed_seconds is not null %}{{ e.elapsed_seconds|number_format(2) }} s{% else %}—{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody></table>
+  {% endif %}
+</div>
+
+{% if pv.tonal is defined and pv.tonal.label is defined %}
+<div class="card"><h2>Consensus tonal</h2>
+  <div><strong>{{ pv.tonal.label }}</strong> · support {{ pv.tonal.support ?? 0 }}/{{ pv.tonal.sources|length }}</div>
+  <table><thead><tr><th>Gène</th><th>Tonalité</th><th>Confiance source</th></tr></thead><tbody>
+  {% for s in pv.tonal.sources ?? [] %}
+    {% set legacy_source_key = 'ped' ~ 'al' %}
+    <tr><td>{{ s.module is defined ? s.module : (attribute(s, 'ge' ~ 'ne') ?? '—') }}</td><td>{{ s.label }}</td><td>{% if s.confidence is not null %}{{ (s.confidence*100)|number_format(1) }}%{% else %}—{% endif %}</td></tr>
+  {% endfor %}
+  </tbody></table>
+</div>
+{% endif %}
+
+{% if pv.audioset is defined and pv.audioset.agreements is defined %}
+<div class="card"><h2>Consensus AudioSet · PANNs / PaSST</h2>
+  <div class="meta">Confidence opérationnelle non calibrée : décroissance exponentielle du rang absolu + persistance temporelle top-5/top-10, puis minimum entre PANNs et PaSST. Seuil de décision 60 %. Les labels génériques restent visibles mais ne sont pas retenus. Ce pourcentage n'est pas une probabilité calibrée.</div>
+  {% if pv.audioset.agreements %}
+  <table><thead><tr><th>Label</th><th>Support</th><th>Scores source</th><th>Confidence</th><th>Stabilité</th><th>Décision</th></tr></thead><tbody>
+  {% for a in pv.audioset.agreements %}
+    <tr>
+      <td>{{ a.label }}</td>
+      <td>{{ a.support }}</td>
+      <td>{% for s in a.sources ?? [] %}{% set legacy_source_key = 'ped' ~ 'al' %}{{ s.module is defined ? s.module : (attribute(s, 'ge' ~ 'ne') ?? '—') }}={{ (s.score*100)|number_format(1) }}%{% if not loop.last %} · {% endif %}{% endfor %}</td>
+      <td>{% if a.confidence is defined and a.confidence is not null %}{{ (a.confidence*100)|number_format(1) }}%{% else %}—{% endif %}</td>
+      <td>
+        {% if a.source_evidence is defined and a.source_evidence %}
+          {% for e in a.source_evidence %}
+            {{ e.module is defined ? e.module : (attribute(e, 'ge' ~ 'ne') ?? '—') }} : rang {{ e.rank ?? '—' }}/{{ e.class_count ?? '—' }}, rang-score {% if e.rank_score is defined %}{{ (e.rank_score*100)|number_format(0) }}%{% else %}—{% endif %}, top-5 {% if e.top5_support is defined %}{{ (e.top5_support*100)|number_format(0) }}%{% else %}—{% endif %}, top-10 {{ (e.top10_support*100)|number_format(0) }}%{% if not loop.last %}<br>{% endif %}
+          {% endfor %}
+        {% elseif a.temporal_support_min is defined and a.temporal_support_min is not null %}
+          {{ (a.temporal_support_min*100)|number_format(0) }}%
+        {% else %}
+          —
+        {% endif %}
+      </td>
+      <td>
+        {% if a.decision is defined and a.decision == 'accepted' %}
+          <span class="badge ok">retenu</span>
+        {% elseif a.decision is defined and a.decision == 'contextual' %}
+          <span class="badge">contextuel</span>
+        {% elseif a.decision is defined and a.decision == 'generic' %}
+          <span class="badge">générique</span>
+        {% elseif a.decision is defined %}
+          <span class="badge">incertain</span>
+        {% else %}
+          —
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody></table>
+  {% else %}<p class="meta">Aucun label commun entre moteurs.</p>{% endif %}
+</div>
+{% endif %}
+
+{% if pv.embeddings is defined and pv.embeddings %}
+<div class="card"><h2>Embeddings MERT</h2>
+<table><thead><tr><th>Gène</th><th>État</th><th>Dimension</th><th>Chunks</th><th>Norme</th><th>Variation temporelle</th></tr></thead><tbody>
+{% for e in pv.embeddings %}
+<tr><td>{{ e.name }}</td><td>{{ e.status }}</td><td>{{ e.hidden_size ?? '—' }}</td><td>{{ e.chunk_count ?? '—' }}</td><td>{{ e.embedding_norm ?? '—' }}</td><td>{{ e.temporal_std_mean ?? '—' }}</td></tr>
+{% endfor %}
+</tbody></table>
+</div>
+{% endif %}
+
+<div class="card"><div class="meta">Moteur sémantique : {{ t.backend ?? 'indisponible' }}{% if t.model is defined %} · {{ t.model }}{% endif %}. Les scores CLAP sont relatifs à la taxonomie comparée, pas des probabilités calibrées.</div></div>
+<div class="card"><h2>Genre</h2>{% if t.available ?? false %}<table><thead><tr><th>Tag</th><th>Score</th></tr></thead><tbody>{% for x in t.genre ?? [] %}<tr><td>{{ x.label }}</td><td>{{ (x.score*100)|number_format(1) }}%</td></tr>{% endfor %}</tbody></table>{% else %}<p class="meta">Analyse du genre indisponible.</p>{% endif %}</div>
+<div class="card"><h2>Instrumentation probable</h2>{% if t.available ?? false %}<table><thead><tr><th>Instrument</th><th>Score</th></tr></thead><tbody>{% for x in t.instrumentation ?? [] %}<tr><td>{{ x.label }}</td><td>{{ (x.score*100)|number_format(1) }}%</td></tr>{% endfor %}</tbody></table>{% else %}<p class="meta">Classifieur instrument non disponible.</p>{% endif %}</div>
+<div class="card"><h2>Voix</h2>{% if t.available ?? false %}<table><thead><tr><th>Caractéristique</th><th>Score</th></tr></thead><tbody>{% for x in t.voice ?? [] %}<tr><td>{{ x.label }}</td><td>{{ (x.score*100)|number_format(1) }}%</td></tr>{% endfor %}</tbody></table>{% else %}<p class="meta">Classifieur vocal non disponible.</p>{% endif %}</div>
+<div class="card"><h2>Ambiance / mood</h2>{% if t.available ?? false %}<table><thead><tr><th>Tag</th><th>Score</th></tr></thead><tbody>{% for x in t.mood ?? [] %}<tr><td>{{ x.label }}</td><td>{{ (x.score*100)|number_format(1) }}%</td></tr>{% endfor %}</tbody></table>{% else %}<p class="meta">Classifieur mood non disponible.</p>{% endif %}</div>
+
+</details>
+<div class="card"><a class="button secondary" href="{{ path('scientific_run',{id:selected_profile_run.id}) }}">Run PROFILE</a> <a class="button" href="{{ path('workbench_stems',{song:selected_song.id}) }}">Ouvrir STEMS</a> <span class="meta">Navigation uniquement.</span></div>
+{# Full-page PROFILE HTML replacement retired; JSON observer owns live updates. #}
+
+{% endif %}
+{% endif %}
+{% endblock %}

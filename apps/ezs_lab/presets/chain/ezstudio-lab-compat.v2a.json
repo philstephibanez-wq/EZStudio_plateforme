@@ -1,0 +1,19 @@
+{
+  "schema": "ezstudio.chain-preset.v1",
+  "id": "ezstudio-lab-compat",
+  "revision": "v2a",
+  "runtime_min": "2a",
+  "phases": [
+    {
+      "phase": "profile",
+      "preset": "profile/profile-r3b35c-compat.v2a.json"
+    }
+  ],
+  "publication_gates": {
+    "profile_equivalence_required": true,
+    "stems_migrated": false,
+    "chords_migrated": false,
+    "lyrics_migrated": false,
+    "publish_to_ezscore": false
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "schema": "ezstudio.module-config.v1",
+  "module": {
+    "id": "semantic.clap-open-vocabulary",
+    "name": "CLAP Open Vocabulary",
+    "phase": "profile",
+    "revision": "r3b35c-compat-v1"
+  },
+  "engine": {
+    "adapter": "clap-zero-shot",
+    "model": "laion/clap-htsat-unfused",
+    "device": "cuda:0"
+  },
+  "parameters": {
+    "sample_rate": 48000,
+    "chunk_seconds": 10.0,
+    "max_chunks": 8
+  },
+  "taxonomy": {
+    "families": {
+      "genre": [
+        "chanson française", "folk", "ballad", "singer-songwriter",
+        "pop", "rock", "soft rock", "jazz", "blues", "soul",
+        "classical", "orchestral", "country", "electronic",
+        "disco", "funk", "reggae", "latin", "world music", "cabaret"
+      ],
+      "instrumentation": [
+        "acoustic guitar", "electric guitar", "piano", "accordion",
+        "violin", "cello", "string section", "acoustic bass",
+        "bass guitar", "drum kit", "percussion", "snare drum",
+        "kick drum", "organ", "synthesizer", "brass section",
+        "trumpet", "trombone", "saxophone", "flute", "clarinet",
+        "harmonica", "mandolin", "ukulele", "harp"
+      ],
+      "mood": [
+        "emotional", "reflective", "intimate", "somber", "passionate",
+        "mournful", "longing", "dramatic", "romantic", "melancholic",
+        "warm", "calm", "dreamy", "nostalgic", "dark", "tense",
+        "energetic", "joyful", "uplifting", "peaceful"
+      ],
+      "voice": [
+        "male lead vocal", "female lead vocal", "backing vocals",
+        "vocal harmonies", "choir", "spoken voice",
+        "raspy singing voice", "vibrato singing",
+        "powerful emotional singing", "soft intimate singing",
+        "instrumental music with no vocals"
+      ]
+    },
+    "prompts": {
+      "genre": "This music is {label}.",
+      "instrumentation": "This music contains {label}.",
+      "mood": "The mood of this music is {label}.",
+      "voice": "The recording features {label}."
+    }
+  },
+  "decision": {
+    "families": {
+      "genre": {"mode": "compatibility_top_k", "top_k": 6},
+      "instrumentation": {"mode": "compatibility_top_k", "top_k": 12},
+      "mood": {"mode": "compatibility_top_k", "top_k": 8},
+      "voice": {"mode": "compatibility_top_k", "top_k": 8}
+    }
+  },
+  "output": {
+    "preserve_raw": true,
+    "preserve_normalized": true,
+    "calibrated": false,
+    "score_semantics": "category_relative_softmax"
+  }
+}

@@ -6,7 +6,7 @@ namespace Ezs\Web\Module\Coordination;
 /** Read-only LAB queue probe. No claim, command, or side effects. */
 final class LabQueueProbe
 {
-    public function __construct(private readonly ?\Closure $fetch = null, private readonly string $labRoot = 'H:\\EZStudio_lab') {}
+    public function __construct(private readonly ?\Closure $fetch = null, private ?string $labRoot = null) { $this->labRoot = $labRoot ?? dirname(__DIR__, 4) . '/apps/ezs_lab'; }
 
     public function status(): array
     {
@@ -31,9 +31,9 @@ final class LabQueueProbe
                 return $body;
             };
 
-            $body = $fetch('http://127.0.0.1:8702/internal/analysis/desktop/jobs/queue', [
+            $body = $fetch('http://127.0.0.1:8000/internal/analysis/desktop/jobs/queue', [
                 'X-EZScore-Analysis-Token: ' . $token,
-                'Accept: application/json',
+                'Accept: application/json', 'Host: lab.ezstudio.local',
             ]);
             if (strlen($body) > 2097152) {
                 throw new \RuntimeException('lab_response_too_large');

@@ -3,7 +3,7 @@
 param([Parameter(Mandatory=$true)][ValidateSet('Preflight','Activate','Status')][string]$Action,
       [string]$BackupDirectory = 'H:\temp\EZS_WATCHDOG_RESIDENT_R1G_TASK_BACKUP')
 $ErrorActionPreference = 'Stop'
-$root = 'H:\EZS_orchestrator'
+$root = (Resolve-Path "$PSScriptRoot\..").Path
 $name = 'EZS_orchestrator_supervisor'
 $task = Get-ScheduledTask -TaskName $name -ErrorAction Stop
 if ($task.Actions.Count -ne 1) { throw 'EZS_RESIDENT_TASK_ACTION_COUNT' }

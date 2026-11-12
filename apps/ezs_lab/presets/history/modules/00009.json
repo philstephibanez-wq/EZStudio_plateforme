@@ -1,0 +1,38 @@
+{
+  "composition": {
+    "device": "cuda:0",
+    "engine": {
+      "name": "transformers.MERT",
+      "version": "5.9.0"
+    },
+    "family": "embedding",
+    "id": "embedding.mert-330m",
+    "implementation": {
+      "callable": "genes.embedding_mert.run_330m",
+      "source_sha256": "f4abc631419b2d3bc9ad021d7dccb937f3696a77615d1faee05f944c487f05d3"
+    },
+    "model": {
+      "id": "m-a-p/MERT-v1-330M",
+      "inference_dtype": "cuda-autocast-float16",
+      "path": "H:\\AIModels\\audio\\embeddings\\mert\\MERT-v1-330M",
+      "weights_dtype": "torch.float32"
+    },
+    "name": "MERT Music Embedding 330M",
+    "order": 71,
+    "parameters": {
+      "aggregation": "mean",
+      "chunk_seconds": 10.0,
+      "dtype": "float16",
+      "max_chunks": 6
+    },
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-09T20:17:26+00:00",
+  "fingerprint": "8a766404f0490ef23b6379a16d7c4adbaeea7e3fbc312cd4d1635a600a73261c",
+  "id": 9,
+  "module_key": "embedding.mert-330m",
+  "revision_number": 1,
+  "revision_ref": "embedding.mert-330m.r1",
+  "schema": "ezstudio.preset.export.module.v1"
+}

@@ -13,7 +13,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name:'ezs:services',description:'État désiré et contrôle explicite des sites FrankenPHP')]
 final class ServiceSupervisorCommand extends Command
 {
-    private const ROOT='H:/EZS_orchestrator';
+    private static function root(): string { return dirname(__DIR__, 4) . '/apps/orchestrator'; }
     private const GROUPS=['root','dev','lab','assistant','prod'];
 
     protected function configure(): void
@@ -30,7 +30,7 @@ final class ServiceSupervisorCommand extends Command
     public static function planned(array $desired): array
     {
         $plan=[];
-        foreach (self::GROUPS as $group) {
+        foreach (self::groups() as $group) {
             if ($group==='root') continue;
             if (($desired[$group]??DesiredServiceState::STOPPED)===DesiredServiceState::RUNNING) $plan[]=$group;
         }
@@ -43,7 +43,7 @@ final class ServiceSupervisorCommand extends Command
         $action=(string)$input->getArgument('action');
         $group=(string)($input->getArgument('group')??'');
         if (!in_array($action,['status','tick','diagnostics','start','stop','restart'],true)) return Command::INVALID;
-        if (in_array($action,['start','stop','restart'],true) && !in_array($group,self::GROUPS,true)) return Command::INVALID;
+        if (in_array($action,['start','stop','restart'],true) && !in_array($group,self::groups(),true)) return Command::INVALID;
         try {
             $intent=new DesiredServiceState();
             if ($action==='status') {

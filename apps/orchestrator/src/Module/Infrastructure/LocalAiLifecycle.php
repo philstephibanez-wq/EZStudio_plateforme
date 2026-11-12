@@ -5,9 +5,9 @@ namespace Ezs\Web\Module\Infrastructure;
 /** Démarrage isolé de l'IA Assistant sur MAIN. Aucun arrêt de processus. */
 final class LocalAiLifecycle
 {
-    public const ROOT = 'H:/EZStudioLab_assistant';
-    public const EXE = self::ROOT.'/runtime/ai/bin/llama-server.exe';
-    public const MODEL = self::ROOT.'/runtime/models-cache/assistant/bench/qwen2.5-1.5b-instruct-q4_k_m/qwen2.5-1.5b-instruct-q4_k_m.gguf';
+    public static function root(): string { return dirname(__DIR__, 4) . '/apps/ezs_assistant'; }
+    public static function exe(): string { return self::root()() . '/runtime/ai/bin/llama-server.exe'; }
+    public static function model(): string { return self::root()() . '/runtime/models-cache/assistant/bench/qwen2.5-1.5b-instruct-q4_k_m/qwen2.5-1.5b-instruct-q4_k_m.gguf'; }
     public const PORT = 8720;
     private static array $handles=[];
     private readonly \Closure $inventory;
@@ -41,13 +41,13 @@ final class LocalAiLifecycle
     /** @return list<string> */
     public static function arguments():array
     {
-        return ['-m',self::MODEL,'--host','127.0.0.1','--port','8720','-c','24576','-np','1'];
+        return ['-m',self::model(),'--host','127.0.0.1','--port','8720','-c','24576','-np','1'];
     }
     private static function isOurs(array $p):bool
     {
         $norm=static fn(string $s):string=>strtolower(str_replace('/','\\',$s));
-        if($norm((string)($p['executable']??''))!==$norm(self::EXE))return false;
-        $parts=[self::EXE,...self::arguments()];
+        if($norm((string)($p['executable']??''))!==$norm(self::exe()))return false;
+        $parts=[self::exe(),...self::arguments()];
         $patterns=array_map(static fn(string $s):string=>'(?:"'.preg_quote($norm($s),'~').'"|'.preg_quote($norm($s),'~').')',$parts);
         return (bool)preg_match('~^\s*'.implode('\s+',$patterns).'\s*$~iD',$norm((string)($p['command']??'')));
     }
@@ -64,7 +64,7 @@ final class LocalAiLifecycle
     /** @return array{pid:int,action:string} */
     public function start():array
     {
-        if(!(($this->exists)(self::EXE)) || !(($this->exists)(self::MODEL)))throw new \RuntimeException('EZS_AI_DEPENDENCY_MISSING');
+        if(!(($this->exists)(self::exe())) || !(($this->exists)(self::model())))throw new \RuntimeException('EZS_AI_DEPENDENCY_MISSING');
         $inventory=($this->inventory)();$listeners=($this->listeners)();
         $pid=$this->owner($listeners);
         $llamas=array_values(array_filter($inventory,static fn(array $p):bool=>str_ends_with(strtolower(str_replace('\\','/',(string)($p['executable']??''))),'/llama-server.exe')));
@@ -94,14 +94,14 @@ final class LocalAiLifecycle
     }
     private static function nativeSpawn():int
     {
-        $logDir=self::ROOT.'/logs';
+        $logDir=self::root().'/logs';
         if(!is_dir($logDir))throw new \RuntimeException('EZS_AI_LOGDIR_MISSING');
         $nonce=bin2hex(random_bytes(6));
-        $resource=proc_open([self::EXE,...self::arguments()], [
+        $resource=proc_open([self::exe(),...self::arguments()], [
             0=>['file','NUL','r'],
             1=>['file',$logDir.'/llama-orchestrator-'.$nonce.'.out.log','a'],
             2=>['file',$logDir.'/llama-orchestrator-'.$nonce.'.err.log','a'],
-        ],$pipes,self::ROOT,null,['bypass_shell'=>true,'create_new_console'=>false,'suppress_errors'=>true]);
+        ],$pipes,self::root(),null,['bypass_shell'=>true,'create_new_console'=>false,'suppress_errors'=>true]);
         if(!is_resource($resource))throw new \RuntimeException('EZS_AI_PROC_OPEN_FAILED');
         $s=proc_get_status($resource);
         if(!($s['running']??false) || (int)($s['pid']??0)<1){proc_close($resource);throw new \RuntimeException('EZS_AI_PROC_EXITED');}

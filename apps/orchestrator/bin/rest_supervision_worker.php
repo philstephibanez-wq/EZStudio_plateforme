@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /** Dedicated, one-shot PHP worker launched hidden through Windows COM by the REST controller. */
-$root = 'H:/EZS_orchestrator';
+$root = dirname(__DIR__, 4) . '/apps/orchestrator';
 $id = (string)($argv[1]??'');
 if (!preg_match('/^[a-f0-9]{32}$/D',$id)) exit(2);
 require $root.'/vendor/autoload.php';

@@ -1,0 +1,77 @@
+{% if selected_profile_run.state == 'done' %}
+<div class="card" id="profile-ai-request" data-url="{{ path('profile_ai_review_status', {id: selected_profile_run.id}) }}">
+  <h2>ASSISTANT · Révision musicale IA</h2>
+  <div class="meta">Qwen sur XPS · run #{{ selected_profile_run.id }} · aucune modification du résultat scientifique ou des presets.</div>
+  <form id="profile-ai-request-form" action="{{ path('profile_ai_review_request', {id: selected_profile_run.id}) }}" method="post" onsubmit="return false">
+    <button type="button" id="profile-ai-run-button">Réviser avec l’IA</button>
+  </form>
+  <div class="profile-ai-progress" aria-label="Progression de la révision IA">
+    <progress id="profile-ai-progress" max="100" value="0" style="width:100%;height:16px"></progress>
+    <div class="meta" role="status" id="profile-ai-request-state">Consultation…</div>
+    <div class="meta" id="profile-ai-current-item" aria-live="polite" hidden></div>
+  </div>
+  <button type="button" id="profile-ai-refresh-results" hidden>Afficher la révision enregistrée</button>
+</div>
+<script>
+(function () {
+ const root=document.getElementById('profile-ai-request');
+ const form=document.getElementById('profile-ai-request-form');
+ const state=document.getElementById('profile-ai-request-state');
+ const button=document.getElementById('profile-ai-run-button');
+ const progress=document.getElementById('profile-ai-progress');
+ const currentItem=document.getElementById('profile-ai-current-item');
+ const refreshLink=document.getElementById('profile-ai-refresh-results');
+ if (!root || !form || !state || !button || !progress || !currentItem) return;
+
+ function show(item) {
+   const s=item?.status || 'non demandée';
+   const number=Number(item?.progress);
+   const known=item?.progress!==null && item?.progress!==undefined && Number.isFinite(number) && number>=0 && number<=100;
+   if (s==='completed') progress.value=100;
+   else if (s==='running' && (!known || number<=1)) progress.removeAttribute('value');
+   else if (s==='running' && known) progress.value=number;
+   else progress.value=0;
+   const info=s==='completed' ? 'Révision IA terminée' :
+     s==='running' ? 'Analyse IA en cours'+(known && number>1 ? ' · '+Math.round(number)+' %' : '') :
+     s==='queued' ? 'Révision IA en attente' :
+     s==='cancelling' ? 'Annulation de la révision IA demandée' :
+     s==='cancelled' ? 'Révision IA annulée' :
+     s==='error' ? 'Erreur de révision IA' : 'Aucune révision en cours';
+   state.textContent=info+(item?.job_id ? ' · Job #'+item.job_id : '')+(item?.message ? ' · '+item.message : '');
+   // The worker will expose the actual item only once sequenced analysis is implemented.
+   const itemName=typeof item?.current_item==='string' ? item.current_item.trim() : '';
+   const step=Number(item?.item_index), total=Number(item?.item_total);
+   const stepLabel=Number.isInteger(step) && Number.isInteger(total) && step>0 && total>=step ? ' · '+step+'/'+total : '';
+   currentItem.textContent=s==='running' && itemName ? 'Item analysé : '+itemName.slice(0,160)+stepLabel : '';
+   currentItem.hidden=!currentItem.textContent;
+   button.disabled=s==='running'||s==='queued'||s==='cancelling';
+   // Never reload automatically: a completed job remains completed across visits.
+   // The revision is persisted; the user can refresh results exactly once on demand.
+   if (refreshLink) refreshLink.hidden=s!=='completed';
+
+ }
+ async function refresh() {
+   try {
+     const r=await fetch(root.dataset.url,{credentials:'same-origin',cache:'no-store'});
+     if (!r.ok) throw new Error('HTTP '+r.status);
+     const j=await r.json();show(j.request);
+   } catch (e) {state.textContent='Suivi indisponible : '+e.message;progress.removeAttribute('value');currentItem.hidden=true;}
+ }
+ // Force a new document fetch rather than a same-page hash jump on stale DOM.
+ // The run remains selected in the URL; the server reads the persisted LAB revision.
+ if (refreshLink) refreshLink.addEventListener('click',function(){
+   window.location.hash='profile-ai-revisions';
+   window.location.reload();
+ });
+ button.addEventListener('click',async function(e){
+   e.preventDefault();button.disabled=true;state.textContent='Demande en cours…';progress.removeAttribute('value');currentItem.hidden=true;
+   try {
+      const r=await fetch(form.action,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Profile-AI-Action':'request','Accept':'application/json'}});
+      const j=await r.json();if(!r.ok) throw new Error(j.error||'HTTP '+r.status);
+      show(j.request);
+   } catch(err){state.textContent='Erreur : '+err.message;progress.value=0;currentItem.hidden=true;button.disabled=false;}
+ });
+ refresh();setInterval(refresh,5000);
+})();
+</script>
+{% endif %}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ezstudio.chords.v1",
+  "title": "EZStudio CHORDS exchange contract",
+  "type": "object",
+  "required": ["schema", "schema_version", "timebase", "segments", "beat_grid_s", "signature", "tempo"],
+  "properties": {
+    "schema": {"const": "ezstudio.chords"},
+    "schema_version": {"const": 1},
+    "timebase": {"const": "original_audio_seconds"},
+    "segments": {"type": "array"},
+    "beat_grid_s": {"type": "array", "items": {"type": "number"}},
+    "signature": {"type": "string"},
+    "tempo": {"type": "number"},
+    "no_chord_token": {"const": "N"}
+  }
+}

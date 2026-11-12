@@ -1,0 +1,37 @@
+{
+  "composition": {
+    "device": "cpu:numpy",
+    "engine": {
+      "name": "madmom-infer",
+      "version": "0.3.0"
+    },
+    "family": "tonal",
+    "id": "tonal.madmom-key-cnn-2017",
+    "implementation": {
+      "callable": "modules.tonal_madmom_key.run_2017",
+      "source_sha256": "d100cd238ed4417483c3549bb433acc0b8027aedf5ef08f121ea3ac5717de4f7"
+    },
+    "model": {
+      "id": "CPJKU-key-cnn-2017-ensemble4",
+      "path": "H:\\AIModels\\audio\\tonal\\madmom-key-cnn\\2017",
+      "sha256": {
+        "key_cnn_1.pkl": "cc0d78e9ba7a3bf5b1cc3ee257f3dabfad4e7a87fdba7ff1a055ef6549b89007",
+        "key_cnn_2.pkl": "390dc811e21eb7da06858b03b4d15a3022d05595aefd57cc66be154520ad976d",
+        "key_cnn_3.pkl": "b430b6e77ca330a3a8478806b9126bf5f25ededc60d8a6da36b84f388b6e6869",
+        "key_cnn_4.pkl": "ee0c9b2c7960783c067115d5fd7097c2dfa4680b1c2fc6a2434b5af2a08c600b"
+      }
+    },
+    "name": "Madmom Key CNN 2017 Ensemble",
+    "order": 31,
+    "parameters": [],
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-10T11:59:46+00:00",
+  "fingerprint": "9a14eda5fed133dbe6ab7b2d6fe2980562c9f6aa09557e0dc81cc99579f35eb6",
+  "id": 31,
+  "module_key": "tonal.madmom-key-cnn-2017",
+  "revision_number": 3,
+  "revision_ref": "tonal.madmom-key-cnn-2017.r3",
+  "schema": "ezstudio.preset.export.module.v1"
+}

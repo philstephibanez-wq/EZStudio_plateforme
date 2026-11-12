@@ -1,0 +1,97 @@
+{% extends 'base.html.twig' %}
+{% block title %}Assistant MAIN — Suivi documentaire{% endblock %}
+{% block body %}
+<style>
+  .stage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;margin:16px 0}
+  .stage{border:1px solid #29404a;border-radius:10px;padding:12px;background:#111d23}
+  .stage strong{display:block;margin-bottom:6px}.stage small{color:#9fb5c1}
+  .stage[data-state="running"]{border-color:#e6ba66}
+  .stage[data-state="done"]{border-color:#65c59b}
+  .mono{font-family:Consolas,monospace}.small{color:#9fb5c1;font-size:.88rem}
+  .compact{width:100%;border-collapse:collapse}.compact td,.compact th{border-bottom:1px solid #29404a;text-align:left;padding:9px}
+  .panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+  .card{margin-bottom:14px}input{padding:9px;margin:6px 10px 6px 0;color:#edf4f7;background:#12242b;border:1px solid #41606c;border-radius:6px}
+  button{padding:9px 12px;border-radius:7px;background:#284953;color:#f4f8fa;border:1px solid #54717c;cursor:pointer}
+  a{color:#9fd8fd}
+</style>
+<h1>EZStudioLab Assistant — Suivi de contre-expertise</h1>
+<p class="small">Pipeline documentaire conforme au contrat canonique. Les étapes sans données sont explicitement indiquées « non démarrée » ; aucune recherche ou validation n'est simulée.</p>
+<section class="card">
+  <h2>État du système</h2>
+  <div class="grid">
+    <div><strong>Modèle CUDA</strong><p id="engine-state">Vérification…</p><p id="engine-model" class="small">—</p></div>
+    <div><strong>Run LAB</strong><p id="run-state">Aucun run reçu</p></div>
+    <div><strong>Résultat métier</strong><p id="result-state">Aucune contre-expertise effectuée</p></div>
+  </div>
+</section>
+<h2>Étapes du workflow</h2>
+<div class="stage-grid" id="stages">
+{% for label in ['Réception LAB','Découverte Web','Ensembles','Identité','Extraction','Recoupement','Verdicts','Retour LAB'] %}
+  <div class="stage" data-state="pending"><strong>{{ loop.index }}. {{ label }}</strong><small>Non démarrée</small></div>
+{% endfor %}
+</div>
+<div class="panels">
+  <section class="card">
+    <h2>Journal d'exécution</h2>
+    <p class="small">Événements réellement observés dans cette session navigateur ; pas de persistance ni de faux journal.</p>
+    <ol id="journal"><li>Interface ouverte. En attente d'un run LAB.</li></ol>
+  </section>
+  <section class="card">
+    <h2>Théorie des ensembles</h2>
+    <p>Les ensembles sont indexés dynamiquement par les assertions reçues.</p>
+    <table class="compact"><thead><tr><th>Ensemble</th><th>Ressources</th></tr></thead>
+      <tbody id="sets"><tr><td>S<sub>total</sub></td><td>0 — aucun document de recherche ouvert</td></tr></tbody>
+    </table>
+    <p id="intersections" class="small">Intersections : non calculables sans documents analysés.</p>
+  </section>
+</div>
+<section class="card">
+  <h2>Assertions musicales et verdicts</h2>
+  <table class="compact"><thead><tr><th>Caractéristique</th><th>Valeur LAB</th><th>Sources retenues</th><th>Assistant</th></tr></thead>
+    <tbody id="assertions"><tr><td colspan="4">Aucune assertion finale reçue de LAB.</td></tr></tbody>
+  </table>
+  <p class="small">BON / FAUX uniquement avec preuves indépendantes de la version exacte. Sans preuve : NON TROUVÉ. Confiance non calibrée : aucune valeur affichée.</p>
+</section>
+<section class="card">
+  <h2>Recherche Web documentaire autonome</h2>
+  <p role="status">Moteur non raccordé. Aucun fournisseur de recherche généraliste n'est configuré dans ce runtime.</p>
+  <p class="small">Conformément au contrat #11, aucune recherche sur un catalogue unique ne remplace la découverte ouverte des ressources. Aucun résultat ni source ne sont inventés.</p>
+</section>
+{% if app.environment == 'dev' and app.request.host in ['127.0.0.1', 'localhost'] %}
+<details class="card" id="ezs-assistant-diagnostic" style="margin-top:14px">
+  <summary style="cursor:pointer;font-weight:700">Diagnostic technique Assistant — JSON brut expurgé</summary>
+  <p class="small">Observation uniquement : statut Assistant et inférence, sans démarrage ni annulation de jobs.</p>
+  <div style="display:flex;align-items:center;gap:8px;margin:12px 0;flex-wrap:wrap">
+    <button type="button" id="ezs-assistant-diagnostic-refresh">Actualiser</button>
+    <button type="button" id="ezs-assistant-diagnostic-copy">Copier JSON</button>
+    <span id="ezs-assistant-diagnostic-status" role="status">Non collecté</span>
+  </div>
+  <pre id="ezs-assistant-diagnostic-json" tabindex="0" style="overflow:auto;max-height:470px">{ "status": "NON_COLLECTE" }</pre>
+</details>
+<script src="/assistant/js/ezstudio-assistant-diagnostic.js?v=1.6a169" defer></script>
+{% endif %}
+<script>
+(function () {
+    'use strict';
+    const el = (id) => document.getElementById(id);
+    function log(message) {
+        const li = document.createElement('li');
+        li.textContent = new Date().toLocaleTimeString('fr-FR') + ' · ' + message;
+        el('journal').appendChild(li);
+    }
+    async function runtime() {
+        try {
+            const response = await fetch('/api/backoffice/inference', {cache: 'no-store'});
+            const data = await response.json();
+            el('engine-state').textContent = data.state || 'INDISPONIBLE';
+            el('engine-model').textContent = data.model || 'Modèle non identifié';
+            log(data.ok ? 'Sonde CUDA opérationnelle.' : 'Sonde CUDA indisponible.');
+        } catch (error) {
+            el('engine-state').textContent = 'INDISPONIBLE';
+            log('Impossible de consulter la sonde CUDA.');
+        }
+    }
+    runtime();
+}());
+</script>
+{% endblock %}

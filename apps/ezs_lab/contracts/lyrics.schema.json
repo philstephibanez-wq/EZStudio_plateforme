@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ezstudio.lyrics.v1",
+  "title": "EZStudio LYRICS exchange contract",
+  "type": "object",
+  "required": ["schema", "schema_version", "timebase", "language", "words"],
+  "properties": {
+    "schema": {"const": "ezstudio.lyrics"},
+    "schema_version": {"const": 1},
+    "timebase": {"const": "original_audio_seconds"},
+    "language": {"type": "string"},
+    "words": {"type": "array"}
+  }
+}

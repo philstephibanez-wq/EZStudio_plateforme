@@ -8,8 +8,8 @@ use Symfony\Component\Process\Process;
 /** Canonical FrankenPHP lifecycle boundary. No PHP-CGI or Caddy legacy commands. */
 final class NativeSiteLifecycle
 {
-    private const ROOT = 'H:/EZS_orchestrator';
-    private const SCRIPT = self::ROOT.'/scripts/ezs_platform_control.ps1';
+    private static function root(): string { return dirname(__DIR__, 4) . '/apps/orchestrator'; }
+    private static function script(): string { return self::root().'/bin/ezs_platform_control.ps1'; }
     private const SITES = ['dev', 'lab', 'assistant', 'prod'];
 
     /** @var \Closure(list<string>):array{exit_code:int,stdout:string,stderr:string} */
@@ -25,10 +25,10 @@ final class NativeSiteLifecycle
     /** @return array{exit_code:int,stdout:string,stderr:string} */
     private static function invokeWindows(array $argv): array
     {
-        if (PHP_OS_FAMILY !== 'Windows' || !is_file(self::SCRIPT)) {
+        if (PHP_OS_FAMILY !== 'Windows' || !is_file(self::script())) {
             throw new \RuntimeException('EZS_NATIVE_SITE_SCRIPT_UNAVAILABLE');
         }
-        $process = new Process($argv, self::ROOT);
+        $process = new Process($argv, self::root());
         $process->setTimeout(30);
         $process->run();
         return [
@@ -41,7 +41,7 @@ final class NativeSiteLifecycle
     /** @return list<string> */
     public static function arguments(string $site, string $action): array
     {
-        if (!in_array($site, self::SITES, true) || !in_array($action, ['Status', 'Preflight', 'Start', 'Stop'], true)) {
+        if (!in_array($site, self::sites(), true) || !in_array($action, ['Status', 'Preflight', 'Start', 'Stop'], true)) {
             throw new \InvalidArgumentException('EZS_NATIVE_SITE_ARGUMENT_REFUSED');
         }
         if ($site === 'prod' && $action === 'Stop') {
@@ -49,7 +49,7 @@ final class NativeSiteLifecycle
         }
         return [
             'powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-            '-File', self::SCRIPT, '-Site', $site, '-Action', $action,
+            '-File', self::script(), '-Site', $site, '-Action', $action,
         ];
     }
 

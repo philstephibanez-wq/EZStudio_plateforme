@@ -1,0 +1,78 @@
+{
+  "created_at": "2026-10-10T11:59:46+00:00",
+  "fingerprint": "70f59b696a84b4fda4a6628eca0e44e750df89ae348717d6e20d440a8b583490",
+  "id": 6,
+  "metadata": {
+    "manifest_schema": "ezstudio.preset.phase.v1"
+  },
+  "modules": [
+    {
+      "module_revision_id": 28,
+      "phase_revision_id": 6,
+      "position": 0
+    },
+    {
+      "module_revision_id": 29,
+      "phase_revision_id": 6,
+      "position": 1
+    },
+    {
+      "module_revision_id": 30,
+      "phase_revision_id": 6,
+      "position": 2
+    },
+    {
+      "module_revision_id": 31,
+      "phase_revision_id": 6,
+      "position": 3
+    },
+    {
+      "module_revision_id": 32,
+      "phase_revision_id": 6,
+      "position": 4
+    },
+    {
+      "module_revision_id": 33,
+      "phase_revision_id": 6,
+      "position": 5
+    },
+    {
+      "module_revision_id": 34,
+      "phase_revision_id": 6,
+      "position": 6
+    },
+    {
+      "module_revision_id": 35,
+      "phase_revision_id": 6,
+      "position": 7
+    },
+    {
+      "module_revision_id": 36,
+      "phase_revision_id": 6,
+      "position": 8
+    },
+    {
+      "module_revision_id": 37,
+      "phase_revision_id": 6,
+      "position": 9
+    },
+    {
+      "module_revision_id": 38,
+      "phase_revision_id": 6,
+      "position": 10
+    }
+  ],
+  "parents": [
+    {
+      "child_phase_revision_id": 6,
+      "parent_phase_revision_id": 1,
+      "role": "evolution"
+    }
+  ],
+  "phase": "profile",
+  "pipeline_revision": "profile-r3b35c-canonical-genre-vocals",
+  "revision_number": 6,
+  "revision_ref": "PROFILE.r6",
+  "schema": "ezstudio.preset.export.phase.v1",
+  "status": "candidate"
+}

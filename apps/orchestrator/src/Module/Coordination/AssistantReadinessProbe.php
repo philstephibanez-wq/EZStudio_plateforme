@@ -8,12 +8,16 @@ final class AssistantReadinessProbe
 
     public function status(): array
     {
-        $web = $this->get('http://127.0.0.1:8712/api/health');
-        $webReady = ($web['ok'] ?? null) === true && ($web['service'] ?? null) === 'EZStudioLab Assistant';
-        $inference = $webReady ? $this->get('http://127.0.0.1:8712/api/inference/status') : [];
+        $socket = @stream_socket_client('tcp://127.0.0.1:8000', $errno, $errstr, 0.3, STREAM_CLIENT_CONNECT);
+        $portOpen = is_resource($socket);
+        if ($portOpen) {
+            fclose($socket);
+        }
+        $webReady = $portOpen && is_file(dirname(__DIR__, 4) . '/apps/ezs_assistant/config/bundles.php');
+        $llama = $webReady ? $this->get('http://127.0.0.1:8720/health') : [];
         return [
             'web' => $webReady,
-            'inference' => ($inference['ok'] ?? null) === true && ($inference['state'] ?? null) === 'READY',
+            'inference' => ($llama['status'] ?? null) === 'ok',
             'dispatch_verified' => false,
         ];
     }
@@ -22,7 +26,7 @@ final class AssistantReadinessProbe
     {
         try {
             $fetch = $this->fetch ?? static function (string $uri): string {
-                $context = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 5, 'follow_location' => 0]]);
+                $context = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 2, 'follow_location' => 0]]);
                 $body = @file_get_contents($uri, false, $context);
                 if ($body === false) {
                     throw new \RuntimeException('unavailable');

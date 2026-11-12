@@ -24,7 +24,7 @@ function Assert-Old {
 function Assert-NewXml([string]$file) {
     [xml]$x = Get-Content -LiteralPath $file -Raw -Encoding UTF8
     if ($x.service.id -ne $name -or $x.service.executable -ne 'H:\FRANKENPHP\bin\frankenphp.exe' -or
-        $x.service.arguments -ne 'php-server --listen 127.0.0.1:8790 --root H:\EZS_orchestrator\public' -or
+        $x.service.arguments -ne 'php-server --listen 127.0.0.1:8790 --root $(Resolve-Path "$PSScriptRoot\..")\public' -or
         $x.service.startmode -ne 'Manual') {throw 'NEW_SERVICE_XML_INVALID'}
 }
 if ($Action -eq 'Status') {

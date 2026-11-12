@@ -1,0 +1,39 @@
+{
+  "composition": {
+    "device": "cuda:0",
+    "engine": {
+      "name": "transformers.MERT",
+      "version": "5.9.0"
+    },
+    "family": "embedding",
+    "id": "embedding.mert-95m",
+    "implementation": {
+      "callable": "modules.embedding_mert.run_95m",
+      "source_sha256": "15c91573ce95b015713ee4305f91a0fd558a3fab2baf0d880fcb979fbc8b039f"
+    },
+    "model": {
+      "id": "m-a-p/MERT-v1-95M",
+      "inference_dtype": "cuda-autocast-float16",
+      "path": "H:\\AIModels\\audio\\embeddings\\mert\\MERT-v1-95M",
+      "weights_dtype": "torch.float32"
+    },
+    "name": "MERT Music Embedding 95M",
+    "order": 70,
+    "parameters": {
+      "aggregation": "mean",
+      "batch_size": 2,
+      "chunk_seconds": 10.0,
+      "dtype": "float16",
+      "max_chunks": 6
+    },
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-10T11:59:46+00:00",
+  "fingerprint": "d3bbbffa058595885c5e076487a57ffbb98787d1eff563758f14a86dd0bab26f",
+  "id": 35,
+  "module_key": "embedding.mert-95m",
+  "revision_number": 4,
+  "revision_ref": "embedding.mert-95m.r4",
+  "schema": "ezstudio.preset.export.module.v1"
+}

@@ -1,0 +1,145 @@
+{% extends 'base.html.twig' %}
+{% block title %}EZChords Benchmark{% endblock %}
+{% block body %}
+
+<div class="card" id="analyser">
+<h1>Analyser une chanson</h1>
+<form action="{{ path('bench_start') }}" method="post" enctype="multipart/form-data" id="analyze-form">
+<div class="row">
+<label>Chanson
+<input type="file" name="audio" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" required>
+</label>
+<label>Titre
+<input name="title">
+</label>
+<label>Artiste
+<input name="artist">
+</label>
+<label>Signature
+<select name="signature">
+<option>Auto</option><option>2/4</option><option>3/4</option><option>4/4</option>
+<option>6/8</option><option>9/8</option><option>12/8</option>
+</select>
+</label>
+<button type="submit" id="analyze-button">Analyser</button>
+</div>
+</form>
+</div>
+
+<div class="card" id="chansons">
+<h2>Chansons analysées</h2>
+<table>
+<thead>
+<tr><th>#</th><th>Chanson</th><th>Signature</th><th>Tempo</th><th>Revue</th><th aria-label="Actions"></th></tr>
+</thead>
+<tbody>
+{% for r in runs %}
+{% if r.status == 'done' %}
+<tr>
+<td>{{ r.id }}</td>
+<td><a class="song" href="{{ path('bench_view',{id:r.id}) }}">{{ r.title }}{% if r.artist %} — {{ r.artist }}{% endif %}</a></td>
+<td>{{ r.detected_signature ?: r.requested_signature }}</td>
+<td>{{ r.tempo ? r.tempo|number_format(3) ~ ' BPM' : '—' }}</td>
+<td>{{ r.reviewed_at ? 'oui' : 'non' }}</td>
+<td style="width:1%;white-space:nowrap">
+<form action="{{ path('bench_delete',{id:r.id}) }}" method="post"
+      onsubmit="return confirm('Supprimer complètement cette chanson, son audio et toutes ses données de benchmark ?');">
+<button type="submit" class="trash-button" title="Supprimer complètement" aria-label="Supprimer complètement">🗑️</button>
+</form>
+</td>
+</tr>
+{% endif %}
+{% else %}
+<tr><td colspan="6">Aucune chanson analysée.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="card" id="scores">
+<h2>Score global</h2>
+<table>
+<thead><tr><th>Algorithme</th><th>Bon</th><th>Pas bon</th><th>Non revu</th><th>Score</th></tr></thead>
+<tbody>
+{% for s in scores %}
+<tr>
+<td>{{ s.algorithm }}</td>
+<td>{{ s.approved }}</td>
+<td>{{ s.rejected }}</td>
+<td>{{ s.unreviewed }}</td>
+<td class="score">
+{% if s.score_percent is not null %}
+{{ s.approved }}/{{ s.reviewed }} = {{ s.score_percent|number_format(1) }}%
+{% else %}—{% endif %}
+</td>
+</tr>
+{% else %}
+<tr><td colspan="5">Aucun avis enregistré.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<style>
+.analysis-wait[hidden]{display:none}
+.analysis-wait{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(255,255,255,.88);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.analysis-wait-box{
+  background:#fff;
+  border:1px solid #777;
+  padding:22px 28px;
+  min-width:320px;
+  text-align:center;
+}
+.analysis-spinner{
+  width:30px;
+  height:30px;
+  margin:0 auto 12px;
+  border:4px solid #ccc;
+  border-top-color:#222;
+  border-radius:50%;
+  animation:analysis-spin .8s linear infinite;
+}
+@keyframes analysis-spin{to{transform:rotate(360deg)}}
+</style>
+
+<div id="analysis-wait" class="analysis-wait" hidden aria-live="polite" aria-busy="true">
+  <div class="analysis-wait-box">
+    <div class="analysis-spinner" aria-hidden="true"></div>
+    <b>Analyse en cours…</b>
+    <div style="margin-top:8px">Merci de patienter.</div>
+    <div id="analysis-elapsed" style="margin-top:8px;color:#666">0 s</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('analyze-form');
+  const button = document.getElementById('analyze-button');
+  const wait = document.getElementById('analysis-wait');
+  const elapsed = document.getElementById('analysis-elapsed');
+
+  form.addEventListener('submit', () => {
+    button.disabled = true;
+    button.textContent = 'Analyse en cours…';
+    wait.hidden = false;
+
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const seconds = Math.floor((Date.now() - started) / 1000);
+      elapsed.textContent = seconds + ' s';
+    }, 1000);
+
+    window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
+  });
+})();
+</script>
+
+{% endblock %}

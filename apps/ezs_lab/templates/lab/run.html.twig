@@ -1,0 +1,121 @@
+{% extends 'base.html.twig' %}
+{% block title %}Run #{{ run.id }} · EZStudio_lab{% endblock %}
+{% block body %}
+
+<div class="card hero">
+  <div>
+    <h1>Run #{{ run.id }} — {{ run.title }}{% if run.artist %} · {{ run.artist }}{% endif %}</h1>
+    <div class="meta">{{ run.status }} · {{ run.engine_version }} · {{ run.updated_at }}</div>
+  </div>
+  <div>
+    {% if observability and observability.scientific_zip %}
+      <a class="button" href="{{ path('lab_export',{id:run.id}) }}">Export scientifique</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="item-tabs">
+  <a href="#stems">STEMS</a>
+  <a href="#chords">CHORDS</a>
+  <a href="#no-chord">NO-CHORD</a>
+  <a href="#lyrics">LYRICS</a>
+  <a href="#diagnostics">Diagnostics</a>
+  <a href="#logs">Logs</a>
+  <a href="#artifacts">Artefacts</a>
+</div>
+
+<section class="card" id="stems">
+<h2>STEMS</h2>
+{% set stems = result ? (result.no_chord_benchmark.stems ?? null) : null %}
+{% if stems and stems.available %}
+  <span class="badge ok">Disponible</span>
+  <div class="kv" style="margin-top:12px">
+    <div>Source</div><div>{{ stems.source ?? 'EZStudio_lab STEMS' }}</div>
+    <div>Run</div><div>{{ stems.run ?? '—' }}</div>
+    <div>Stockage</div><div>{{ stems.storage_root ?? '—' }}</div>
+  </div>
+{% else %}
+  <span class="badge">Indisponible</span>
+  {% if stems and stems.reason %}<p class="meta">{{ stems.reason }}</p>{% endif %}
+{% endif %}
+</section>
+
+<section class="card" id="chords">
+<h2>CHORDS</h2>
+{% if result %}
+<div class="kv">
+  <div>Engine</div><div>{{ result.engine_version ?? run.engine_version }}</div>
+  <div>Signature</div><div>{{ result.signature ?? '—' }}</div>
+  <div>Tempo</div><div>{{ result.tempo is defined ? result.tempo|number_format(3) ~ ' BPM' : '—' }}</div>
+  <div>Beats</div><div>{{ result.beat_grid_s is defined ? result.beat_grid_s|length : 0 }}</div>
+  <div>Segments</div><div>{{ result.segments is defined ? result.segments|length : 0 }}</div>
+</div>
+<h3>Méthodes métriques</h3>
+<table>
+<thead><tr><th>Méthode</th><th>Phase</th><th>Score</th><th>Marge</th></tr></thead>
+<tbody>
+{% for a in algorithms %}
+<tr><td>{{ a.algorithm }}</td><td>P{{ a.phase }}</td><td>{{ a.score|number_format(5) }}</td><td>{{ a.margin|number_format(5) }}</td></tr>
+{% else %}<tr><td colspan="4">Aucun résultat.</td></tr>{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p class="meta">Analyse non terminée.</p>
+{% endif %}
+</section>
+
+<section class="card" id="no-chord">
+<h2>NO-CHORD</h2>
+{% set nc = result ? (result.no_chord_benchmark ?? null) : null %}
+{% if nc %}
+<div class="kv">
+  <div>Token interne</div><div>{{ nc.contract.internal_token ?? 'N' }}</div>
+  <div>Variante active</div><div>{{ nc.active_variant ?? '—' }}</div>
+  <div>Sources</div><div>{{ nc.evidence_only is defined ? nc.evidence_only|length ~ ' beats instrumentés' : '—' }}</div>
+</div>
+{% else %}
+<p class="meta">Pas de diagnostic No-Chord.</p>
+{% endif %}
+</section>
+
+<section class="card" id="lyrics">
+<h2>LYRICS</h2>
+<span class="badge warn">Item prêt contractuellement · moteur non encore branché</span>
+</section>
+
+<section class="card" id="diagnostics">
+<h2>Diagnostics</h2>
+{% if plots %}
+<div class="diagnostics-grid">
+{% for plot in plots %}
+  <figure class="diag">
+    <img loading="lazy" src="{{ path('lab_plot',{id:run.id,file:plot}) }}" alt="{{ plot }}">
+    <figcaption class="meta">{{ plot }}</figcaption>
+  </figure>
+{% endfor %}
+</div>
+{% else %}
+<p class="meta">Aucun graphique V10 trouvé pour ce run.</p>
+{% endif %}
+</section>
+
+<section class="card" id="logs">
+<h2>Logs</h2>
+<pre class="log">{% for line in logs %}[{{ line.created_at }}] {{ line.level }} {{ line.message }}
+{% else %}Aucun log.{% endfor %}</pre>
+</section>
+
+<section class="card" id="artifacts">
+<h2>Artefacts</h2>
+{% if observability %}
+<div class="kv">
+  <div>Observability</div><div>{{ observability.observability_version ?? '—' }}</div>
+  <div>Artifact root</div><div>{{ observability.artifact_root ?? '—' }}</div>
+  <div>Export</div><div>{{ observability.scientific_zip ?? '—' }}</div>
+</div>
+{% else %}
+<p class="meta">Pas d'artefact d'observabilité enregistré.</p>
+{% endif %}
+</section>
+
+{% endblock %}

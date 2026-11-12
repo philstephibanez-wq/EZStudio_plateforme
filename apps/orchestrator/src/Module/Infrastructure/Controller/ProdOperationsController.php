@@ -12,7 +12,7 @@ final class ProdOperationsController
     private function allowed(Request $request): bool
     {
         return ($_SERVER['APP_ENV'] ?? getenv('APP_ENV') ?: '') === 'dev'
-            && in_array($request->getHost(), ['127.0.0.1', 'localhost'], true)
+            && in_array($request->getHost(), ['127.0.0.1', 'localhost', 'orchestrator.ezstudio.local'], true)
             && in_array($request->getClientIp(), ['127.0.0.1', '::1'], true);
     }
 

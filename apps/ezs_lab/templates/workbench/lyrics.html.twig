@@ -1,0 +1,9 @@
+{% extends 'base.html.twig' %}
+{% block title %}LYRICS · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero"><div><h1>LYRICS</h1><div class="meta">Transcription et alignement de la chanson sélectionnée.</div></div></div>
+{% include 'workbench/_song_selector.html.twig' %}
+{% if latest_run %}
+<div class="card"><a class="button secondary" href="{{ path('lab_run',{id:latest_run.id}) }}#lyrics">Voir le run scientifique #{{ latest_run.id }}</a></div>
+{% endif %}
+{% endblock %}

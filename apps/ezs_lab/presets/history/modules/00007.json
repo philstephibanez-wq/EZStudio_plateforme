@@ -1,0 +1,35 @@
+{
+  "composition": {
+    "device": "cuda:0",
+    "engine": {
+      "name": "transformers.CLAP",
+      "version": "5.9.0"
+    },
+    "family": "semantic",
+    "id": "semantic.clap-open-vocabulary",
+    "implementation": {
+      "callable": "genes.semantic_clap_open_vocab.run",
+      "source_sha256": "460a56f5651d92b7e961cc91142a2c4a70977bd6b23afddb08a9f3f604483560"
+    },
+    "model": {
+      "id": "laion/clap-htsat-unfused",
+      "path": "H:\\AIModels\\audio\\profile\\clap-htsat-unfused"
+    },
+    "name": "CLAP Open Vocabulary",
+    "order": 60,
+    "parameters": {
+      "chunk_seconds": 10.0,
+      "max_chunks": 8,
+      "taxonomy": "ezstudio-r3b10"
+    },
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-09T20:17:26+00:00",
+  "fingerprint": "82d4b374d412268e1336dbcd794df20c03794acae150e30c9793f289d161b798",
+  "id": 7,
+  "module_key": "semantic.clap-open-vocabulary",
+  "revision_number": 1,
+  "revision_ref": "semantic.clap-open-vocabulary.r1",
+  "schema": "ezstudio.preset.export.module.v1"
+}

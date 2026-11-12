@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+{% block title %}Preset · {{ song.title }} · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero">
+  <div>
+    <h1>Preset — {{ song.title }}{% if song.artist %} · {{ song.artist }}{% endif %}</h1>
+    <div class="meta">Branches expérimentales immuables de la chanson.</div>
+  </div>
+</div>
+
+<div class="card">
+<table>
+<thead><tr><th>Run</th><th>Item</th><th>État</th><th>Moteur</th><th>Modèle</th><th>Créé</th><th></th></tr></thead>
+<tbody>
+{% for run in runs %}
+<tr>
+<td><code>{{ run.public_id }}</code></td>
+<td>{{ run.item|upper }}</td>
+<td>{{ run.state }}</td>
+<td>{{ run.engine_name ?: '—' }}{% if run.engine_version %} · {{ run.engine_version }}{% endif %}</td>
+<td>{{ run.model_name ?: '—' }}</td>
+<td>{{ run.created_at }}</td>
+<td><a class="button secondary" href="{{ path('scientific_run',{id:run.id}) }}">Preset</a></td>
+</tr>
+{% else %}
+<tr><td colspan="7">Aucun run Preset enregistré pour cette chanson.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

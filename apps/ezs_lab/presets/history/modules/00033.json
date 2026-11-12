@@ -1,0 +1,33 @@
+{
+  "composition": {
+    "device": null,
+    "engine": {
+      "name": "librosa",
+      "version": "0.11.0"
+    },
+    "family": "descriptors",
+    "id": "descriptors.librosa-lowlevel",
+    "implementation": {
+      "callable": "modules.descriptors_librosa.run",
+      "source_sha256": "c1988225fee6f64f435628f5021aa3a6c04075193732b7449714aaab87d38af0"
+    },
+    "model": {
+      "id": null,
+      "path": null
+    },
+    "name": "Librosa Low-Level Descriptors",
+    "order": 40,
+    "parameters": {
+      "rolloff_percent": 0.85
+    },
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-10T11:59:46+00:00",
+  "fingerprint": "d7c8e7311dc5a4a057f7739b8bf734120bf605da0a9a85e690a756a54bb2d918",
+  "id": 33,
+  "module_key": "descriptors.librosa-lowlevel",
+  "revision_number": 3,
+  "revision_ref": "descriptors.librosa-lowlevel.r3",
+  "schema": "ezstudio.preset.export.module.v1"
+}

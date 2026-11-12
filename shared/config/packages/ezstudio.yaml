@@ -1,0 +1,13 @@
+parameters:
+    ezstudio.platform_root: '%kernel.project_dir%'
+    ezstudio.orchestrator_dir: '%kernel.project_dir%/apps/orchestrator'
+    ezstudio.lab_dir: '%kernel.project_dir%/apps/ezs_lab'
+    ezstudio.assistant_dir: '%kernel.project_dir%/apps/ezs_assistant'
+    ezstudio.dev_dir: '%kernel.project_dir%/apps/ezstudio_dev'
+    ezstudio.prod_dir: '%kernel.project_dir%/apps/ezstudio'
+    ezstudio.data_dir: '%kernel.project_dir%/data'
+    ezstudio.state_dir: '%kernel.project_dir%/var/ezstudio_state'
+    ezstudio.php_bin: '%env(default:default_php_bin:EZS_PHP_BIN)%'
+    ezstudio.python_bin: '%env(default:default_python_bin:EZS_PYTHON_BIN)%'
+    default_php_bin: 'php'
+    default_python_bin: 'python'

@@ -73,7 +73,7 @@ final class GlobalQueueReceiver implements TransportInterface
     {
         if (time() < $this->nextAdmissionPoll) return;
         $this->nextAdmissionPoll = time() + 10;
-        $lab = 'H:/EZStudio_lab';
+        $lab = dirname(__DIR__, 4) . '/apps/ezs_lab';
         if (!is_file($lab.'/bin/console')) return;
         $process = new Process([PHP_BINARY, 'bin/console', 'lab:queue:publish-pending', '--apply'], $lab);
         $process->setTimeout(15);

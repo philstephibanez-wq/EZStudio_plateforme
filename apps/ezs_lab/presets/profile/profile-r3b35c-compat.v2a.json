@@ -1,0 +1,164 @@
+{
+  "schema": "ezstudio.phase-preset.v1",
+  "id": "profile.r3b35c-compat",
+  "revision": "v2a",
+  "phase": "profile",
+  "settings": {
+    "migration_mode": "compatibility",
+    "scientific_baseline": "R3B35C",
+    "production_runner_switch": false
+  },
+  "modules": [
+    {
+      "id": "rhythm.librosa-beat",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "librosa",
+      "order": 10,
+      "settings": {
+        "analysis_sample_rate": 22050,
+        "mono": true
+      }
+    },
+    {
+      "id": "meter.chords-shared-r9",
+      "revision": "r9",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "chords_metric_r9",
+      "model": "beat-this-final0",
+      "device": "cuda:0",
+      "order": 20,
+      "settings": {
+        "confidence": 0.5
+      }
+    },
+    {
+      "id": "tonal.krumhansl-schmuckler",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "librosa-chroma-cqt+ks",
+      "order": 30,
+      "settings": {
+        "chroma": "CQT"
+      }
+    },
+    {
+      "id": "tonal.madmom-key-cnn-2017",
+      "revision": "2017",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "madmom-infer",
+      "model": "CPJKU-key-cnn-2017-ensemble4",
+      "device": "cpu:numpy",
+      "order": 31
+    },
+    {
+      "id": "tonal.madmom-key-cnn-2018",
+      "revision": "2018",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "madmom-infer",
+      "model": "CPJKU-key-cnn-2018",
+      "device": "cpu:numpy",
+      "order": 32
+    },
+    {
+      "id": "descriptors.librosa-lowlevel",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "librosa",
+      "order": 40,
+      "settings": {
+        "rolloff_percent": 0.85
+      }
+    },
+    {
+      "id": "semantic.clap-open-vocabulary",
+      "revision": "r3b35c-compat-v1",
+      "phase": "profile",
+      "adapter": "clap-zero-shot",
+      "engine": "transformers.CLAP",
+      "model": "laion/clap-htsat-unfused",
+      "device": "cuda:0",
+      "order": 60,
+      "settings": {
+        "chunk_seconds": 10.0,
+        "max_chunks": 8,
+        "taxonomy": "ezstudio-r3b10",
+        "cuda_batching": true
+      },
+      "decision": {
+        "mode": "module-config"
+      }
+    },
+    {
+      "id": "embedding.mert-95m",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "transformers.MERT",
+      "model": "m-a-p/MERT-v1-95M",
+      "device": "cuda:0",
+      "order": 70,
+      "settings": {
+        "chunk_seconds": 10.0,
+        "max_chunks": 6,
+        "aggregation": "mean",
+        "dtype": "float16"
+      }
+    },
+    {
+      "id": "embedding.mert-330m",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "transformers.MERT",
+      "model": "m-a-p/MERT-v1-330M",
+      "device": "cuda:0",
+      "order": 71,
+      "settings": {
+        "chunk_seconds": 10.0,
+        "max_chunks": 6,
+        "aggregation": "mean",
+        "dtype": "float16"
+      }
+    },
+    {
+      "id": "semantic.panns-cnn14",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "panns-inference",
+      "model": "Cnn14_mAP=0.431",
+      "device": "cuda:0",
+      "order": 80,
+      "settings": {
+        "sample_rate": 32000,
+        "chunk_seconds": 10.0,
+        "max_chunks": 8
+      }
+    },
+    {
+      "id": "semantic.passt-audioset",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "legacy-profile-callable",
+      "engine": "hear21passt",
+      "model": "passt_s_swa_p16_128_ap476",
+      "device": "cuda:0",
+      "order": 81,
+      "settings": {
+        "sample_rate": 32000,
+        "chunk_seconds": 10.0,
+        "max_chunks": 8
+      }
+    }
+  ],
+  "outputs": {
+    "compatibility_target": "profile-run-78"
+  }
+}

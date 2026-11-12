@@ -1,0 +1,43 @@
+<aside class="perf-panel" id="ezs-performance-panel"
+       data-telemetry-url="{{ path('lab_gpu_telemetry') }}"
+       aria-label="Performance GPU">
+  <div class="perf-drawer">
+    <div class="perf-head"><div><div class="perf-kicker">PERFORMANCE</div><h2>GPU</h2><div class="perf-device" data-perf-name>NVIDIA</div></div></div>
+    <div class="perf-primary">
+      <div class="perf-chart-head"><span>Utilisation GPU</span><strong data-perf-util>—</strong></div>
+      <svg class="perf-chart perf-chart--large" viewBox="0 0 360 120" preserveAspectRatio="none">
+        <g class="perf-grid"><line x1="0" y1="30" x2="360" y2="30"/><line x1="0" y1="60" x2="360" y2="60"/><line x1="0" y1="90" x2="360" y2="90"/><line x1="90" y1="0" x2="90" y2="120"/><line x1="180" y1="0" x2="180" y2="120"/><line x1="270" y1="0" x2="270" y2="120"/></g>
+        <polygon class="perf-area" data-perf-area="util" points=""/><polyline class="perf-line" data-perf-line="util" points=""/>
+      </svg>
+      <div class="perf-scale"><span>120 secondes</span><span>100 %</span></div>
+    </div>
+    <div class="perf-mini-grid">
+      {% for key,label in {memory:'Mémoire GPU',power:'Puissance',temp:'Température',clock:'Horloge SM'} %}
+      <div class="perf-mini">
+        <div class="perf-chart-head"><span>{{ label }}</span><strong data-perf-{{ key }}>—</strong></div>
+        <svg class="perf-chart" viewBox="0 0 174 62" preserveAspectRatio="none">
+          <g class="perf-grid"><line x1="0" y1="31" x2="174" y2="31"/><line x1="58" y1="0" x2="58" y2="62"/><line x1="116" y1="0" x2="116" y2="62"/></g>
+          <polygon class="perf-area" data-perf-area="{{ key }}" points=""/><polyline class="perf-line" data-perf-line="{{ key }}" points=""/>
+        </svg>
+        <small data-perf-{{ key }}-detail>—</small>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="perf-stats">
+      <div><span>Utilisation</span><strong data-stat-util>—</strong></div><div><span>Mémoire dédiée</span><strong data-stat-memory>—</strong></div>
+      <div><span>Puissance</span><strong data-stat-power>—</strong></div><div><span>Température</span><strong data-stat-temp>—</strong></div>
+      <div><span>Horloge SM</span><strong data-stat-clock>—</strong></div><div><span>État</span><strong data-stat-state>—</strong></div>
+    </div>
+    <div class="perf-foot"><span data-perf-status>Initialisation télémétrie…</span><span>2 s · 120 s</span></div>
+  </div>
+</aside>
+<style>
+.perf-panel{position:fixed;left:0;top:56px;bottom:0;width:var(--ezs-perf-width,320px);z-index:900;font-family:Arial,sans-serif}
+.perf-drawer{box-sizing:border-box;width:100%;height:100%;overflow:auto;background:#f7f8fa;border-right:1px solid #cfd4da;padding:14px 12px}
+.perf-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}.perf-kicker{font-size:10px;letter-spacing:.12em;color:#6b737c}.perf-head h2{font-size:26px;margin:2px 0}.perf-device{font-size:12px;color:#68707c}
+.perf-primary,.perf-mini{background:#fff;border:1px solid #d9dde3;border-radius:8px;padding:10px}.perf-primary{margin-bottom:9px}.perf-chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:5px}.perf-chart-head span{font-size:11px;color:#59616a}.perf-chart-head strong{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.perf-chart{display:block;width:100%;height:62px;border:1px solid #dce2e8;background:#fbfcfd}.perf-chart--large{height:120px}.perf-grid line{stroke:#e7ebef;stroke-width:1;vector-effect:non-scaling-stroke}.perf-line{fill:none;stroke:#4b78a8;stroke-width:1.6;vector-effect:non-scaling-stroke;stroke-linejoin:round}.perf-area{fill:#dce9f5;opacity:.6}
+.perf-scale{display:flex;justify-content:space-between;color:#7a828a;font-size:9px;margin-top:4px}.perf-mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.perf-mini small{display:block;color:#7b838c;font-size:9px;margin-top:4px}
+.perf-stats{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:14px;border-top:1px solid #d9dde3}.perf-stats>div{padding:9px 3px;border-bottom:1px solid #e4e7ea}.perf-stats span{display:block;color:#69717a;font-size:10px}.perf-stats strong{display:block;margin-top:2px;font-size:14px;font-variant-numeric:tabular-nums}
+.perf-foot{font-size:9px;color:#79818a;display:flex;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap}.perf-live-on{color:#218c4a!important}
+</style>

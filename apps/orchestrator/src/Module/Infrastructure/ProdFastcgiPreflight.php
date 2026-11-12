@@ -18,7 +18,7 @@ final class ProdFastcgiPreflight
         if (!is_string($dev) || !is_string($prod) || strcasecmp(str_replace('/', '\\', $dev), str_replace('/', '\\', $prod)) === 0) {
             throw new \RuntimeException('PROD_DEV_ROOT_COLLISION');
         }
-        if (strtolower(str_replace('/', '\\', $prod)) !== strtolower('H:\\EZScore')) {
+        if (strtolower(str_replace('/', '\\', $prod)) !== strtolower(dirname(__DIR__, 4) . '/apps/ezstudio')) {
             throw new \RuntimeException('PROD_ROOT_UNEXPECTED');
         }
         if (!is_file($prod.'/public/index.php')) {

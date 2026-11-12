@@ -5,7 +5,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
-$root='H:\EZS_orchestrator'
+$root=(Resolve-Path "$PSScriptRoot\..").Path
 $exe='H:\FRANKENPHP\bin\frankenphp.exe'
 $config=Join-Path $root ('config\frankenphp\Caddyfile.'+$Site+'.native')
 $ports=if($Site -eq 'prod'){@(8501,8510,8511)}elseif($Site -eq 'dev'){@(8502,8602)}else{@(8702,8701)}
@@ -38,7 +38,7 @@ function Assert-Entries {
     if(!(Test-Path -LiteralPath $config -PathType Leaf)){throw 'NATIVE_CONFIG_MISSING'}
     $caddyText=Get-Content -LiteralPath $config -Raw -Encoding UTF8 -ErrorAction Stop
     if($caddyText -match '(?i)\bphp_fastcgi\b|\bphp-cgi\b'){throw 'NATIVE_CONFIG_LEGACY_FASTCGI_REFUSED'}
-    $entries=if($Site -eq 'prod'){@('H:\EZScore\public\index.php','H:\EZS_orchestrator\runtime_components\prod_gateway_php\router.php')}elseif($Site -eq 'dev'){@('H:\EZScore_dev\public\index.php')}else{@('H:\EZStudio_lab\public\index.php')}
+    $entries=if($Site -eq 'prod'){@('H:\EZScore\public\index.php','$(Resolve-Path "$PSScriptRoot\..")\runtime_components\prod_gateway_php\router.php')}elseif($Site -eq 'dev'){@('H:\EZScore_dev\public\index.php')}else{@('$(Resolve-Path "$PSScriptRoot\..\..\ezs_lab")\public\index.php')}
     foreach($f in $entries){if(!(Test-Path -LiteralPath $f -PathType Leaf)){throw ('PHP_ENTRY_MISSING '+$f)}}
 }
 function Assert-No-Foreign($owned,$listeners) {

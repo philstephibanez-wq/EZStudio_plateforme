@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}EZStudio_lab{% endblock %}</title>
+<style>
+:root{
+  --bg:#f5f6f8;--panel:#fff;--ink:#17191d;--muted:#68707c;--line:#d9dde3;
+  --accent:#20242a;--soft:#eef1f4;--ok:#e9f6ed;--warn:#fff6df;--off:#f0f1f3
+}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;margin:0;background:var(--bg);color:var(--ink)}
+header{background:#1e2227;color:#fff;border-bottom:1px solid #000}
+.header-inner{max-width:1760px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:28px}
+.brand{font-size:19px;font-weight:700;color:#fff;text-decoration:none;white-space:nowrap}
+.brand small{font-size:11px;font-weight:400;color:#bfc5cc;margin-left:7px}
+.main-nav{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.main-nav a{color:#e8eaed;text-decoration:none;padding:7px 11px;border-radius:4px;border:1px solid #464c54}
+.main-nav a:hover{background:#30363d}
+.wrap{max-width:1760px;margin:18px auto;padding:0 18px 40px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:16px}
+.hero{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
+.hero h1{margin:0 0 6px;font-size:26px}
+.meta{color:var(--muted);font-size:12px}
+.pipeline{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:12px;margin:16px 0}
+.item-card{background:#fff;border:1px solid var(--line);border-top:4px solid #333;border-radius:6px;padding:14px;min-height:132px}
+.item-card h2{font-size:17px;margin:0 0 8px}
+.item-card p{font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.4}
+.item-card .tabs{font-size:11px;color:#555}
+.badge{display:inline-block;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700;background:var(--off)}
+.badge.ok{background:var(--ok)}
+.badge.warn{background:var(--warn)}
+.badge.error{background:#a32135;color:#fff}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+label{display:flex;flex-direction:column;gap:5px;font-size:13px}
+input,select,button{font:inherit;padding:8px}
+button,.button{cursor:pointer;background:#252a30;color:#fff;border:1px solid #111;border-radius:4px;padding:8px 12px;text-decoration:none;display:inline-block}
+button.secondary,.button.secondary{background:#fff;color:#222;border-color:#aaa}
+table{width:100%;border-collapse:collapse;background:#fff}
+th,td{border-bottom:1px solid var(--line);padding:9px;text-align:left;font-size:13px;vertical-align:top}
+th{background:#f5f6f7;font-size:12px;color:#555}
+a{color:#222}
+.status-grid{display:flex;gap:5px;flex-wrap:wrap}
+.run-link{font-weight:700;text-decoration:none}
+.run-link:hover{text-decoration:underline}
+.item-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 16px}
+.item-tabs a{padding:7px 10px;background:#fff;border:1px solid var(--line);border-radius:4px;text-decoration:none;font-size:12px}
+.diagnostics-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.diag{border:1px solid var(--line);background:#fff;padding:8px}
+.diag img{width:100%;height:auto;display:block}
+pre.log{background:#111820;color:#d9e0e7;padding:12px;overflow:auto;max-height:420px;font:12px Consolas,monospace;white-space:pre-wrap}
+.kv{display:grid;grid-template-columns:190px 1fr;gap:6px 12px;font-size:13px}
+.kv div:nth-child(odd){color:var(--muted)}
+@media(max-width:1050px){.pipeline{grid-template-columns:repeat(2,1fr)}.diagnostics-grid{grid-template-columns:1fr}}
+@media(max-width:650px){.pipeline{grid-template-columns:1fr}.header-inner{align-items:flex-start;flex-direction:column;gap:10px}}
+{% block styles %}{% endblock %}
+/* EZSTUDIO_R3B21B3_FIXED_LEFT_PERFORMANCE */
+:root{--ezs-perf-width:330px}
+.wrap{
+  max-width:none !important;
+  margin:18px 18px 0 calc(var(--ezs-perf-width) + 18px) !important;
+  padding:0 18px 40px !important;
+}
+@media(max-width:1050px){
+  :root{--ezs-perf-width:280px}
+}
+
+
+/* EZSTUDIO_NAV_ACTIVE_R3A3_CSS */
+.main-nav a.active,
+.main-nav a[aria-current="page"]{
+  background:#f5f6f8;
+  color:#17191d;
+  border-color:#f5f6f8;
+  font-weight:700;
+  box-shadow:0 0 0 1px rgba(255,255,255,.12) inset;
+}
+.main-nav a.active:hover,
+.main-nav a[aria-current="page"]:hover{
+  background:#fff;
+}
+</style>
+  <link rel="stylesheet" href="/vendor/jquery-ui/jquery-ui.css">
+<style id="ezstudio-r3b22-layout">
+/* EZSTUDIO_R3B22_FIXED_LEFT_PERFORMANCE */
+:root{--ezs-perf-width:320px}
+.wrap{max-width:none!important;margin:18px 18px 0 calc(var(--ezs-perf-width) + 18px)!important;padding:0 18px 40px!important}
+@media(max-width:1050px){:root{--ezs-perf-width:280px}}
+</style>
+<link rel="stylesheet" href="/css/ezstudio-dark.css?v=1">
+<style id="ezs-queue-confirm-css">
+.ezs-confirm-dialog{max-width:min(92vw,470px);width:470px;padding:0;border:1px solid #536478;border-radius:12px;background:#1a232f;color:#eff5fc;box-shadow:0 16px 60px #000b;font:inherit}
+.ezs-confirm-dialog::backdrop{background:#020710b8;backdrop-filter:blur(2px)}
+.ezs-confirm-header{padding:17px 20px;border-bottom:1px solid #425063;display:flex;align-items:center;justify-content:space-between}
+.ezs-confirm-close{border:0;background:transparent;color:#cbd5e1;font-size:22px;padding:0 4px}
+.ezs-confirm-body{padding:22px 20px;line-height:1.5}
+.ezs-confirm-actions{display:flex;gap:10px;justify-content:flex-end;padding:14px 20px 18px}
+.ezs-confirm-actions button{border-radius:7px;padding:9px 16px}
+.ezs-confirm-keep{background:#354253;border-color:#57667c;color:#fff}
+.ezs-confirm-accept{background:#b72c3b;border-color:#e14d60;color:#fff;font-weight:600}
+.ezs-confirm-dialog button:focus-visible{outline:3px solid #75c2ff;outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+<div class="header-inner">
+  <a class="brand" href="{{ path('workbench_home') }}">EZStudio_lab <small>v{{ lab_version }} · Audio Analysis Laboratory</small></a>
+  {% set route_name = app.request.attributes.get('_route') %}
+{% set current_song_id =
+  (selected_song is defined and selected_song ? selected_song.id :
+   (run is defined and run and run.song_id is defined ? run.song_id : app.request.query.get('song')))
+%}
+<nav class="main-nav" aria-label="Pipeline">
+  <a href="{{ path('workbench_home') }}"
+     class="{{ route_name == 'workbench_home' ? 'active' : '' }}"
+     {% if route_name == 'workbench_home' %}aria-current="page"{% endif %}>Catalogue</a>
+  <a href="{{ path('workbench_profile', current_song_id ? {song:current_song_id} : {}) }}"
+     class="{{ route_name == 'workbench_profile' ? 'active' : '' }}"
+     {% if route_name == 'workbench_profile' %}aria-current="page"{% endif %}>Profile</a>
+  <a href="{{ path('workbench_stems', current_song_id ? {song:current_song_id} : {}) }}"
+     class="{{ route_name == 'workbench_stems' ? 'active' : '' }}"
+     {% if route_name == 'workbench_stems' %}aria-current="page"{% endif %}>Stems</a>
+  <a href="{{ path('lab_chords_experiment', current_song_id ? {song:current_song_id} : {}) }}"
+     class="{{ route_name in ['lab_chords_experiment','bench_view'] ? 'active' : '' }}"
+     {% if route_name in ['lab_chords_experiment','bench_view'] %}aria-current="page"{% endif %}>Chords</a>
+  <a href="{{ path('workbench_lyrics', current_song_id ? {song:current_song_id} : {}) }}"
+     class="{{ route_name == 'workbench_lyrics' ? 'active' : '' }}"
+     {% if route_name == 'workbench_lyrics' %}aria-current="page"{% endif %}>Lyrics</a>
+  <a href="{{ path('workbench_runs', current_song_id ? {song:current_song_id} : {}) }}"
+     class="{{ route_name in ['workbench_runs','lab_run'] ? 'active' : '' }}"
+     {% if route_name in ['workbench_runs','lab_run'] %}aria-current="page"{% endif %}>Runs</a>
+</nav>
+</div>
+</header>
+{% include '_gpu_monitor.html.twig' %}
+<div class="wrap">{% block body %}{% endblock %}</div>
+{% if app.environment == 'dev' and app.request.host in ['127.0.0.1', 'localhost'] %}
+<aside id="ezstudio-dev-diagnostic-region" class="wrap" aria-label="Diagnostic des jobs LAB">
+  <details id="ezstudio-queue-diagnostic" class="card" data-url="{{ path('lab_local_queue_diagnostic') }}">
+    <summary style="cursor:pointer;font-weight:700">Diagnostic technique LAB — demandes, jobs et exécutions</summary>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <button type="button" id="ezstudio-queue-diagnostic-refresh">Actualiser</button>
+      <button type="button" id="ezstudio-queue-diagnostic-copy" class="secondary">Copier le diagnostic JSON</button>
+      <span role="status" aria-live="polite" id="ezstudio-queue-diagnostic-status">Non collecté</span>
+    </div>
+    <pre id="ezstudio-queue-diagnostic-output" tabindex="0" class="log">{ "status": "NON_COLLECTE" }</pre>
+    <div class="meta">Observation locale uniquement, sans données audio privées ni commande sur les workers. L'état global non consulté reste inconnu.</div>
+  </details>
+</aside>
+{% endif %}
+
+  <script src="/vendor/jquery/jquery-4.0.0.min.js"></script>
+  <script src="/vendor/jquery-ui/jquery-ui-1.14.2.min.js"></script>
+  <script src="/js/ezstudio-lab.js?v={{ lab_version|url_encode }}"></script>
+  {% if app.environment == 'dev' and app.request.host in ['127.0.0.1', 'localhost'] %}<script src="/js/ezstudio-queue-debug.js?v=1.6a38"></script>{% endif %}
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "baselines": [
+    {
+      "fingerprint": "c014913397661e641d86aac0cdff15a51d9def3963270f543d2180666a99af09",
+      "phase": "profile",
+      "phase_revision_id": 1,
+      "revision_ref": "PROFILE.r1"
+    }
+  ],
+  "schema": "ezstudio.preset.export.baselines.v1"
+}

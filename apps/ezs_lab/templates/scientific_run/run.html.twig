@@ -1,0 +1,100 @@
+{% extends 'base.html.twig' %}
+{% block title %}Preset {{ run.public_id }} · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero">
+<div>
+<h1>Preset {{ run.public_id }}</h1>
+<div class="meta">{{ run.title }}{% if run.artist %} · {{ run.artist }}{% endif %} · {{ run.item|upper }} · {{ run.state }}</div>
+</div>
+<a class="button secondary" href="{{ path('scientific_run_json',{id:run.id}) }}">JSON</a>
+</div>
+
+<div class="card">
+<h2>Identité scientifique</h2>
+<div class="kv">
+<div>Moteur</div><div>{{ run.engine_name ?: '—' }}</div>
+<div>Version</div><div>{{ run.engine_version ?: '—' }}</div>
+<div>Modèle</div><div>{{ run.model_name ?: '—' }}</div>
+<div>Checkpoint</div><div>{{ run.checkpoint ?: '—' }}</div>
+<div>Créé</div><div>{{ run.created_at }}</div>
+<div>Terminé</div><div>{{ run.finished_at ?: '—' }}</div>
+{% if run.labels.execution_contract is defined %}<div>Contrat exécution</div><div>{{ run.labels.execution_contract }}</div>{% endif %}
+{% if run.labels.execution_request is defined %}<div>Request</div><div>{{ run.labels.execution_request }}</div>{% endif %}
+</div>
+</div>
+
+<div class="card">
+<h2>Ascendance</h2>
+{% if run.parents %}
+<table><thead><tr><th>Rôle</th><th>Parent</th><th>Item</th><th>Moteur</th><th></th></tr></thead><tbody>
+{% for p in run.parents %}
+<tr>
+<td>{{ p.role }}</td>
+<td><code>{{ p.public_id }}</code></td>
+<td>{{ p.item|upper }}</td>
+<td>{{ p.engine_name ?: '—' }}</td>
+<td><a class="button secondary" href="{{ path('scientific_run',{id:p.id}) }}">Ouvrir</a></td>
+</tr>
+{% endfor %}
+</tbody></table>
+{% else %}
+<p class="meta">Run racine de sa branche.</p>
+{% endif %}
+</div>
+
+<div class="card">
+<h2>Entrées sélectionnées</h2>
+<table><thead><tr><th>Rôle d'entrée</th><th>Artefact</th><th>Rôle artefact</th><th>SHA-256</th></tr></thead><tbody>
+{% for a in run.inputs %}
+<tr>
+<td>{{ a.input_role }}</td>
+<td><code>{{ a.artifact_id }}</code></td>
+<td>{{ a.role }}</td>
+<td><code>{{ a.sha256 }}</code></td>
+</tr>
+{% else %}
+<tr><td colspan="4">Aucune entrée enregistrée.</td></tr>
+{% endfor %}
+</tbody></table>
+</div>
+
+<div class="card">
+<h2>Configuration</h2>
+<pre class="log">{{ run.config|json_encode(constant('JSON_PRETTY_PRINT')) }}</pre>
+</div>
+
+<div class="card">
+<h2>Artefacts</h2>
+<table><thead><tr><th>Rôle</th><th>ID</th><th>SHA-256</th><th>Chemin</th></tr></thead><tbody>
+{% for a in run.artifacts %}
+<tr>
+<td>{{ a.role }}</td>
+<td><code>{{ a.artifact_id }}</code></td>
+<td><code>{{ a.sha256 }}</code></td>
+<td>{{ a.path }}</td>
+</tr>
+{% else %}
+<tr><td colspan="4">Aucun artefact enregistré.</td></tr>
+{% endfor %}
+</tbody></table>
+</div>
+
+<div class="card">
+<h2>Descendance</h2>
+{% if run.children %}
+<table><thead><tr><th>Rôle</th><th>Enfant</th><th>Item</th><th>Moteur</th><th></th></tr></thead><tbody>
+{% for c in run.children %}
+<tr>
+<td>{{ c.role }}</td>
+<td><code>{{ c.public_id }}</code></td>
+<td>{{ c.item|upper }}</td>
+<td>{{ c.engine_name ?: '—' }}</td>
+<td><a class="button secondary" href="{{ path('scientific_run',{id:c.id}) }}">Ouvrir</a></td>
+</tr>
+{% endfor %}
+</tbody></table>
+{% else %}
+<p class="meta">Aucun run aval.</p>
+{% endif %}
+</div>
+{% endblock %}

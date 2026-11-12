@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param([switch]$Once)
 $ErrorActionPreference='Stop'
-$root='H:\EZS_orchestrator'
+$root=(Resolve-Path "$PSScriptRoot\..").Path
 $logDir=Join-Path $root 'var\log\supervision'
 if(!(Test-Path -LiteralPath $logDir -PathType Container)){
     New-Item -ItemType Directory -Force -Path $logDir|Out-Null

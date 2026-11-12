@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ezstudio.module-preset.v1",
+  "title": "EZStudio ModulePreset",
+  "type": "object",
+  "required": [
+    "id",
+    "revision",
+    "phase",
+    "adapter",
+    "engine"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "enum": [
+        "profile",
+        "stems",
+        "chords",
+        "lyrics"
+      ]
+    },
+    "adapter": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "device": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "order": {
+      "type": "integer"
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "settings": {
+      "type": "object"
+    },
+    "decision": {
+      "type": "object"
+    },
+    "outputs": {
+      "type": "object"
+    },
+    "diagnostics": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

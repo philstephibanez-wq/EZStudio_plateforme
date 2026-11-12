@@ -1,0 +1,188 @@
+{% extends 'base.html.twig' %}
+{% block title %}EZStudioLab Assistant{% endblock %}
+{% block body %}
+<h1>EZStudioLab Assistant</h1>
+<div class="grid">
+  <div class="card"><div class="label">État</div><div id="state" class="value">Chargement…</div></div>
+  <div class="card"><div class="label">Activité</div><div id="activity" class="value">—</div></div>
+  <div class="card"><div class="label">LAB</div><div id="lab" class="value">REST</div></div>
+  <div class="card"><div class="label">Modèles IA</div><div id="models" class="value">SMB</div></div>
+  <div class="card"><div class="label">Moteur d’inférence</div><div id="inference-state" class="value">Vérification…</div><div id="inference-version">Version non vérifiée</div><div id="inference-model">Modèle non vérifié</div><details><summary>Chemin du modèle</summary><div id="inference-model-path" style="overflow-wrap:anywhere;font-size:.8rem"></div></details></div>
+  <div class="card"><div class="label">Persistance</div><div class="value">LAB uniquement</div></div>
+  <div class="card"><div class="label">Base Assistant</div><div class="value">Aucune</div></div>
+</div>
+<div class="card" style="margin-top:14px">
+  <div class="label">Dernière trace locale PROFILE · historique, non liée au job sélectionné</div>
+  <div id="consultation-state" class="value">Aucun traitement observé</div>
+  <div id="consultation-detail">—</div>
+  <progress id="consultation-progress" max="4" value="0" style="width:100%"></progress>
+  <div class="label">Progression du traitement, pas taux de justesse · aucune validation scientifique implicite</div>
+</div>
+<section class="card" style="margin-top:14px" aria-labelledby="lab-review-title">
+  <h2 id="lab-review-title">Historique des contre-expertises PROFILE · résultats LAB</h2>
+  <p id="lab-review-explanation">Historique LAB : cette révision peut concerner une autre chanson. Elle n'est jamais présentée comme le résultat du job en cours. Pour demander une révision déterminée, utiliser ?run_id=NUMERO dans l'URL.</p>
+  <div id="lab-review-state" role="status">Chargement…</div>
+  <div id="lab-review-results"></div>
+  <button type="button" id="lab-review-refresh">Actualiser les résultats LAB</button>
+</section>
+{% endblock %}
+{% block javascripts %}
+<script>
+(function(){
+    var state=document.getElementById('lab-review-state');
+    var output=document.getElementById('lab-review-results');
+    var button=document.getElementById('lab-review-refresh');
+    function element(tag,value){
+        var node=document.createElement(tag);
+        if(value!==undefined)node.textContent=String(value);
+        return node;
+    }
+    function refresh(){
+        var selection=new URLSearchParams(window.location.search);
+        var run=selection.get('run_id');
+        var scoped=run!==null && /^[1-9][0-9]*$/.test(run);
+        state.textContent=scoped?'Lecture de la révision LAB du run #'+run+'…':'Lecture de la dernière révision historique LAB (non liée au job actuel)…';
+        fetch('/api/profile/latest-review'+(scoped?'?run_id='+encodeURIComponent(run):''),{cache:'no-store'})
+            .then(function(response){return response.json();})
+            .then(function(data){
+                output.replaceChildren();
+                if(!data.ok){state.textContent='Erreur technique : '+(data.error||'LAB inaccessible')+(data.reason?' · '+data.reason:'');return;}
+                if(data.state!=='available'){state.textContent=scoped?'Aucune révision pour le run #'+run+'.':'Aucune contre-expertise persistée dans LAB.';return;}
+                if(scoped && String(data.run_id)!==String(run)) {
+                    state.textContent='Réponse LAB non conforme : révision d’un autre run. Affichage bloqué.';
+                    return;
+                }
+                var declared=data.identity_declared||{};
+                state.textContent=(scoped?'Révision du run demandé #'+run+' · ':'HISTORIQUE LAB — PAS LE JOB COURANT · ')+'Analyse #'+(data.analysis_reference||data.run_id)+' · Preset #'+(data.preset_reference||'non renseigné')+' · Révision #'+data.revision_id+' · '+data.status+
+                    ' · Identité déclarée : '+(declared.title||'?')+' — '+(declared.artist||'?')+
+                    ' · Correspondance de l’enregistrement non confirmée';
+                var doc=data.documentary_catalogue_suggestions||{};
+                if(doc.schema){
+                    var block=element('section');block.className='card';block.style.marginTop='12px';
+                    block.appendChild(element('h3','Identité et crédits proposés · avis consultatif'));
+                    var work=doc.work||{}, recording=doc.recording||{};
+                    function field(name,value){
+                        var values=Array.isArray(value)?value:[value];
+                        var label=values.filter(function(v){return v&&v.value;}).map(function(v){
+                            return v.value+' ('+(v.status||'inconnu')+')';
+                        }).join(', ');
+                        block.appendChild(element('p',name+' : '+(label||'Non documenté')));
+                    }
+                    field('Titre complet',work.full_title);
+                    field('Interprètes',recording.performers);
+                    field('Paroliers / auteurs',work.lyricists);
+                    field('Compositeurs',work.composers);
+                    field('Arrangeurs',recording.arrangers);
+                    (doc.consulted_identity_sources||[]).forEach(function(url){
+                        if(typeof url!=='string'||!url.startsWith('https://'))return;
+                        var link=element('a',url);link.href=url;link.target='_blank';link.rel='noopener noreferrer';
+                        block.appendChild(link);
+                    });
+                    output.appendChild(block);
+                }
+                var labels={'duration':'Durée','tempo':'Tempo','meter':'Mesure','key':'Tonalité',
+                    'genre':'Genre','instrument:0':'Instruments','lead_vocal':'Voix principale',
+                    'backing_vocals':'Voix d’accompagnement','vocal_harmonies':'Harmonies vocales','choir':'Chœurs'};
+                var table=element('table');
+                table.style.width='100%';table.style.borderCollapse='collapse';
+                table.style.fontSize='0.92rem';
+                var head=element('thead'),header=element('tr');
+                ['Item','LAB','Avis','Documentaire','Référence','Preuves'].forEach(function(label){
+                    var th=element('th',label);th.style.textAlign='left';th.style.padding='9px 7px';
+                    header.appendChild(th);
+                });
+                head.appendChild(header);table.appendChild(head);
+                var body=element('tbody');
+                (data.items||[]).forEach(function(item){
+                    var observation=item.documentary_observation||{};
+                    var cmp={concordant:'Concordante',discordant:'Discordante',indeterminate:'Indéterminée'};
+                    var tr=element('tr');
+                    tr.style.borderTop='1px solid #344452';
+                    var tdName=element('td',labels[item.key]||item.key);
+                    tdName.style.padding='9px 7px';tdName.style.fontWeight='bold';
+                    tr.appendChild(tdName);
+                    var tdLab=element('td',item.lab_value||'—');tdLab.style.padding='9px 7px';tr.appendChild(tdLab);
+                    var tdVerdict=element('td',item.verdict||'INCONNU');tdVerdict.style.padding='9px 7px';
+                    tdVerdict.style.color=item.verdict==='BON'?'#93edb9':item.verdict==='MAUVAIS'?'#ffb3b3':'#c8d0db';
+                    tr.appendChild(tdVerdict);
+                    var tdComparison=element('td',observation.status?(cmp[observation.comparison]||'Indéterminée'):'—');
+                    tdComparison.style.padding='9px 7px';
+                    tdComparison.style.color=observation.comparison==='concordant'?'#a0d6ff':observation.comparison==='discordant'?'#ffd596':'#c8d0db';
+                    tr.appendChild(tdComparison);
+                    var tdRef=element('td',observation.reference_value||'—');tdRef.style.padding='9px 7px';tr.appendChild(tdRef);
+                    var tdProof=element('td');tdProof.style.padding='9px 7px';
+                    var details=element('details');var summary=element('summary','Détails');summary.style.cursor='pointer';
+                    details.appendChild(summary);
+                    details.appendChild(element('p','Avis : '+(item.verdict||'INCONNU')+' · '+(item.reason||'Aucune justification disponible')));
+                    details.appendChild(element('p','Enregistrement exact non confirmé · verdict scientifique inchangé.'));
+                    details.appendChild(element('p','Référence scientifique validée : '+(item.external_value||'aucune')));
+                    function addLinks(urls,prefix){
+                        Array.from(new Set(urls||[])).forEach(function(url,index){
+                            if(typeof url!=='string'||!url.startsWith('https://'))return;
+                            var link=element('a',prefix+' '+(index+1));
+                            link.href=url;link.target='_blank';link.rel='noopener noreferrer';
+                            link.style.display='block';details.appendChild(link);
+                        });
+                    }
+                    addLinks(observation.citations,'Référence documentaire');
+                    addLinks(item.sources,'Source consultée');
+                    if(!(item.sources||[]).length)details.appendChild(element('p','Aucune preuve scientifique admissible.'));
+                    tdProof.appendChild(details);tr.appendChild(tdProof);body.appendChild(tr);
+                });
+                table.appendChild(body);
+                var scrolling=element('div');scrolling.style.overflowX='auto';scrolling.appendChild(table);
+                output.appendChild(scrolling);
+            })
+            .catch(function(){state.textContent='Erreur technique : lecture LAB indisponible';});
+    }
+    button.addEventListener('click',refresh);
+    refresh();
+})();
+</script>
+
+
+<script>
+(function inferencePoll(){
+  $.getJSON('/api/inference/status').done(function(d){
+    $('#inference-state').text(d.state==='READY'?'PRÊT':'INDISPONIBLE').attr('class','value '+(d.ok?'ok':'bad'));
+    $('#inference-version').text('Moteur : '+(d.engine||'llama.cpp')+' · version '+(d.engine_version||'non exposée'));
+    var modelPath=String(d.model||'');
+    $('#inference-model').text('Modèle : '+(modelPath.split(/[\\\\/]/).pop()||'non identifié'));
+    $('#inference-model-path').text(modelPath||'non renseigné');
+  }).fail(function(xhr){
+    $('#inference-state').text('INDISPONIBLE').attr('class','value bad');
+    $('#inference-version').text('Version non vérifiée');
+    $('#inference-model').text('Inférence inaccessible');
+  }).always(function(){setTimeout(inferencePoll,5000);});
+})();
+(function poll(){
+  $.getJSON('/api/status').done(function(s){
+    $('#state').text(s.state||'UNKNOWN').attr('class','value '+(s.ok?'ok':'bad'));
+    $('#activity').text(s.activity||'—');
+
+    var lab=s.lab_rest||{};
+    var labOk=!!(lab.reachable&&lab.authorized);
+    $('#lab')
+      .text((labOk?'OK · ':'KO · ')+(lab.base_url||'REST'))
+      .attr('class','value '+(labOk?'ok':'bad'));
+
+    var m=s.models||{};
+    $('#models')
+      .text((m.accessible?'OK · ':'KO · ')+(m.root||'SMB'))
+      .attr('class','value '+(m.accessible?'ok':'bad'));
+
+    var c=s.profile_consultation||{};
+    var name={not_started:'Non démarré',in_progress:'En cours',completed:'Terminé',error:'Échec',unavailable:'Indisponible'};
+    $('#consultation-state').text('Historique local : '+(name[c.state]||'État inconnu'));
+    $('#consultation-detail').text(c.run_id ? ('ANCIENNE TRACE — PAS LE JOB COURANT · Run #'+c.run_id+' · '+(c.stage||'—')+' · '+(c.completed||0)+' / '+(c.total||4)+' étapes'+(c.verified_count===null||c.verified_count===undefined?'':' · '+c.verified_count+' valeurs examinées · '+(c.evidence_count||0)+' justifiées')+(c.revision?' · révision #'+c.revision:'')) : 'Aucune trace de vérification indépendante locale');
+    $('#consultation-progress').attr('max',c.total||4).val(c.completed||0);
+
+  }).fail(function(xhr){
+    $('#state').text('ERROR').attr('class','value bad');
+
+  }).always(function(){
+    setTimeout(poll,3000);
+  });
+})();
+</script>
+{% endblock %}

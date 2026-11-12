@@ -1,0 +1,33 @@
+{
+  "composition": {
+    "device": "cuda:0",
+    "engine": {
+      "name": "chords_metric_r9",
+      "version": null
+    },
+    "family": "meter",
+    "id": "meter.chords-shared-r9",
+    "implementation": {
+      "callable": "modules.meter_chords_shared.run",
+      "source_sha256": "0fa03893335d6e5b0383adb9664d368b000982cf7fb35d82606f009257fd30cc"
+    },
+    "model": {
+      "id": "beat-this-final0",
+      "path": "H:\\AIModels\\audio\\rhythm\\beat-this\\beat_this-final0.ckpt"
+    },
+    "name": "CHORDS Shared Meter R9",
+    "order": 20,
+    "parameters": [],
+    "thresholds": {
+      "confidence": 0.5
+    },
+    "weights": []
+  },
+  "created_at": "2026-10-10T11:59:46+00:00",
+  "fingerprint": "2d28a443a13dfdf2ff3bde5c643adf840af7bb9512a3bb27f9ac348c1c27b797",
+  "id": 29,
+  "module_key": "meter.chords-shared-r9",
+  "revision_number": 3,
+  "revision_ref": "meter.chords-shared-r9.r3",
+  "schema": "ezstudio.preset.export.module.v1"
+}

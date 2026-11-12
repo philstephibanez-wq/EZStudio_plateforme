@@ -1,0 +1,297 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ run.title }} · EZChords Benchmark{% endblock %}
+
+{% block styles %}
+.review-check{display:flex!important;flex-direction:row!important;align-items:center;gap:6px!important;white-space:nowrap}
+.display-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.display-controls label{display:flex;flex-direction:row;gap:6px;align-items:center}
+.volume-control{display:flex!important;flex-direction:row!important;align-items:center;gap:6px!important}
+.volume-control input[type=range]{width:120px;padding:0}
+.player-panel{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.player-panel audio{min-width:min(620px,100%);max-width:100%}
+.player-state{font-size:12px;color:#666;min-width:170px}
+.timeline-line{display:grid;grid-template-columns:205px minmax(0,1fr) 185px;gap:10px;align-items:center;margin:10px 0}
+.algo-name{font-weight:bold}
+.timeline{display:flex;overflow-x:auto;border:1px solid #444;background:#fff;height:58px;scrollbar-width:thin;scroll-behavior:smooth}
+.measure{min-width:auto;padding:0;border-right:2px solid #555;display:flex;flex-direction:column;box-sizing:border-box;font:13px Consolas,monospace;white-space:nowrap}
+.measure .n{display:block;height:16px;padding:2px 6px;box-sizing:border-box;background:#eee;border-bottom:1px solid #bbb;font:9px Arial,sans-serif;color:#777}
+.beats{display:flex;height:41px}
+.beat{min-width:68px;padding:9px 8px 6px;box-sizing:border-box;border-right:1px solid #ccc;font:15px Consolas,monospace;text-align:center;white-space:nowrap;position:relative}
+.beat:last-child{border-right:0}
+.beat.current{outline:3px solid #111;outline-offset:-3px;background:#e8e8e8;font-weight:bold}
+.measure.current-measure>.n{background:#d8d8d8;font-weight:bold}
+.algo-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.listen-button{padding:5px 9px}
+.listen-radio{display:flex;flex-direction:row;gap:5px;align-items:center}
+.choice{display:flex;gap:12px;align-items:center;justify-content:flex-end}
+.choice label{display:flex;flex-direction:row;align-items:center;gap:4px}
+@media(max-width:1100px){
+  .timeline-line{grid-template-columns:180px minmax(0,1fr) 165px}
+  .beat{min-width:62px}
+}
+@media(max-width:900px){
+  .timeline-line{grid-template-columns:1fr}
+  .choice{margin-bottom:8px;justify-content:flex-start}
+}
+{% endblock %}
+
+{% block body %}
+
+{# Transitional compatibility: avoid strict_variables failures while old/new
+   benchmark result contracts coexist. These defaults are presentation-only. #}
+{% set silence_diagnostic = silence_diagnostic|default(null) %}
+{% set no_chord_benchmark = no_chord_benchmark|default(null) %}
+
+{% set signature_used = run.detected_signature ?: run.requested_signature %}
+{% set denominator = signature_used and '/' in signature_used ? signature_used|split('/')[1] : '4' %}
+{% set rest_symbol = denominator == '8' ? '𝄾' : '𝄽' %}
+
+{% if run.status != 'done' %}
+<div class="card">
+<h1>{{ run.title }}{% if run.artist %} — {{ run.artist }}{% endif %}</h1>
+
+{% if run.status == 'error' %}
+<h2>Analyse en erreur</h2>
+<div class="meta">{{ run.error ?: 'Erreur inconnue.' }}</div>
+{% else %}
+<h2>Analyse asynchrone en cours</h2>
+<div style="margin:12px 0;height:16px;background:#ddd;position:relative">
+  <div id="run-progress-bar" style="height:100%;width:{{ run.progress }}%;background:#555"></div>
+</div>
+<div id="run-progress-text"><b>{{ run.progress }}%</b> · {{ run.status }}</div>
+<div class="meta" style="margin-top:8px">La requête HTTP est libérée. Le worker Python continue indépendamment.</div>
+<pre id="run-log-tail" style="margin-top:12px;max-height:280px;overflow:auto;white-space:pre-wrap;background:#111;color:#ddd;padding:10px"></pre>
+
+<script>
+(() => {
+  const statusUrl = {{ path('bench_status', {id:run.id})|json_encode|raw }};
+  const bar = document.getElementById('run-progress-bar');
+  const text = document.getElementById('run-progress-text');
+  const log = document.getElementById('run-log-tail');
+
+  async function poll() {
+    try {
+      const response = await fetch(statusUrl, {cache: 'no-store'});
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || ('HTTP ' + response.status));
+
+      bar.style.width = Math.max(0, Math.min(100, Number(data.progress || 0))) + '%';
+      text.innerHTML = '<b>' + Number(data.progress || 0) + '%</b> · ' + data.status;
+
+      if (Array.isArray(data.logs)) {
+        log.textContent = data.logs.map(row =>
+          (row.created_at ? row.created_at + ' ' : '') +
+          (row.level ? row.level + ' ' : '') +
+          (row.message || '')
+        ).join('\n');
+        log.scrollTop = log.scrollHeight;
+      }
+
+      if (data.done) {
+        location.reload();
+        return;
+      }
+
+      if (data.status === 'error') {
+        location.reload();
+        return;
+      }
+    } catch (err) {
+      text.textContent = 'Suivi temporairement indisponible : ' + (err.message || String(err));
+    }
+
+    setTimeout(poll, 1000);
+  }
+
+  poll();
+})();
+</script>
+{% endif %}
+</div>
+{% endif %}
+
+{% if run.status == 'done' %}
+<div class="card">
+<h1>{{ run.title }}{% if run.artist %} — {{ run.artist }}{% endif %}</h1>
+<div class="meta">
+Signature : {{ signature_used }}
+· Tempo : {{ run.tempo ? run.tempo|number_format(3) ~ ' BPM' : '—' }}
+</div>
+
+{% if meter_diagnostic %}
+<div class="meta" style="margin-top:6px">
+Auto métrique :
+initiale {{ meter_diagnostic.initial_signature ?? meter_diagnostic.signature }}
+→ utilisée {{ meter_diagnostic.signature }}
+{% if meter_diagnostic.duple_refinement is defined and meter_diagnostic.duple_refinement.applied %}
+· Δ(4/4−2/4) BeatThis = {{ meter_diagnostic.duple_refinement.delta_4_minus_2|number_format(5) }}
+{% endif %}
+</div>
+{% endif %}
+
+{% if convergence %}
+<div class="meta" style="margin-top:4px">
+Convergence : {{ convergence.distinct_phases }} phase(s) distincte(s)
+{% if convergence.unanimous %}· <b>unanimité des 6 méthodes</b>{% endif %}
+</div>
+{% endif %}
+
+{% if no_chord_benchmark %}
+<div class="meta" style="margin-top:8px">
+<b>No-Chord V7N</b> · actif : {{ no_chord_benchmark.active_variant }}
+· interne <code>N</code> · affichage {{ rest_symbol }}
+· EZScore read-only
+</div>
+<div class="meta" style="margin-top:4px">
+{% for v in no_chord_benchmark.variants %}
+{% if v.error is defined %}
+{{ v.name }} = erreur
+{% else %}
+{{ v.name }} = {{ v.no_chord_beats }}/{{ v.total_beats }}
+{% endif %}
+{% if not loop.last %} · {% endif %}
+{% endfor %}
+</div>
+{% endif %}
+</div>
+
+<div class="card">
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+<a
+  id="reanalyze-cached-stems"
+  href="{{ path('bench_reanalyze_cached_stems', {id:run.id}) }}"
+  style="display:inline-block;padding:9px 14px;border:1px solid #888;border-radius:6px;text-decoration:none;font-weight:600"
+>Ré-analyser avec stems en cache</a>
+<span class="meta">
+Recalcule accords / N / grilles sur le MP3 existant.
+Aucun redécoupage de stems : l'action est refusée si le cache stems n'existe pas.
+</span>
+</div>
+</div>
+
+<div class="card">
+<h2>Lecture synchronisée <span style="font-size:12px;color:#777;font-weight:normal">Player V7N</span></h2>
+<div class="player-panel">
+<label style="display:flex;flex-direction:row;align-items:center;gap:6px">
+<input type="checkbox" id="mp3-enabled" {% if audio_available %}checked{% else %}disabled{% endif %}>
+MP3 original{% if not audio_available %} — absent{% endif %}
+</label>
+
+<button type="button" id="master-play">▶ Lire</button>
+<button type="button" id="master-stop">■ Stop</button>
+<button type="button" id="audio-test">Test piano</button>
+
+<label class="volume-control">
+MP3
+<input type="range" id="mp3-volume" min="0" max="100" value="100">
+<span id="mp3-volume-value">100%</span>
+</label>
+
+<label class="volume-control">
+MIDI
+<input type="range" id="midi-volume" min="0" max="100" value="80">
+<span id="midi-volume-value">80%</span>
+</label>
+
+{% if audio_available %}
+<audio id="master-audio" preload="metadata" controls controlsList="nodownload" src="{{ audio_url }}"></audio>
+{% else %}
+<audio id="master-audio" preload="metadata" controls></audio>
+{% endif %}
+
+<div class="player-state" id="player-state">
+{% if audio_available %}MP3 prêt à charger.{% else %}Lecture accords seule disponible.{% endif %}
+</div>
+<div class="player-state" id="synth-state">Synthé : non initialisé</div>
+</div>
+</div>
+
+<div class="card">
+<div class="display-controls">
+<strong>Complexité des accords affichés</strong>
+<select id="chord-display-level" aria-label="Complexité des accords">
+<option value="beginner">Débutant</option>
+<option value="intermediate" selected>Intermédiaire</option>
+<option value="advanced">Confirmé</option>
+</select>
+<span class="meta">La timeline et le piano virtuel utilisent immédiatement ce niveau. L'analyse brute reste inchangée.</span>
+</div>
+</div>
+
+<div class="card">
+<form action="{{ path('bench_review',{id:run.id}) }}" method="post">
+
+{% for a in algorithms %}
+<div class="timeline-line" data-algo-row="{{ loop.index0 }}" data-algo-name="{{ a.algorithm|e('html_attr') }}">
+<div>
+<div class="algo-name">{{ a.algorithm }}</div>
+<div class="meta">P{{ a.phase }} · S {{ a.score|number_format(5) }} · M {{ a.margin|number_format(5) }}</div>
+{% set ps = phase_diagnostics[a.algorithm] ?? [] %}
+{% if ps %}
+<div class="meta">
+{% for p in ps %}
+P{{ p.phase }}={{ p.score|number_format(4) }}{% if not loop.last %} · {% endif %}
+{% endfor %}
+</div>
+{% endif %}
+<div class="algo-tools">
+<label class="listen-radio">
+<input type="radio" name="listen_algo" value="{{ loop.index0 }}" {% if loop.first %}checked{% endif %}>
+Écouter
+</label>
+<button type="button" class="listen-button" data-play-algo="{{ loop.index0 }}">▶</button>
+</div>
+</div>
+
+<div class="timeline" data-timeline="{{ loop.index0 }}">
+{% for m in a.grid %}
+<div class="measure" data-measure="{{ m.measure }}" data-start="{{ m.start_s is defined and m.start_s is not null ? m.start_s : '' }}">
+<span class="n">M{{ '%02d'|format(m.measure) }}</span>
+<div class="beats">
+{% set tokens = m.tokens is defined ? m.tokens : m.text|trim|split(' ') %}
+{% for chord in tokens %}
+{% if chord != '' %}
+<div class="beat" data-token="{{ chord|e('html_attr') }}"><span class="chord-label">{{ chord == 'N' ? rest_symbol : chord }}</span></div>
+{% endif %}
+{% endfor %}
+</div>
+</div>
+{% endfor %}
+</div>
+
+<div class="choice">
+<label class="review-check">
+<input type="checkbox" name="approved[]" value="{{ a.algorithm }}"
+{% if a.review_status == 'approved' %}checked{% endif %}>
+Bon
+</label>
+<span class="meta">
+{% if a.review_status == 'approved' %}approuvé{% elseif a.review_status == 'rejected' %}pas bon{% else %}non revu{% endif %}
+</span>
+</div>
+</div>
+{% endfor %}
+
+<div class="row" style="margin-top:18px">
+<label>Référence
+<input name="reference" value="{{ review ? review.reference : 'Riffstation' }}">
+</label>
+<label style="flex:1">Commentaire
+<input name="comment" value="{{ review ? review.comment : '' }}">
+</label>
+<button type="submit">Enregistrer</button>
+</div>
+
+</form>
+</div>
+
+<script>
+window.EZCHORDS_AUDIO_AVAILABLE = {{ audio_available ? 'true' : 'false' }};
+</script>
+<script src="/js/benchmark-player.js?v=7n"></script>
+<script src="/js/benchmark-volume-v8.js?v=8"></script>
+
+{% endif %}
+
+{% endblock %}

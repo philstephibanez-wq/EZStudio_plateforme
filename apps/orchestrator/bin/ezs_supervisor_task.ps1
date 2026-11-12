@@ -7,7 +7,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $taskName = 'EZS_orchestrator_supervisor'
-$root = 'H:\EZS_orchestrator'
+$root = (Resolve-Path "$PSScriptRoot\..").Path
 $runner = Join-Path $root 'scripts\ezs_supervisor_tick.ps1'
 $hidden = Join-Path $root 'scripts\ezs_supervisor_hidden.vbs'
 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue

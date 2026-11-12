@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+{% block title %}Comparaison {{ item|upper }} · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero">
+<div>
+<h1>Comparaison inter-chansons — {{ item|upper }}</h1>
+<div class="meta">Agrégation par moteur/version/modèle.</div>
+</div>
+</div>
+
+<div class="card">
+<table>
+<thead><tr><th>Moteur</th><th>Version</th><th>Modèle</th><th>Chansons</th><th>Runs</th></tr></thead>
+<tbody>
+{% for row in rows %}
+<tr>
+<td>{{ row.engine_name ?: '—' }}</td>
+<td>{{ row.engine_version ?: '—' }}</td>
+<td>{{ row.model_name ?: '—' }}</td>
+<td>{{ row.songs }}</td>
+<td>{{ row.runs }}</td>
+</tr>
+{% else %}
+<tr><td colspan="5">Aucune donnée comparable.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

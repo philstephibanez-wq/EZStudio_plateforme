@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ezstudio.stems.v1",
+  "title": "EZStudio STEMS exchange contract",
+  "type": "object",
+  "required": ["schema", "schema_version", "audio_hash", "timebase", "duration_seconds", "engines", "stems"],
+  "properties": {
+    "schema": {"const": "ezstudio.stems"},
+    "schema_version": {"const": 1},
+    "audio_hash": {"type": "string", "minLength": 32},
+    "timebase": {"const": "original_audio_seconds"},
+    "duration_seconds": {"type": "number", "minimum": 0},
+    "analysis_elapsed_seconds": {"type": "number", "minimum": 0},
+    "engines": {"type": "object"},
+    "stems": {
+      "type": "object",
+      "required": ["lead_vocals", "backing_vocals", "drums", "bass", "guitar", "piano", "other"]
+    }
+  }
+}

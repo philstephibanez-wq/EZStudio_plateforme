@@ -4,9 +4,9 @@ param(
     [Parameter(Mandatory=$true)][ValidateSet('Preflight','Status','Start','Stop')][string]$Action
 )
 $ErrorActionPreference = 'Stop'
-$root='H:\EZS_orchestrator'
-$native=Join-Path $root 'scripts\ezs_native_site.ps1'
-$assistant=Join-Path $root 'scripts\ezs_assistant_stack.ps1'
+$root=(Resolve-Path "$PSScriptRoot\..").Path
+$native=Join-Path $root 'bin\ezs_native_site.ps1'
+$assistant=Join-Path $root 'bin\ezs_assistant_stack.ps1'
 $exe='H:\FRANKENPHP\bin\frankenphp.exe'
 if ($Site -eq 'prod' -and $Action -eq 'Stop') {
     throw 'PROD_STOP_PROTECTED_REFUSED'

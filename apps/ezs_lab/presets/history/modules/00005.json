@@ -1,0 +1,34 @@
+{
+  "composition": {
+    "device": "cpu:numpy",
+    "engine": {
+      "name": "madmom-infer",
+      "version": "0.3.0"
+    },
+    "family": "tonal",
+    "id": "tonal.madmom-key-cnn-2018",
+    "implementation": {
+      "callable": "genes.tonal_madmom_key.run_2018",
+      "source_sha256": "dea4376308edb8b9b46d1a41ef4f5ec3ab645c5f8dc1bb51bd63eae06709006e"
+    },
+    "model": {
+      "id": "CPJKU-key-cnn-2018",
+      "path": "H:\\AIModels\\audio\\tonal\\madmom-key-cnn\\2018\\key_cnn.pkl",
+      "sha256": {
+        "key_cnn.pkl": "c58ba553be1048877662a663a2670c0051b3c2c66d109b6042ba722ed0bfc7a6"
+      }
+    },
+    "name": "Madmom Genre-Agnostic Key CNN 2018",
+    "order": 32,
+    "parameters": [],
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-09T20:17:26+00:00",
+  "fingerprint": "71922c4303e37351badf0bb475f167b9e7b1ee82841ba5cc246fb012033bef15",
+  "id": 5,
+  "module_key": "tonal.madmom-key-cnn-2018",
+  "revision_number": 1,
+  "revision_ref": "tonal.madmom-key-cnn-2018.r1",
+  "schema": "ezstudio.preset.export.module.v1"
+}

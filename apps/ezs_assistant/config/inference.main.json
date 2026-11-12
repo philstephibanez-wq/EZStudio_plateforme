@@ -1,0 +1,8 @@
+{
+  "schema": "ezstudio-assistant.inference.v1",
+  "provider": "openai-compatible",
+  "endpoint": "http://127.0.0.1:8720",
+  "model": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+  "parameters": {"temperature": 0, "max_tokens": 256},
+  "timeout_seconds": 90
+}

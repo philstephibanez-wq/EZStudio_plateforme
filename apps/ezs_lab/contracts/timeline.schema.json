@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ezstudio.timeline.v1",
+  "title": "EZStudio timeline exchange contract",
+  "type": "object",
+  "required": ["schema", "schema_version", "timebase", "beats"],
+  "properties": {
+    "schema": {"const": "ezstudio.timeline"},
+    "schema_version": {"const": 1},
+    "timebase": {"const": "original_audio_seconds"},
+    "beats": {"type": "array"},
+    "measures": {"type": "array"},
+    "chords": {"type": "array"},
+    "words": {"type": "array"}
+  }
+}

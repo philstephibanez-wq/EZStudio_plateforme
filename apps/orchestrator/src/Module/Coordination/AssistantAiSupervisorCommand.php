@@ -34,7 +34,7 @@ final class AssistantAiSupervisorCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $root = 'H:/EZStudioLab_assistant';
+        $root = dirname(__DIR__, 4) . '/apps/ezs_assistant';
         $exe = $root . '/runtime/ai/bin/llama-server.exe';
         $model = $root . '/' . self::MODEL;
         if (!is_file($exe) || !is_file($model)) {

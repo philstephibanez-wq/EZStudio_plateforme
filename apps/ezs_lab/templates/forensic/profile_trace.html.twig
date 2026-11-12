@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diagnostic brut PROFILE — {{ producer }} #{{ run_id }}</title>
+<style>
+body{font:14px system-ui,sans-serif;margin:2rem;max-width:1250px;background:#111923;color:#e5edf5}
+a{color:#9dd3ff}a:focus-visible{outline:2px solid orange}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1118;border:1px solid #304050;padding:1rem}
+nav a{margin-right:1rem;display:inline-block;margin-bottom:.8rem}small{color:#aabac9}
+</style>
+</head>
+<body>
+<h1>Diagnostic brut — {{ producer }} / PROFILE #{{ run_id }}</h1>
+<p>Trace {{ trace_id }} · État {{ manifest.completeness ?? 'non évaluée' }} · {{ documents|length }} documents</p>
+{% if manifest.omissions is defined and manifest.omissions is not empty %}<p><strong>Pièces absentes :</strong> {{ manifest.omissions|join(', ') }}</p>{% endif %}
+<p><small>Les données ont été expurgées avant archivage. Lecture locale seule, sans calcul ni reformulation.</small></p>
+<nav aria-label="Pièces de diagnostic">
+<a href="{{ path('profile_forensic_diagnostic', {producer:producer, run_id:run_id, trace_id:trace_id}) }}">Manifeste</a>
+{% for doc in documents %}<a href="{{ path('profile_forensic_diagnostic', {producer:producer, run_id:run_id, trace_id:trace_id, document:doc.logical_name}) }}">{{ doc.display_name ?? doc.logical_name }}</a>{% endfor %}
+</nav>
+<h2>{{ selected_document == '' ? 'manifest.json' : selected_document }}</h2>
+<pre id="raw-json">{{ raw_content|e('html') }}</pre>
+</body>
+</html>

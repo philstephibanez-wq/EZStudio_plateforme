@@ -2,8 +2,8 @@
 param([Parameter(Mandatory=$true)][ValidateSet('Preflight','Status','Start','Stop')][string]$Action)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
-$root='H:\EZS_orchestrator'
-$assistant='H:\EZStudioLab_assistant'
+$root=(Resolve-Path "$PSScriptRoot\..").Path
+$assistant=(Resolve-Path "$PSScriptRoot\..\..\ezs_assistant").Path
 $start=Join-Path $assistant 'scripts\start.ps1'
 $stop=Join-Path $assistant 'scripts\stop.ps1'
 $config=Join-Path $root 'config\frankenphp\Caddyfile.assistant.native'

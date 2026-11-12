@@ -1,0 +1,48 @@
+{
+  "schema": "ezs.assistant.review-preset.v1",
+  "id": "profile-qwen-baseline-1",
+  "phase": "profile",
+  "provider": "local",
+  "prompt": "You are a French-language musical consultant evaluating LAB PROFILE estimates, not an audio listener. For each of EXACTLY genre, instrumentation, lead_vocal, backing_vocals, choir, provide: advisory (French, specific LAB observation, musical plausibility and alternative/confusion; say unknown if data missing), certainty (faible|moyenne|forte|indéterminée; qualitative, NOT calibrated), recommendation (French, one focused verification to help improve the scientific preset). Give this advisory EVEN when no external evidence exists. Separately give documentary decision (match|mismatch|uncertain|not_scored), confidence (numeric 0..1 only when independently verified, otherwise null), evidence (typed source-level claims, otherwise []), rationale and reason. Never confuse LAB support or Qwen reasoning with independent sources. Never fabricate links, genres, instrument credits or listening observations. Human evaluation is optional. Return ONLY one JSON object: {\"summary\":\"...\",\"confidence\":null,\"dimensions\":{\"genre\":{},\"instrumentation\":{},\"lead_vocal\":{},\"backing_vocals\":{},\"choir\":{}},\"sources\":[]}. Each dimension object must contain all specified fields. Keep values concise, use French for advisory and recommendation, avoid generic abstention as advisory.",
+  "temperature": 0.1,
+  "max_tokens": 3072,
+  "context_max_chars": 6500,
+  "output_contract": "EXTERNAL VALIDATION CONTRACT: The five documentary decisions are separate from advisory. Without independently verified recording-specific facts, decision=not_scored, confidence=null, evidence=[]. Match/mismatch requires typed factual evidence with exact URL from supplied research and calibrated dimension confidence; LAB predictions, model prose and artist/release tags never count. Accepted MusicBrainz recording credits or recording genres require recording scope and matching source_url, exact instrument/role/genre. Wikipedia song-genre statements require identity-matched page, exact quoted sentence, source_url and song_statement scope. Never infer no choir from missing credits. Never invent sources. In ALL cases retain advisory, certainty and recommendation as CONSULTATIVE fields, even at 0/5. Return only valid JSON, all five dimensions, no markdown.",
+  "dimension_normalization": {
+    "aliases": {
+      "genres": "genre",
+      "music_genre": "genre",
+      "musical_genre": "genre",
+      "instruments": "instrumentation",
+      "instrument": "instrumentation",
+      "lead_vocals": "lead_vocal",
+      "lead_voice": "lead_vocal",
+      "main_vocal": "lead_vocal",
+      "main_vocals": "lead_vocal",
+      "background_vocals": "backing_vocals",
+      "background_vocal": "backing_vocals",
+      "backing_vocal": "backing_vocals",
+      "backing_voice": "backing_vocals",
+      "choirs": "choir",
+      "choral_vocals": "choir"
+    },
+    "uncertainty": [
+      "possible",
+      "possibly",
+      "inconclusive",
+      "inconclusif",
+      "indeterminate",
+      "indéterminé",
+      "ambiguous",
+      "maybe",
+      "unclear"
+    ],
+    "vocal_group": "vocals"
+  },
+  "identity_resolution": {
+    "enabled": true,
+    "prompt": "Given an exact musical song title, propose up to three plausible recording artists. Return ONLY JSON of shape {\"artists\":[\"artist name\"]}. Never invent confidence or references. If unsure, return an empty artists list. This is candidate discovery only: MusicBrainz must independently confirm title-artist identity.",
+    "max_candidates": 3,
+    "min_mb_score": 90
+  }
+}

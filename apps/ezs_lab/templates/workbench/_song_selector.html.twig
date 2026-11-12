@@ -1,0 +1,21 @@
+{% if songs %}
+<div class="card">
+  <form method="get" class="row">
+    <label>Chanson
+      <select name="song" onchange="this.form.submit()">
+        {% for song in songs %}
+          <option value="{{ song.id }}" {{ selected_song and song.id == selected_song.id ? 'selected' : '' }}>
+            {{ song.title }}{% if song.artist %} — {{ song.artist }}{% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if selected_song %}
+      <div>
+        <strong>{{ selected_song.title }}{% if selected_song.artist %} — {{ selected_song.artist }}{% endif %}</strong>
+        <div class="meta">{{ selected_song.source_filename }}</div>
+      </div>
+    {% endif %}
+  </form>
+</div>
+{% endif %}

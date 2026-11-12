@@ -1,9 +1,9 @@
 {
   "schema": "ezs.orchestrator.config.v5",
-  "orchestrator_root": "H:\\EZS_orchestrator",
+  "orchestrator_root": "apps/orchestrator",
   "servers": {
     "dev": {
-      "root": "H:\\EZScore_dev",
+      "root": "apps/ezstudio_dev",
       "backend_port": 8602,
       "public_port": 8502,
       "allowed_envs": [
@@ -11,11 +11,11 @@
         "prod"
       ],
       "default_env": "dev",
-      "analysis_python": "H:\\EZScore_dev\\.venv-py313\\Scripts\\python.exe",
-      "web_php": "H:\\PHP\\php-8.5-x64\\php.exe"
+      "analysis_python": "apps/ezstudio_dev\\.venv-py313\\Scripts\\python.exe",
+      "web_php": "php"
     },
     "prod": {
-      "root": "H:\\EZScore",
+      "root": "apps/ezstudio",
       "backend_port": 8511,
       "gateway_port": 8510,
       "public_port": 8501,
@@ -23,19 +23,19 @@
         "prod"
       ],
       "default_env": "prod",
-      "analysis_python": "H:\\EZScore\\.venv-py313\\Scripts\\python.exe",
-      "web_php": "H:\\PHP\\php-8.5-x64\\php.exe"
+      "analysis_python": "apps/ezstudio\\.venv-py313\\Scripts\\python.exe",
+      "web_php": "php"
     },
     "lab": {
-      "root": "H:\\EZStudio_lab",
+      "root": "apps/ezs_lab",
       "backend_port": 8701,
       "public_port": 8702,
       "allowed_envs": [
         "dev"
       ],
       "default_env": "dev",
-      "analysis_python": "H:\\Python\\pythoncore-3.14-64\\python.exe",
-      "web_php": "H:\\PHP\\php-8.5-x64\\php.exe"
+      "analysis_python": "python",
+      "web_php": "php"
     }
   },
   "analysis": {

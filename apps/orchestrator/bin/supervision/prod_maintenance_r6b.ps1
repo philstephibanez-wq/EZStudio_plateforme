@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
-$root='H:\EZS_orchestrator'
+$root=(Resolve-Path "$PSScriptRoot\..").Path
 $site='H:\EZS_maintenance'
 $php='H:\PHP\php-8.5-x64\php.exe'
 $franken='H:\FRANKENPHP\bin\frankenphp.exe'

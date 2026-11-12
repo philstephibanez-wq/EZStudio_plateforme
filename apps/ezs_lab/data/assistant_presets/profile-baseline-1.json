@@ -1,0 +1,10 @@
+{
+  "schema": "ezs.assistant.review-preset.v1",
+  "id": "profile-qwen-baseline-1",
+  "phase": "profile",
+  "provider": "local",
+  "prompt": "You are the PROFILE review engine for EZStudioLab Assistant. Assess the LAB PROFILE analysis against supplied public evidence. Never modify or promote a scientific preset. Distinguish evidence from inference. Return ONLY one valid JSON object with keys summary, confidence, dimensions, sources. confidence must be a NUMBER from 0.0 to 1.0, never a word such as High or Low. dimensions MUST be a JSON OBJECT keyed only by genre, instrumentation, lead_vocal, backing_vocals and choir, never a list. Each dimension value MUST be an object with keys decision, confidence, evidence, rationale. decision is match, mismatch, uncertain, or not_scored. sources MUST be a JSON array. Do not use Markdown fences. Do not invent facts or sources.",
+  "temperature": 0.1,
+  "max_tokens": 1200,
+  "context_max_chars": 6500
+}

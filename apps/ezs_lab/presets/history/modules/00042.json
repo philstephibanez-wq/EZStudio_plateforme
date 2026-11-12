@@ -1,0 +1,48 @@
+{
+  "composition": {
+    "device": null,
+    "engine": {
+      "method": "librosa-estimate-tuning+spectral-peak-offset",
+      "name": "librosa",
+      "version": null
+    },
+    "family": "tuning",
+    "id": "tuning.librosa-reference-pitch",
+    "implementation": {
+      "callable": "modules.tuning_librosa.run",
+      "source_sha256": "4459733be4826acfff7254d93652231ab0a1ca9029ae1ca2c01e8c2ececa357e"
+    },
+    "model": {
+      "id": null,
+      "path": null
+    },
+    "name": "Librosa Reference Pitch",
+    "order": 45,
+    "parameters": {
+      "chunk_seconds": 12.0,
+      "hpss_margin": 1.0,
+      "max_chunks": 8,
+      "resolution_semitones": 0.01,
+      "spectral_fmax_hz": 4000.0,
+      "spectral_fmin_hz": 55.0,
+      "spectral_hop_length": 2048,
+      "spectral_n_fft": 8192,
+      "spectral_peaks_per_frame": 12
+    },
+    "thresholds": {
+      "max_cross_method_disagreement_cents": 5.0,
+      "max_estimator_disagreement_cents": 5.0,
+      "minimum_chunk_support": 3,
+      "spectral_minimum_peak_count": 80,
+      "stable_mad_cents": 5.0
+    },
+    "weights": []
+  },
+  "created_at": "2026-10-11T03:04:08+00:00",
+  "fingerprint": "fd9e5392d85b59ca6657590a9154684ce40868255af62404568a9aa2660fd0e3",
+  "id": 42,
+  "module_key": "tuning.librosa-reference-pitch",
+  "revision_number": 3,
+  "revision_ref": "tuning.librosa-reference-pitch.r3",
+  "schema": "ezstudio.preset.export.module.v1"
+}

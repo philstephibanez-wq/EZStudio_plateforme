@@ -1,0 +1,105 @@
+{% extends 'base.html.twig' %}
+{% block title %}STEMS #{{ job.job_id }} · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero">
+<div>
+<h1>STEMS #{{ job.job_id }} — {{ job.song.title ?? 'Sans titre' }}</h1>
+<div class="meta">{{ job.state }} · {{ job.progress ?? 0 }}%{% if scientific_run %} · {{ scientific_run.public_id }}{% endif %}</div>
+</div>
+<span class="badge {{ job.state == 'done' ? 'ok' : (job.state == 'error' ? 'warn' : '') }}">{{ job.state }}</span>
+</div>
+
+<div class="item-tabs">
+<a href="#preset">Preset</a>
+<a href="#resultat">Résultat</a>
+<a href="#diagnostics">Diagnostics</a>
+<a href="#comparaison">Comparaison</a>
+<a href="#logs">Logs</a>
+<a href="#artefacts">Artefacts</a>
+</div>
+
+<section class="card" id="preset">
+<h2>Preset du run</h2>
+<div class="kv">
+<div>Job / run</div><div>#{{ job.job_id }}</div>
+<div>Audio hash</div><div><code>{{ job.request.audio_hash ?? '—' }}</code></div>
+<div>Song ID</div><div>{{ job.song_id ?? '—' }}</div>
+<div>Profil moteur</div><div>{{ job.request.engine_profile ?? 'canonical_roformer' }}</div>
+<div>Ré-analyse forcée</div><div>{{ job.request.force ?? false ? 'oui' : 'non' }}</div>
+<div>Parent STEMS</div><div>{{ job.request.parent_job_id ?? '—' }}</div>
+<div>Contrat</div><div>{{ job.request.output_contract ?? 'ezstudio.stems.v1' }}</div>
+<div>Run scientifique</div><div>{% if scientific_run %}<a href="{{ path('scientific_run',{id:scientific_run.id}) }}">{{ scientific_run.public_id }}</a>{% else %}—{% endif %}</div>
+<div>Artefacts du run</div><div>{{ scientific_run ? scientific_run.artifacts|length : 0 }}</div>
+<div>Source</div><div>{{ job.paths.source ?? '—' }}</div>
+<div>Stockage</div><div>{{ job.paths.storage_root ?? '—' }}</div>
+</div>
+</section>
+
+<section class="card" id="resultat"><h2>Résultat</h2>
+{% if manifest %}
+<div class="kv">
+<div>Schéma</div><div>{{ manifest.schema ?? 'ezstudio.stems' }} v{{ manifest.schema_version ?? 1 }}</div>
+<div>Timebase</div><div>{{ manifest.timebase ?? '—' }}</div>
+<div>Durée audio</div><div>{{ manifest.duration_seconds ?? '—' }} s</div>
+<div>Temps calcul</div><div>{{ manifest.analysis_elapsed_seconds ?? '—' }} s</div>
+<div>Device</div><div>{{ manifest.device ?? '—' }}</div>
+<div>Engine</div><div>{{ manifest.engine.name ?? manifest.engine ?? '—' }}</div>
+</div>
+{% elseif job.state == 'error' %}
+<p>{{ job.error ?? 'Erreur inconnue' }}</p>
+{% else %}
+<p class="meta">Résultat non encore publié.</p>
+{% endif %}
+</section>
+
+<section class="card" id="diagnostics"><h2>Diagnostics</h2>
+{% if diagnostics %}
+<table>
+<thead><tr><th>Stem</th><th>Durée</th><th>SR</th><th>RMS</th><th>Peak</th><th>Silence</th></tr></thead>
+<tbody>
+{% for name,d in diagnostics.tracks %}
+<tr>
+<td>{{ name }}</td>
+<td>{{ d.duration_seconds|number_format(3) }} s</td>
+<td>{{ d.sample_rate }}</td>
+<td>{{ d.rms|number_format(6) }}</td>
+<td>{{ d.peak|number_format(6) }}</td>
+<td>{{ (d.silence_ratio * 100)|number_format(2) }}%</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p class="meta">Diagnostics disponibles après publication.</p>
+{% endif %}
+</section>
+
+<section class="card" id="comparaison">
+<h2>Comparaison</h2>
+<p class="meta">Ce run reste immuable et peut être comparé aux autres runs STEMS de la même chanson et, via Comparaisons, aux runs d'autres chansons.</p>
+</section>
+
+<section class="card" id="logs">
+<h2>Logs</h2>
+<pre class="log">{{ worker_log ?: 'Aucun log STEMS.' }}</pre>
+</section>
+
+<section class="card" id="artefacts"><h2>Artefacts</h2>
+{% if manifest and manifest.stems is defined %}
+<table>
+<thead><tr><th>Stem</th><th>Fichier</th><th>Octets</th></tr></thead>
+<tbody>
+{% for name,a in manifest.stems %}
+<tr><td>{{ name }}</td><td>{{ a.file }}</td><td>{{ a.bytes }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p class="meta">Aucun artefact publié.</p>
+{% endif %}
+</section>
+
+{% if job.state in ['queued','running'] %}
+<script>setTimeout(()=>location.reload(),2000);</script>
+{% endif %}
+{% endblock %}

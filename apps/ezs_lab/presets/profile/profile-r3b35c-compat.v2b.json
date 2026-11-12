@@ -1,0 +1,369 @@
+{
+  "schema": "ezstudio.phase-preset.v1",
+  "id": "profile.r3b35c-compat",
+  "revision": "v2b",
+  "phase": "profile",
+  "settings": {
+    "migration_mode": "compatibility",
+    "scientific_baseline": "R3B35C",
+    "equivalence_baseline_run": 78
+  },
+  "modules": [
+    {
+      "id": "rhythm.librosa-beat",
+      "display_name": "Librosa Beat Tracker",
+      "family": "rhythm",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "librosa",
+      "order": 10,
+      "parameters": {
+        "mono": true,
+        "analysis_sample_rate": 22050
+      },
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.rhythm_librosa:run"
+      }
+    },
+    {
+      "id": "meter.chords-shared-r9",
+      "display_name": "CHORDS Shared Meter R9",
+      "family": "meter",
+      "revision": "r9",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "chords_metric_r9",
+      "order": 20,
+      "parameters": {},
+      "thresholds": {
+        "confidence": 0.5,
+        "metric_level_score_margin": 0.02,
+        "metric_level_min_score": 0.0
+      },
+      "weights": {},
+      "implementation": {
+        "callable": "modules.meter_chords_shared:run"
+      },
+      "model": "beat-this-final0",
+      "device": "cuda:0",
+      "model_path": {
+        "$env_path": "EZSTUDIO_BEAT_THIS_CHECKPOINT",
+        "default": {
+          "$path": [
+            "ai_models_root",
+            "audio",
+            "rhythm",
+            "beat-this",
+            "beat_this-final0.ckpt"
+          ]
+        }
+      }
+    },
+    {
+      "id": "tonal.krumhansl-schmuckler",
+      "display_name": "Krumhansl-Schmuckler Key",
+      "family": "tonal",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "librosa-chroma-cqt+ks",
+      "order": 30,
+      "parameters": {
+        "chroma": "CQT"
+      },
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.tonal_ks:run"
+      }
+    },
+    {
+      "id": "tonal.madmom-key-cnn-2017",
+      "display_name": "Madmom Key CNN 2017 Ensemble",
+      "family": "tonal",
+      "revision": "2017",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "madmom-infer",
+      "order": 31,
+      "parameters": {},
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.tonal_madmom_key:run_2017"
+      },
+      "model": "CPJKU-key-cnn-2017-ensemble4",
+      "device": "cpu:numpy",
+      "model_path": {
+        "$path": [
+          "ai_models_root",
+          "audio",
+          "tonal",
+          "madmom-key-cnn",
+          "2017"
+        ]
+      }
+    },
+    {
+      "id": "tonal.madmom-key-cnn-2018",
+      "display_name": "Madmom Genre-Agnostic Key CNN 2018",
+      "family": "tonal",
+      "revision": "2018",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "madmom-infer",
+      "order": 32,
+      "parameters": {},
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.tonal_madmom_key:run_2018"
+      },
+      "model": "CPJKU-key-cnn-2018",
+      "device": "cpu:numpy",
+      "model_path": {
+        "$path": [
+          "ai_models_root",
+          "audio",
+          "tonal",
+          "madmom-key-cnn",
+          "2018",
+          "key_cnn.pkl"
+        ]
+      }
+    },
+    {
+      "id": "descriptors.librosa-lowlevel",
+      "display_name": "Librosa Low-Level Descriptors",
+      "family": "descriptors",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "librosa",
+      "order": 40,
+      "parameters": {
+        "rolloff_percent": 0.85
+      },
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.descriptors_librosa:run"
+      }
+    },
+    {
+      "id": "tuning.librosa-reference-pitch",
+      "display_name": "Librosa Reference Pitch",
+      "family": "tuning",
+      "revision": "r2d",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "librosa",
+      "order": 45,
+      "parameters": {
+        "resolution_semitones": 0.01,
+        "chunk_seconds": 12.0,
+        "max_chunks": 8,
+        "hpss_margin": 1.0,
+        "cqt_offset_min_cents": -30,
+        "cqt_offset_max_cents": 30,
+        "cqt_offset_step_cents": 2,
+        "cqt_fmin_hz": 55.0,
+        "cqt_n_octaves": 6,
+        "cqt_hop_length": 2048
+      },
+      "thresholds": {
+        "minimum_chunk_support": 3,
+        "stable_mad_cents": 5.0,
+        "max_estimator_disagreement_cents": 5.0,
+        "max_cross_method_disagreement_cents": 5.0
+      },
+      "weights": {},
+      "implementation": {
+        "callable": "modules.tuning_librosa:run"
+      }
+    },
+    {
+      "id": "semantic.clap-open-vocabulary",
+      "display_name": "CLAP Open Vocabulary",
+      "family": "semantic",
+      "revision": "r3b35c-compat-v1",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "transformers.CLAP",
+      "order": 60,
+      "parameters": {
+        "chunk_seconds": 10.0,
+        "max_chunks": 8,
+        "taxonomy": "ezstudio-r3b10",
+        "batch_size": {
+          "$env_int": "EZSTUDIO_CLAP_BATCH_SIZE",
+          "default": 2,
+          "min": 1
+        },
+        "cuda_batching": true
+      },
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.semantic_clap_open_vocab:run",
+        "module_config": "profile/semantic.clap-open-vocabulary.r3b35c.json"
+      },
+      "model": "laion/clap-htsat-unfused",
+      "device": "cuda:0",
+      "model_path": {
+        "$path": [
+          "profile_models_root",
+          "clap-htsat-unfused"
+        ]
+      }
+    },
+    {
+      "id": "embedding.mert-95m",
+      "display_name": "MERT Music Embedding 95M",
+      "family": "embedding",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "transformers.MERT",
+      "order": 70,
+      "parameters": {
+        "chunk_seconds": 10.0,
+        "max_chunks": 6,
+        "aggregation": "mean",
+        "dtype": "float16",
+        "batch_size": {
+          "$env_int": "EZSTUDIO_MERT_BATCH_SIZE",
+          "default": 2,
+          "min": 1
+        }
+      },
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.embedding_mert:run_95m"
+      },
+      "model": "m-a-p/MERT-v1-95M",
+      "device": "cuda:0",
+      "model_path": {
+        "$path": [
+          "ai_models_root",
+          "audio",
+          "embeddings",
+          "mert",
+          "MERT-v1-95M"
+        ]
+      }
+    },
+    {
+      "id": "embedding.mert-330m",
+      "display_name": "MERT Music Embedding 330M",
+      "family": "embedding",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "transformers.MERT",
+      "order": 71,
+      "parameters": {
+        "chunk_seconds": 10.0,
+        "max_chunks": 6,
+        "aggregation": "mean",
+        "dtype": "float16",
+        "batch_size": {
+          "$env_int": "EZSTUDIO_MERT_BATCH_SIZE",
+          "default": 2,
+          "min": 1
+        }
+      },
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.embedding_mert:run_330m"
+      },
+      "model": "m-a-p/MERT-v1-330M",
+      "device": "cuda:0",
+      "model_path": {
+        "$path": [
+          "ai_models_root",
+          "audio",
+          "embeddings",
+          "mert",
+          "MERT-v1-330M"
+        ]
+      }
+    },
+    {
+      "id": "semantic.panns-cnn14",
+      "display_name": "PANNs CNN14 AudioSet",
+      "family": "semantic",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "panns-inference",
+      "order": 80,
+      "parameters": {
+        "sample_rate": 32000,
+        "chunk_seconds": 10.0,
+        "max_chunks": 8
+      },
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.semantic_panns:run"
+      },
+      "model": "Cnn14_mAP=0.431",
+      "device": "cuda:0",
+      "model_path": {
+        "$path": [
+          "ai_models_root",
+          "audio",
+          "semantic",
+          "panns",
+          "Cnn14_mAP=0.431.pth"
+        ]
+      }
+    },
+    {
+      "id": "semantic.passt-audioset",
+      "display_name": "PaSST AudioSet Transformer",
+      "family": "semantic",
+      "revision": "r3b35c",
+      "phase": "profile",
+      "adapter": "python-callable",
+      "engine": "hear21passt",
+      "order": 81,
+      "parameters": {
+        "sample_rate": 32000,
+        "chunk_seconds": 10.0,
+        "max_chunks": 8,
+        "batch_size": {
+          "$env_int": "EZSTUDIO_PASST_BATCH_SIZE",
+          "default": 2,
+          "min": 1
+        }
+      },
+      "thresholds": {},
+      "weights": {},
+      "implementation": {
+        "callable": "modules.semantic_passt:run"
+      },
+      "model": "passt_s_swa_p16_128_ap476",
+      "device": "cuda:0",
+      "model_path": {
+        "$path": [
+          "ai_models_root",
+          "audio",
+          "semantic",
+          "passt",
+          "passt-s-f128-p16-s10-ap.476-swa.pt"
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "schema": "ezstudio.profile.v1",
+    "compatibility_target": "profile-run-78"
+  }
+}

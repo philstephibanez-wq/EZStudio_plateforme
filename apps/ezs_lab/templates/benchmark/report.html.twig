@@ -1,0 +1,53 @@
+{% extends 'base.html.twig' %}
+{% block title %}Bilan · EZChords Benchmark{% endblock %}
+{% block body %}
+<div class="card">
+<h1>Bilan des évaluations</h1>
+<p class="meta">Vue consolidée des notes par chanson et par algorithme.</p>
+</div>
+
+<div class="card">
+<h2>Résumé par algorithme</h2>
+<table>
+<thead><tr><th>Algorithme</th><th>Bon</th><th>Pas bon</th><th>Non revu</th><th>Score</th></tr></thead>
+<tbody>
+{% for s in scores %}
+<tr>
+<td>{{ s.algorithm }}</td>
+<td>{{ s.approved }}</td>
+<td>{{ s.rejected }}</td>
+<td>{{ s.unreviewed }}</td>
+<td class="score">{% if s.score_percent is not null %}{{ s.score_percent|number_format(1) }}%{% else %}—{% endif %}</td>
+</tr>
+{% else %}
+<tr><td colspan="5">Aucun résultat.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="card">
+<h2>Détail chanson × algorithme</h2>
+<table>
+<thead>
+<tr><th>Chanson</th><th>Algorithme</th><th>Phase</th><th>Signature</th><th>Tempo</th><th>Note</th><th>Référence</th><th>Commentaire</th></tr>
+</thead>
+<tbody>
+{% for r in rows %}
+<tr>
+<td><a class="song" href="{{ path('bench_view',{id:r.run_id}) }}">{{ r.title }}{% if r.artist %} — {{ r.artist }}{% endif %}</a></td>
+<td>{{ r.algorithm }}</td>
+<td>P{{ r.phase }}</td>
+<td>{{ r.detected_signature ?: r.requested_signature }}</td>
+<td>{{ r.tempo ? r.tempo|number_format(3) ~ ' BPM' : '—' }}</td>
+<td>{% if r.review_status == 'approved' %}Bon{% elseif r.review_status == 'rejected' %}Pas bon{% else %}Non revu{% endif %}</td>
+<td>{{ r.reference ?: '—' }}</td>
+<td>{{ r.comment ?: '' }}</td>
+</tr>
+{% else %}
+<tr><td colspan="8">Aucune évaluation.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

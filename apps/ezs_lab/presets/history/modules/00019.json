@@ -1,0 +1,33 @@
+{
+  "composition": {
+    "device": null,
+    "engine": {
+      "name": "librosa-chroma-cqt+ks",
+      "version": "0.11.0"
+    },
+    "family": "tonal",
+    "id": "tonal.krumhansl-schmuckler",
+    "implementation": {
+      "callable": "genes.tonal_ks.run",
+      "source_sha256": "fe680af3795260683e33697576cd91038750f0ff294c7850467a7170d58ccf6c"
+    },
+    "model": {
+      "id": null,
+      "path": null
+    },
+    "name": "Krumhansl-Schmuckler Key",
+    "order": 30,
+    "parameters": {
+      "chroma": "CQT"
+    },
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-10T10:37:26+00:00",
+  "fingerprint": "fbb833049188e40e955cbc1030302d3aa078bec5027e1aec4223a526fba3a768",
+  "id": 19,
+  "module_key": "tonal.krumhansl-schmuckler",
+  "revision_number": 2,
+  "revision_ref": "tonal.krumhansl-schmuckler.r2",
+  "schema": "ezstudio.preset.export.module.v1"
+}

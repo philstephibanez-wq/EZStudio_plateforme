@@ -34,7 +34,7 @@ final class QueueSongLabels
     /** @return array<int,string> */
     public static function read(): array
     {
-        $lab = 'H:/EZStudio_lab';
+        $lab = dirname(__DIR__, 4) . '/apps/ezs_lab';
         if (!is_file($lab.'/bin/console')) return [];
         try {
             $process = new Process([PHP_BINARY, 'bin/console', 'lab:queue:song-labels', '--no-interaction'], $lab);

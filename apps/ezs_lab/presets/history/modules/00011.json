@@ -1,0 +1,36 @@
+{
+  "composition": {
+    "device": "cuda:0-isolated",
+    "engine": {
+      "name": "hear21passt",
+      "version": "0.0.26"
+    },
+    "family": "semantic",
+    "id": "semantic.passt-audioset",
+    "implementation": {
+      "callable": "genes.semantic_passt.run",
+      "source_sha256": "5c3e76ca33f0a6912f8cebb24d5d094df4b8a618ea5c0e1aba4c1d79ea46f7a4"
+    },
+    "model": {
+      "id": "PaSST-s-f128-p16-s10-ap476-swa",
+      "path": "H:\\AIModels\\audio\\semantic\\passt\\passt-s-f128-p16-s10-ap.476-swa.pt",
+      "sha256": "302903fa8c4aee817b11dc982da0b29aaf8d11a3e722420476d0a12c9db70c2c"
+    },
+    "name": "PaSST AudioSet Transformer",
+    "order": 81,
+    "parameters": {
+      "chunk_seconds": 10.0,
+      "max_chunks": 8,
+      "sample_rate": 32000
+    },
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-09T20:17:26+00:00",
+  "fingerprint": "f998d9c8b419467d3b288b26fe3a5a8339711c3c6416e8f16fdc17c652b4473c",
+  "id": 11,
+  "module_key": "semantic.passt-audioset",
+  "revision_number": 1,
+  "revision_ref": "semantic.passt-audioset.r1",
+  "schema": "ezstudio.preset.export.module.v1"
+}

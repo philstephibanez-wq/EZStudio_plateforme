@@ -1,24 +1,23 @@
-# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
-
-# This file is the entry point to configure your own services.
-# Files in the packages/ subdirectory configure your dependencies.
-# See also https://symfony.com/doc/current/service_container/import.html
-
-# Put parameters here that don't need to change on each machine where the app is deployed
-# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    app.database_path: '%kernel.project_dir%/apps/ezs_lab/data/benchmark.sqlite'
+    ezs_lab.app_dir: '%kernel.project_dir%/apps/ezs_lab'
 
 services:
     _defaults:
         autowire: true
         autoconfigure: true
-
-    App\:
-        resource: '../../../src/'
-        exclude:
-            - '../../../src/DependencyInjection/'
-            - '../../../src/Entity/'
-            - '../../../src/Kernel.php'
+        bind:
+            $databasePath: '%app.database_path%'
 
     EZSLab\:
         resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+
+    EZSLab\Service\BenchmarkLauncher:
+        arguments:
+            $database: '@EZSLab\Service\Database'
+            $projectDir: '%ezs_lab.app_dir%'
+            $pythonExecutable: 'H:\Python\pythoncore-3.14-64\python.exe'
+            $dependencyRoot: '%kernel.project_dir%/var/runtime/deps'
+            $keepUploads: true

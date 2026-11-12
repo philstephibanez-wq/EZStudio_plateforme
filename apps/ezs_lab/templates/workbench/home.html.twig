@@ -1,0 +1,209 @@
+{% extends 'base.html.twig' %}
+{% block title %}Catalogue · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero">
+  <div>
+    <h1>Catalogue</h1>
+    <div class="meta">Chaîne d’analyse : PROFILE → STEMS → CHORDS/N → LYRICS.</div>
+  </div>
+  <a class="button" href="{{ path('workbench_import') }}">Importer une chanson</a>
+</div>
+
+{% if app.request.query.get('profile_all_queued') is not null %}
+<div class="card">
+  <strong>PROFILE ALL</strong> —
+  {{ app.request.query.get('profile_all_queued') }} job(s) ajouté(s),
+  {{ app.request.query.get('profile_all_skipped_active')|default(0) }} déjà actif(s),
+  {{ app.request.query.get('profile_all_skipped_source')|default(0) }} sans source disponible.
+</div>
+{% endif %}
+
+<style>
+.catalog-actions{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+.catalog-phase-action{display:inline-flex;align-items:center;gap:2px}
+.catalog-trash{padding:.42rem .5rem;min-width:2rem}
+.catalog-zip-disabled{opacity:.45;pointer-events:none}
+.catalog-job-cancel{margin-left:6px;padding:.2rem .45rem;font-size:11px}
+</style>
+
+<div class="catalog-batch-toolbar">
+  <form method="post"
+        action="{{ path('profile_analyze_all') }}"
+        class="catalog-profile-all-form"
+        data-confirm="Lancer une nouvelle analyse PROFILE sur toutes les chansons du catalogue ? Les jobs PROFILE déjà actifs seront ignorés."
+        style="display:inline">
+    <button type="submit" class="secondary">PROFILE ALL</button>
+  </form>
+  <a class="button secondary"
+     href="{{ path('profile_export_all_zip') }}"
+     title="Exporter tous les résultats PROFILE disponibles">ZIP ALL</a>
+</div>
+
+<div class="card" id="catalog-live-phase">
+<table>
+<thead>
+<tr>
+  <th>Chanson</th>
+  <th>PROFILE</th>
+  <th>STEMS</th>
+  <th>CHORDS</th>
+  <th>LYRICS</th>
+  <th>Actions</th>
+</tr>
+</thead>
+<tbody>
+{% for song in songs %}
+<tr>
+  <td>
+    <strong>{{ song.title }}</strong>
+    {% if song.artist %}<div class="meta">{{ song.artist }}</div>{% endif %}
+    <div class="meta">{{ song.source_filename }}</div>
+  </td>
+
+  {% for key in ['profile','stems','chords','lyrics'] %}
+    {% set s = attribute(song, key) %}
+    <td>
+      {% if s.state == 'done' %}
+        <span class="badge ok">Prêt{% if s.version %} · <span class="catalog-version">{{ s.version|replace({'PROFILE.':'','STEMS.':'','CHORDS.':'','LYRICS.':''}) }}</span>{% endif %}</span>
+        {% if key == 'profile' %}
+          {% if song.profile_ai_reviewed ?? false %}
+            <div>
+              <span class="badge ok" title="Avis IA documentaire déjà enregistré ; sans validation scientifique">Révisé par l’IA</span>
+              <a href="{{ path('workbench_profile', {song: song.id, run: song.profile.run_id}) }}#profile-ai-revision-{{ song.profile_ai_revision_id }}">
+                <span class="meta">Voir la révision #{{ song.profile_ai_revision_id }}</span>
+              </a>
+            </div>
+          {% endif %}
+        {% endif %}
+      {% elseif key == 'profile' and s.state == 'legacy_fifo' %}
+        <span class="badge">Ancienne tentative FIFO (historique)</span>
+      {% elseif s.state == 'queued' %}
+        <span class="badge" data-analysis-active="1">En attente{% if s.progress is not null %} · {{ s.progress }}%{% endif %}</span>
+        {% if s.job_id %}<button type="button" class="secondary catalog-job-cancel" data-job-cancel-url="{{ path('analysis_job_cancel',{id:s.job_id}) }}" data-job-id="{{ s.job_id }}" title="Annuler le job #{{ s.job_id }}">■</button>{% endif %}
+      {% elseif s.state == 'running' or s.job_status == 'cancelling' %}
+        <span class="badge warn" data-analysis-active="1">{{ s.job_status == 'cancelling' ? 'Annulation…' : 'En cours' }}{% if s.progress is not null %} · {{ s.progress }}%{% endif %}</span>
+        {% if s.job_id %}<button type="button" class="secondary catalog-job-cancel" data-job-cancel-url="{{ path('analysis_job_cancel',{id:s.job_id}) }}" data-job-id="{{ s.job_id }}" title="Annuler le job #{{ s.job_id }}">■</button>{% endif %}
+      {% elseif s.state == 'cancelled' or s.job_status == 'cancelled' %}
+        <span class="badge">Annulé</span>
+      {% elseif s.state == 'error' %}
+        <span class="badge error">Erreur</span>
+      {% elseif s.state == 'configured' %}
+        <span class="badge">Configuré</span>
+      {% else %}
+        <span class="badge">—</span>
+      {% endif %}
+      {% if key == 'profile' %}
+          {% set expertise = expertise_by_song[song.id] ?? {active: [], latest: null} %}
+          {% for job in expertise.active %}
+            <div class="meta" data-analysis-active="1">
+              EXPERTISE IA · Job #{{ job.job_id }} · Position {{ job.position }}
+              · {{ job.status == 'queued' ? 'En attente' : (job.status == 'cancelling' ? 'Annulation demandée' : 'En cours') }}
+              · {{ job.progress }} %
+              {% if job.status in ['queued', 'running'] %}
+                <button type="button" class="secondary catalog-job-cancel"
+                        data-job-cancel-url="{{ path('analysis_job_cancel', {id: job.job_id}) }}"
+                        data-job-id="{{ job.job_id }}"
+                        title="Annuler l’expertise #{{ job.job_id }}"
+                        aria-label="Annuler l’expertise #{{ job.job_id }}">■ Annuler</button>
+              {% endif %}
+            </div>
+          {% else %}
+            {% if expertise.latest is not null %}
+              <div class="meta">
+                Dernière expertise · Job #{{ expertise.latest.job_id }}
+                · {% if expertise.latest.status == 'cancelled' %}Annulée{% elseif expertise.latest.status == 'completed' %}Terminée{% elseif expertise.latest.status == 'error' %}Erreur{% else %}{{ expertise.latest.status }}{% endif %}
+              </div>
+            {% elseif not (song.profile_ai_reviewed ?? false) %}
+              <div class="meta">Aucune expertise demandée</div>
+            {% endif %}
+          {% endfor %}
+      {% endif %}
+      {% if key == 'profile' and s.state == 'done' and s.run_id %}
+        <div class="meta"><a href="{{ path('workbench_profile',{song:song.id,run:s.run_id}) }}">Résultat scientifique #{{ s.run_id }}</a></div>
+      {% endif %}
+      {% if key == 'profile' and s.latest_attempt is defined and s.latest_attempt is not null %}
+        {% set attempt = s.latest_attempt %}
+        {% if attempt.state == 'error' %}
+          <div class="catalog-attempt"><span class="badge error">Dernier essai : erreur</span></div>
+        {% elseif attempt.state == 'cancelled' %}
+          <div class="catalog-attempt"><span class="badge">Dernier essai : annulé</span></div>
+        {% elseif attempt.state == 'legacy_fifo' %}
+          <div class="catalog-attempt"><span class="badge">Ancienne tentative FIFO (historique)</span></div>
+        {% elseif attempt.state == 'queued' %}
+          <div class="catalog-attempt"><span class="badge" data-analysis-active="1">Dernier essai : en attente</span>
+          {% if attempt.job_id %}<button type="button" class="secondary catalog-job-cancel" data-job-cancel-url="{{ path('analysis_job_cancel',{id:attempt.job_id}) }}" data-job-id="{{ attempt.job_id }}" title="Annuler le job #{{ attempt.job_id }}">■</button>{% endif %}</div>
+        {% elseif attempt.state == 'running' %}
+          <div class="catalog-attempt"><span class="badge warn" data-analysis-active="1">Dernier essai : en cours</span>
+          {% if attempt.job_id %}<button type="button" class="secondary catalog-job-cancel" data-job-cancel-url="{{ path('analysis_job_cancel',{id:attempt.job_id}) }}" data-job-id="{{ attempt.job_id }}" title="Annuler le job #{{ attempt.job_id }}">■</button>{% endif %}</div>
+        {% endif %}
+      {% endif %}
+    </td>
+  {% endfor %}
+
+  <td>
+    <div class="catalog-actions">
+      {% set actions = [
+        {key:'profile', label:'PROFILE', route:'workbench_profile', cascade:'PROFILE + STEMS + CHORDS/N + LYRICS'},
+        {key:'stems', label:'STEMS', route:'workbench_stems', cascade:'STEMS + CHORDS/N + LYRICS'},
+        {key:'chords', label:'CHORDS', route:'lab_chords_experiment', cascade:'CHORDS/N + LYRICS'},
+        {key:'lyrics', label:'LYRICS', route:'workbench_lyrics', cascade:'LYRICS'}
+      ] %}
+      {% for action in actions %}
+        {% set state = attribute(song, action.key) %}
+        <span class="catalog-phase-action">
+          <a class="button secondary{{ state.state == 'done' ? ' catalog-phase-ready' : '' }}" href="{{ path(action.route,{song:song.id}) }}">{{ action.label }}</a>
+          {% if state.state != 'none' %}
+          <form method="post"
+                action="{{ path('catalog_phase_delete',{id:song.id,phase:action.key}) }}"
+                class="catalog-delete-form"
+                data-confirm="Abandonner {{ action.cascade }} pour « {{ song.title|e('html_attr') }} » ? Les Presets et l’historique seront conservés."
+                style="display:inline">
+            <button type="submit"
+                    class="secondary catalog-trash catalog-delete-button"
+                    title="Abandonner {{ action.cascade }} sans détruire les Presets"
+                    aria-label="Abandonner {{ action.cascade }}">🗑</button>
+          </form>
+          {% endif %}
+        </span>
+      {% endfor %}
+
+      {% set analysis_chain_present =
+        song.profile.state != 'none'
+        or song.stems.state != 'none'
+        or song.chords.state != 'none'
+        or song.lyrics.state != 'none'
+      %}
+      {% if analysis_chain_present %}
+        <a class="button secondary"
+           href="{{ path('preset_export_zip',{id:song.id}) }}"
+           title="Exporter les Presets disponibles">Exporter les Presets</a>
+      {% else %}
+        <span class="button secondary catalog-zip-disabled" title="Aucun Preset disponible">Exporter les Presets</span>
+      {% endif %}
+
+      <form method="post"
+            action="{{ path('catalog_delete',{id:song.id}) }}"
+            class="catalog-delete-form"
+            data-confirm="Supprimer définitivement « {{ song.title|e('html_attr') }} », sa chaîne d’analyse complète et sa source ?"
+            style="display:inline">
+        <button type="submit"
+                class="secondary catalog-trash catalog-delete-button"
+                title="Purge définitive de la chanson entière"
+                aria-label="Supprimer {{ song.title }}">🗑</button>
+      </form>
+    </div>
+  </td>
+</tr>
+{% else %}
+<tr>
+  <td colspan="6">
+    Aucune chanson dans le catalogue.
+    <a href="{{ path('workbench_import') }}">Importer une chanson</a>
+  </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+{% endblock %}

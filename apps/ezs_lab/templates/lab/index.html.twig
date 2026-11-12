@@ -1,0 +1,162 @@
+{% extends 'base.html.twig' %}
+{% block title %}EZStudio_lab{% endblock %}
+
+{% block styles %}
+.workbench-layout{display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;align-items:start}
+.catalog-list{display:flex;flex-direction:column;gap:7px;max-height:620px;overflow:auto}
+.catalog-item{display:block;border:1px solid var(--line);border-radius:5px;padding:9px 10px;text-decoration:none;background:#fff}
+.catalog-item:hover{background:var(--soft)}
+.catalog-item.active{border-color:#333;box-shadow:inset 3px 0 0 #333;background:#f8f8f8}
+.catalog-title{font-weight:700}
+.catalog-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.song-context{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.song-hash{font:11px Consolas,monospace;color:var(--muted);word-break:break-all}
+.pipeline-workbench{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0 16px}
+.pipeline-workbench .item-card{min-height:165px}
+.item-state{margin-top:10px}
+.history-table td,.history-table th{white-space:nowrap}
+.history-table td:nth-child(2){white-space:normal}
+@media(max-width:1150px){.workbench-layout{grid-template-columns:1fr}.pipeline-workbench{grid-template-columns:1fr}}
+{% endblock %}
+
+{% block body %}
+<div class="card hero">
+  <div>
+    <h1>EZStudio_lab</h1>
+    <div class="meta">Workbench de benchmark scientifique · IMPORT → STEMS → CHORDS → LYRICS</div>
+  </div>
+  <span class="badge ok">Runtime LAB autonome</span>
+</div>
+
+<div class="card" id="import">
+  <h2>IMPORT</h2>
+  <p class="meta">Ajouter une source au catalogue. Elle devient le contexte commun des benchmarks STEMS, CHORDS et LYRICS.</p>
+  <form action="{{ path('bench_start') }}" method="post" enctype="multipart/form-data">
+    <div class="row">
+      <label>Audio<input type="file" name="audio" accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a,.aac" required></label>
+      <label>Titre<input name="title"></label>
+      <label>Artiste<input name="artist"></label>
+      <label>Signature
+        <select name="signature">
+          <option>Auto</option><option>2/4</option><option>3/4</option><option>4/4</option>
+          <option>6/8</option><option>9/8</option><option>12/8</option>
+        </select>
+      </label>
+      <button type="submit">Importer et lancer le benchmark historique</button>
+    </div>
+  </form>
+</div>
+
+<div class="workbench-layout">
+  <aside class="card">
+    <h2>Chansons</h2>
+    <p class="meta">Sélectionne la chanson de travail.</p>
+    <div class="catalog-list">
+      {% for song in songs %}
+        <a class="catalog-item {{ selected_song and song.id == selected_song.id ? 'active' : '' }}"
+           href="{{ path('lab_index', {song:song.id}) }}">
+          <div class="catalog-title">{{ song.title }}</div>
+          {% if song.artist %}<div>{{ song.artist }}</div>{% endif %}
+          <div class="catalog-meta">{{ song.source_filename }} · {{ song.run_count }} run(s)</div>
+        </a>
+      {% else %}
+        <div class="meta">Aucune chanson importée.</div>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <main>
+    {% if selected_song %}
+      <div class="card song-context">
+        <div>
+          <h2 style="margin-top:0">{{ selected_song.title }}{% if selected_song.artist %} — {{ selected_song.artist }}{% endif %}</h2>
+          <div class="meta">Source : {{ selected_song.source_filename }}</div>
+          <div class="song-hash">SHA-256 : {{ selected_song.audio_sha256 }}</div>
+        </div>
+        <div class="meta">
+          Importée : {{ selected_song.created_at }}
+          {% if latest_run %}<br>Dernier run : #{{ latest_run.id }} · {{ latest_run.updated_at }}{% endif %}
+        </div>
+      </div>
+
+      <div class="pipeline-workbench">
+        <section class="item-card" id="stems">
+          <h2>STEMS</h2>
+          <p>Séparation, comparaison de moteurs, mesures GPU/VRAM, diagnostics spectraux et artefacts réutilisables.</p>
+          <div class="tabs">Résultats · Diagnostics · Comparaisons · Logs · Artefacts</div>
+          <div class="item-state">
+            {% set stems_count = 0 %}
+            {% for x in runs %}{% if x.stems_ready %}{% set stems_count = stems_count + 1 %}{% endif %}{% endfor %}
+            <span class="badge {{ stems_count > 0 ? 'ok' : '' }}">{{ stems_count }} résultat(s) STEMS historique(s)</span>
+          </div>
+        </section>
+
+        <section class="item-card" id="chords">
+          <h2>CHORDS</h2>
+          <p>Accords, métrique/downbeat, projection beat, No-Chord N et comparaison des méthodes validées.</p>
+          <div class="tabs">Résultats · Diagnostics · Comparaisons · Logs · Artefacts</div>
+          <div class="item-state">
+            {% set chords_count = 0 %}
+            {% for x in runs %}{% if x.chords_ready %}{% set chords_count = chords_count + 1 %}{% endif %}{% endfor %}
+            <span class="badge {{ chords_count > 0 ? 'ok' : '' }}">{{ chords_count }} run(s) CHORDS historique(s)</span>
+          </div>
+        </section>
+
+        <section class="item-card" id="lyrics">
+          <h2>LYRICS</h2>
+          <p>Whisper/WhisperX, forced alignment, VAD, word/syllable/phoneme timing et comparaison de modèles.</p>
+          <div class="tabs">Résultats · Diagnostics · Comparaisons · Logs · Artefacts</div>
+          <div class="item-state"><span class="badge">Moteurs à raccorder</span></div>
+        </section>
+      </div>
+
+      <div class="card" id="runs">
+        <h2>Historique complet — {{ selected_song.title }}</h2>
+        <p class="meta">Les runs existants restent immuables. Cette vue expose les paramètres stockés sans recalcul.</p>
+        <table class="history-table">
+          <thead>
+          <tr>
+            <th>Run</th><th>Pipeline disponible</th><th>Demandé</th><th>Détecté</th><th>Tempo</th>
+            <th>Moteur</th><th>État</th><th>Créé</th><th>Modifié</th><th></th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for x in runs %}
+            {% set r = x.row %}
+            <tr>
+              <td>#{{ r.id }}</td>
+              <td>
+                <div class="status-grid">
+                  <span class="badge {{ x.stems_ready ? 'ok' : '' }}">STEMS</span>
+                  <span class="badge {{ x.chords_ready ? 'ok' : '' }}">CHORDS</span>
+                  <span class="badge {{ x.no_chord_ready ? 'ok' : '' }}">N</span>
+                  <span class="badge {{ x.lyrics_ready ? 'ok' : '' }}">LYRICS</span>
+                </div>
+              </td>
+              <td>{{ r.requested_signature }}</td>
+              <td>{{ r.detected_signature ?: '—' }}</td>
+              <td>{{ r.tempo ? r.tempo|number_format(3) ~ ' BPM' : '—' }}</td>
+              <td>{{ x.engine_version ?: '—' }}</td>
+              <td>{{ r.status }} · {{ r.progress }}%</td>
+              <td>{{ r.created_at }}</td>
+              <td>{{ r.updated_at }}</td>
+              <td>
+                <a class="button secondary" href="{{ path('lab_run',{id:r.id}) }}">Run</a>
+                {% if x.chords_ready %}<a class="button secondary" href="{{ path('bench_view',{id:r.id}) }}">CHORDS</a>{% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="10">Aucun run pour cette chanson.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="card">
+        <h2>Aucune chanson sélectionnée</h2>
+        <p class="meta">Importe une source pour créer le premier contexte de benchmark.</p>
+      </div>
+    {% endif %}
+  </main>
+</div>
+{% endblock %}

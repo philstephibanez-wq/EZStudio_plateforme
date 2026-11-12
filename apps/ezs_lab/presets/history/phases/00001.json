@@ -1,0 +1,72 @@
+{
+  "created_at": "2026-10-09T20:17:26+00:00",
+  "fingerprint": "c014913397661e641d86aac0cdff15a51d9def3963270f543d2180666a99af09",
+  "id": 1,
+  "metadata": {
+    "manifest_schema": "ezstudio.genome.region.v1"
+  },
+  "modules": [
+    {
+      "module_revision_id": 1,
+      "phase_revision_id": 1,
+      "position": 0
+    },
+    {
+      "module_revision_id": 2,
+      "phase_revision_id": 1,
+      "position": 1
+    },
+    {
+      "module_revision_id": 3,
+      "phase_revision_id": 1,
+      "position": 2
+    },
+    {
+      "module_revision_id": 4,
+      "phase_revision_id": 1,
+      "position": 3
+    },
+    {
+      "module_revision_id": 5,
+      "phase_revision_id": 1,
+      "position": 4
+    },
+    {
+      "module_revision_id": 6,
+      "phase_revision_id": 1,
+      "position": 5
+    },
+    {
+      "module_revision_id": 7,
+      "phase_revision_id": 1,
+      "position": 6
+    },
+    {
+      "module_revision_id": 8,
+      "phase_revision_id": 1,
+      "position": 7
+    },
+    {
+      "module_revision_id": 9,
+      "phase_revision_id": 1,
+      "position": 8
+    },
+    {
+      "module_revision_id": 10,
+      "phase_revision_id": 1,
+      "position": 9
+    },
+    {
+      "module_revision_id": 11,
+      "phase_revision_id": 1,
+      "position": 10
+    }
+  ],
+  "parents": [],
+  "phase": "profile",
+  "pipeline_revision": "profile-r3b31-genomic-evolution",
+  "revision_number": 1,
+  "revision_ref": "PROFILE.r1",
+  "schema": "ezstudio.preset.export.phase.v1",
+  "status": "promoted"
+}

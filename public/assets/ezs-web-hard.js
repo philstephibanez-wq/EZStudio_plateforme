@@ -17,12 +17,12 @@
                 .addClass('text-bg-'+(ok?'success':maintenance?'warning':'danger'));
             $card.attr('data-ezs-state',data ? data.state : 'INCONNU');
             $card.attr('data-ezs-probe',data?'hard_tcp_http':'unavailable');
-            const publicPort={dev:'8502',lab:'8702',assistant:'8712'}[site];
+            const publicPort={dev:'8000',lab:'8000',assistant:'8000'}[site];
             const publicOpen=Boolean(data && data.ports && data.ports[publicPort]);
             $('#tcp-'+site).text(publicOpen?'Ouvert':'Fermé');
             $('#http-'+site).text(data && data.http && data.http.status!==null?String(data.http.status):'Sans réponse');
             $('#tech-http-'+site).text(data && data.http && data.http.status!==null?String(data.http.status):'Sans réponse');
-            const backend={dev:'8602',lab:'8701',assistant:'8713'}[site];
+            const backend={dev:'8000',lab:'8000',assistant:'8000'}[site];
             const b=Boolean(data && data.ports && data.ports[backend]);
             if(site==='dev'){
                 $('#dev-backend').text(b?'Port TCP ouvert':'Port TCP fermé');
@@ -39,7 +39,7 @@
                     names.forEach(name=>state(name,data.sites[name]));
                     const prod=data.sites.prod;
                     $('#http-prod').text(prod && prod.http && prod.http.status!==null ? String(prod.http.status) : 'Sans réponse');
-                    $('#tcp-prod').text(prod && prod.ports && prod.ports['8501'] ? 'Ouvert' : 'Fermé');
+                    $('#tcp-prod').text(prod && prod.ports && prod.ports['8000'] ? 'Ouvert' : 'Fermé');
                     feedback.text('Ping hard TCP/HTTP · '+(data.captured_utc||'mesuré'));
                 }).fail(function(){
                     names.forEach(name=>state(name,null));

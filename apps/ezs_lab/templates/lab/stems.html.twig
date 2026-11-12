@@ -1,0 +1,93 @@
+{% extends 'base.html.twig' %}
+{% block title %}STEMS · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero">
+  <div>
+    <h1>STEMS</h1>
+    <div class="meta">Séparation, historique expérimental et Preset et artefacts.</div>
+  </div>
+</div>
+
+{% if songs %}
+<div class="card">
+<form method="get" action="{{ path('lab_stems') }}" class="row">
+<label>Chanson
+<select name="song" onchange="this.form.submit()">
+{% for song in songs %}
+<option value="{{ song.id }}" {{ selected_song and song.id == selected_song.id ? 'selected' : '' }}>
+  {{ song.title }}{% if song.artist %} — {{ song.artist }}{% endif %}
+</option>
+{% endfor %}
+</select>
+</label>
+{% if selected_song %}
+<div>
+<strong>{{ selected_song.title }}{% if selected_song.artist %} — {{ selected_song.artist }}{% endif %}</strong>
+<div class="meta">{{ selected_song.source_filename }} · {{ selected_song.audio_sha256|slice(0,16) }}…</div>
+</div>
+{% endif %}
+</form>
+</div>
+{% endif %}
+
+{% if selected_song %}
+<div class="card">
+<h2>Nouvelle analyse STEMS</h2>
+<form method="post" action="{{ path('lab_stems_analyze') }}">
+<input type="hidden" name="song" value="{{ selected_song.id }}">
+<div class="row">
+<label>Profil moteur
+<select name="engine_profile">
+  <option value="canonical_roformer">RoFormer canonique (BS-RoFormer + MelBand)</option>
+</select>
+</label>
+<button type="submit" name="force" value="0" {{ source_available ? '' : 'disabled' }}>Analyser</button>
+{% if jobs %}
+<button type="submit" name="force" value="1" {{ source_available ? '' : 'disabled' }}>Ré-analyser</button>
+{% endif %}
+</div>
+</form>
+<p class="meta">Chaque analyse crée un run scientifique immuable. Les stems produits deviennent des artefacts SHA-256 réutilisables par CHORDS et LYRICS.</p>
+</div>
+
+<div class="card">
+<h2>Historique STEMS</h2>
+<table>
+<thead>
+<tr>
+  <th>Job</th><th>Run</th><th>État</th><th>Progression</th>
+  <th>Moteur</th><th>Artefacts</th><th>Parent technique</th><th>Actions</th>
+</tr>
+</thead>
+<tbody>
+{% for j in jobs %}
+{% set d = scientific_runs[j.job_id] ?? null %}
+<tr>
+<td><a class="run-link" href="{{ path('lab_stems_job',{id:j.job_id}) }}">#{{ j.job_id }}</a></td>
+<td>{% if d %}<code>{{ d.public_id }}</code>{% else %}—{% endif %}</td>
+<td><span class="badge {{ j.state == 'done' ? 'ok' : (j.state == 'error' ? 'warn' : '') }}">{{ j.state }}</span></td>
+<td>{{ j.progress ?? 0 }}%</td>
+<td>{{ j.request.engine_profile ?? 'canonical_roformer' }}</td>
+<td>{{ d ? d.artifacts|length : 0 }}</td>
+<td>{{ j.request.parent_job_id ?? '—' }}</td>
+<td>
+{% if d %}
+<a class="button secondary" href="{{ path('scientific_run',{id:d.id}) }}">Preset</a>
+{% endif %}
+</td>
+</tr>
+{% else %}
+<tr><td colspan="8">Aucune analyse STEMS pour cette chanson.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% if scientific_runs|length %}
+<p><a class="button" href="{{ path('lab_chords_experiment',{song:selected_song.id}) }}">Préparer une analyse CHORDS</a></p>
+{% endif %}
+</div>
+{% endif %}
+
+{% if jobs|filter(j => j.state in ['queued','running'])|length > 0 %}
+<script>setTimeout(()=>location.reload(),3000);</script>
+{% endif %}
+{% endblock %}

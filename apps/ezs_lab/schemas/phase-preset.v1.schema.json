@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ezstudio.phase-preset.v1",
+  "title": "EZStudio PhasePreset",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "revision",
+    "phase",
+    "modules"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ezstudio.phase-preset.v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "enum": [
+        "profile",
+        "stems",
+        "chords",
+        "lyrics"
+      ]
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "module-preset.v1.schema.json"
+      }
+    },
+    "settings": {
+      "type": "object"
+    },
+    "outputs": {
+      "type": "object"
+    }
+  }
+}

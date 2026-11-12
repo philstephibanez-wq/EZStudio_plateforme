@@ -1,0 +1,36 @@
+{
+  "composition": {
+    "device": "cuda:0",
+    "engine": {
+      "name": "panns-inference",
+      "version": "0.1.0"
+    },
+    "family": "semantic",
+    "id": "semantic.panns-cnn14",
+    "implementation": {
+      "callable": "genes.semantic_panns.run",
+      "source_sha256": "15cc746d4a594fbbd6a64a1d11bb86b3b615b883174abeb363698fc7d0ad1565"
+    },
+    "model": {
+      "id": "PANNs-Cnn14-AudioSet-mAP0.431",
+      "path": "H:\\AIModels\\audio\\semantic\\panns\\Cnn14_mAP=0.431.pth",
+      "sha256": "0dc499e40e9761ef5ea061ffc77697697f277f6a960894903df3ada000e34b31"
+    },
+    "name": "PANNs CNN14 AudioSet",
+    "order": 80,
+    "parameters": {
+      "chunk_seconds": 10.0,
+      "max_chunks": 8,
+      "sample_rate": 32000
+    },
+    "thresholds": [],
+    "weights": []
+  },
+  "created_at": "2026-10-10T10:37:26+00:00",
+  "fingerprint": "e2b9fc8ae339744e786eb6e0a6ea397ebbb37512c4025c3af23020c595b351c1",
+  "id": 26,
+  "module_key": "semantic.panns-cnn14",
+  "revision_number": 2,
+  "revision_ref": "semantic.panns-cnn14.r2",
+  "schema": "ezstudio.preset.export.module.v1"
+}

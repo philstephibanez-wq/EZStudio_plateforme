@@ -1,0 +1,166 @@
+/* EZStudio_lab dark UI — durable application theme */
+:root{
+  --bg:#0f1419;
+  --panel:#171d24;
+  --ink:#e8edf3;
+  --muted:#98a4b3;
+  --line:#2c3642;
+  --accent:#7fb0ff;
+  --soft:#202833;
+  --ok:#183c2b;
+  --warn:#493819;
+  --off:#242c35;
+}
+
+html,body{background:#0f1419;color:var(--ink)}
+body{color-scheme:dark}
+
+header{background:#0b1015;border-bottom-color:#27313b}
+.brand,.brand:visited{color:#f2f6fa}
+.brand small{color:#9ca9b8}
+
+.main-nav a{
+  color:#cbd5df;
+  background:#141a20;
+  border-color:#37424e;
+}
+.main-nav a:hover{background:#202832}
+.main-nav a.active,
+.main-nav a[aria-current="page"]{
+  background:#e6edf5;
+  color:#11161b;
+  border-color:#e6edf5;
+}
+.main-nav a.active:hover,
+.main-nav a[aria-current="page"]:hover{background:#fff}
+
+.card,
+.item-card,
+.diag{
+  background:var(--panel);
+  border-color:var(--line);
+}
+
+table{background:var(--panel)}
+th{
+  background:#202731;
+  color:#b9c5d1;
+  border-bottom-color:#34404d;
+}
+td{border-bottom-color:var(--line)}
+tr:hover td{background:#1b222b}
+
+.meta,.kv div:nth-child(odd){color:var(--muted)}
+a{color:#c7dcf8}
+
+input,select,textarea{
+  background:#10161c;
+  color:var(--ink);
+  border:1px solid #3a4654;
+  border-radius:4px;
+}
+input:focus,select:focus,textarea:focus{
+  outline:1px solid #6f9ed8;
+  border-color:#6f9ed8;
+}
+
+button,.button{
+  background:#25374b;
+  color:#f5f8fb;
+  border-color:#3e5872;
+}
+button:hover,.button:hover{background:#304862}
+
+button.secondary,.button.secondary{
+  background:#202832;
+  color:#dce5ee;
+  border-color:#465361;
+}
+button.secondary:hover,.button.secondary:hover{background:#2b3541}
+
+.badge{
+  background:#29323c;
+  color:#dce5ee;
+}
+.badge.ok{
+  background:#1b5037;
+  color:#c8f4d9;
+}
+.badge.warn{
+  background:#604719;
+  color:#ffe2a2;
+}
+
+pre.log{
+  background:#090d11;
+  color:#dce6ef;
+  border:1px solid #25303a;
+}
+
+/* Catalogue */
+.catalog-batch-toolbar{
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:8px;
+  margin:0 0 10px;
+}
+.catalog-batch-toolbar .button,
+.catalog-batch-toolbar button{
+  min-width:104px;
+}
+.catalog-phase-ready{
+  background:#1f6d49!important;
+  color:#e6fff0!important;
+  border-color:#2f9a67!important;
+}
+.catalog-phase-ready:hover{
+  background:#27835a!important;
+}
+.catalog-version{
+  opacity:.88;
+  font-weight:600;
+}
+
+/* GPU performance panel: override the component's light inline CSS. */
+.perf-drawer{
+  background:#11171d!important;
+  color:#e6edf4!important;
+  border-right-color:#2d3742!important;
+}
+.perf-kicker,
+.perf-device,
+.perf-chart-head span,
+.perf-scale,
+.perf-mini small,
+.perf-stats span,
+.perf-foot{
+  color:#93a0ae!important;
+}
+.perf-primary,
+.perf-mini{
+  background:#171e26!important;
+  border-color:#303b47!important;
+}
+.perf-chart{
+  background:#10161c!important;
+  border-color:#303b47!important;
+}
+.perf-grid line{stroke:#27323d!important}
+.perf-line{stroke:#6fa3d8!important}
+.perf-area{fill:#284563!important;opacity:.55!important}
+.perf-stats{border-top-color:#303b47!important}
+.perf-stats>div{border-bottom-color:#26313c!important}
+.perf-live-on{color:#55cc84!important}
+
+/* Keep dense lab tables readable on dark background. */
+.catalog-actions .catalog-trash{
+  background:#251f23;
+}
+.catalog-actions .catalog-trash:hover{
+  background:#3a292f;
+}
+
+@media(max-width:900px){
+  .catalog-batch-toolbar{justify-content:flex-start;flex-wrap:wrap}
+}

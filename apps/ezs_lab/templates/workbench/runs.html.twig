@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+{% block title %}Runs · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero"><div><h1>RUNS</h1><div class="meta">Historique scientifique de la chanson sélectionnée.</div></div></div>
+{% include 'workbench/_song_selector.html.twig' %}
+<div class="card">
+<table>
+<thead><tr><th>Run</th><th>État</th><th>Signature</th><th>Tempo</th><th>Moteur</th><th>Créé</th><th></th></tr></thead>
+<tbody>
+{% for run in runs %}
+<tr>
+<td>#{{ run.id }}</td>
+<td>{{ run.status }} · {{ run.progress }}%</td>
+<td>{{ run.detected_signature ?: run.requested_signature }}</td>
+<td>{{ run.tempo ? run.tempo|number_format(3) ~ ' BPM' : '—' }}</td>
+<td>{{ run.engine_version }}</td>
+<td>{{ run.created_at }}</td>
+<td style="white-space:nowrap">
+  <a class="button secondary" href="{{ path('lab_run',{id:run.id}) }}">RUN</a>
+  {% if run.status == 'done' %}<a class="button secondary" href="{{ path('bench_view',{id:run.id}) }}">CHORDS</a>{% endif %}
+</td>
+</tr>
+{% else %}
+<tr><td colspan="7">Aucun run.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

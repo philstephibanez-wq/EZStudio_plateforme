@@ -5,25 +5,25 @@ namespace Ezs\Web\Module\Infrastructure;
 /** Gestion Windows native et conservative, sans shell ni PowerShell. */
 final class NativeWindowsLifecycle
 {
-    private const ROOT = 'H:/EZS_orchestrator';
-    private const PHP_CGI = 'H:/PHP/php-8.5-x64/php-cgi.exe';
-    private const CADDY = 'H:/Caddy/caddy.exe';
-    private const DEV = [
-        'root_php' => ['port'=>8791,'exe'=>self::PHP_CGI,'cwd'=>self::ROOT,'args'=>'-b 127.0.0.1:8791'],
-        'root_caddy' => ['port'=>8790,'exe'=>self::CADDY,'cwd'=>self::ROOT,'args'=>'run --config "H:/EZS_orchestrator/config/caddy/Caddyfile.dev-lab-assistant-candidate" --adapter caddyfile'],
-        'ezscore_dev' => ['port'=>8602,'exe'=>self::PHP_CGI,'cwd'=>'H:/EZScore_dev','args'=>'-b 127.0.0.1:8602'],
-        'ezscore_preview' => ['port'=>8862,'exe'=>self::PHP_CGI,'cwd'=>'H:/EZScore_dev','args'=>'-b 127.0.0.1:8862'],
-        'lab' => ['port'=>8701,'exe'=>self::PHP_CGI,'cwd'=>'H:/EZStudio_lab','args'=>'-b 127.0.0.1:8701'],
-        'assistant' => ['port'=>8713,'exe'=>self::PHP_CGI,'cwd'=>'H:/EZStudioLab_assistant','args'=>'-b 127.0.0.1:8713'],
-    ];
+    private static function root(): string { return dirname(__DIR__, 4) . '/apps/orchestrator'; }
+    private static function php_cgi(): string { return 'H:/PHP/php-8.5-x64/php-cgi.exe'; }
+    private static function caddy(): string { return 'H:/Caddy/caddy.exe'; }
+    private static function dev(): array { return [
+        'root_php' => ['port'=>8791,'exe'=>self::php_cgi(),'cwd'=>self::root(),'args'=>'-b 127.0.0.1:8791'],
+        'root_caddy' => ['port'=>8790,'exe'=>self::caddy(),'cwd'=>self::root(),'args'=>'run --config "H:/EZS_orchestrator/config/caddy/Caddyfile.dev-lab-assistant-candidate" --adapter caddyfile'],
+        'ezscore_dev' => ['port'=>8602,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezstudio_dev','args'=>'-b 127.0.0.1:8602'],
+        'ezscore_preview' => ['port'=>8862,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezstudio_dev','args'=>'-b 127.0.0.1:8862'],
+        'lab' => ['port'=>8701,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezs_lab','args'=>'-b 127.0.0.1:8701'],
+        'assistant' => ['port'=>8713,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezs_assistant','args'=>'-b 127.0.0.1:8713'],
+    ]; }
     /** PROD : un seul Caddy expose les trois facades, deux FastCGI distincts.
      * Le backend Symfony conserve APP_ENV=prod / APP_DEBUG=0 et son SSO. */
-    private const PROD = [
-        'prod_backend' => ['port'=>8512,'exe'=>self::PHP_CGI,'cwd'=>'H:/EZScore','args'=>'-b 127.0.0.1:8512'],
-        'prod_gateway' => ['port'=>18515,'exe'=>self::PHP_CGI,'cwd'=>self::ROOT.'/runtime_components/prod_gateway_php','args'=>'-b 127.0.0.1:18515'],
-        'prod_caddy' => ['port'=>8501,'additional_ports'=>[8510,8511], 'exe'=>self::CADDY,'cwd'=>self::ROOT,
+    private static function prod(): array { return [
+        'prod_backend' => ['port'=>8512,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezstudio','args'=>'-b 127.0.0.1:8512'],
+        'prod_gateway' => ['port'=>18515,'exe'=>self::php_cgi(),'cwd'=>self::root().'/runtime_components/prod_gateway_php','args'=>'-b 127.0.0.1:18515'],
+        'prod_caddy' => ['port'=>8501,'additional_ports'=>[8510,8511], 'exe'=>self::caddy(),'cwd'=>self::root(),
             'args'=>'run --config "H:/EZS_orchestrator/config/caddy/Caddyfile.prod" --adapter caddyfile'],
-    ];
+    ]; }
     /** @var list<resource> Process handles held until the CLI exits. */
     private static array $spawnHandles = [];
     private readonly \Closure $inventory;
@@ -45,13 +45,13 @@ final class NativeWindowsLifecycle
         $this->terminate=$terminate ? \Closure::fromCallable($terminate) : self::nativeTerminate(...);
         if(!in_array($profile,['dev','prod'],true))throw new \InvalidArgumentException('EZS_NATIVE_PROFILE_REFUSED');
         $this->profile=$profile;
-        $this->managedSpecs=$profile==='prod' ? self::PROD : self::DEV;
-        $this->runtime=$runtime ?? self::ROOT.'/runtime/v2-'.$profile;
+        $this->managedSpecs=$profile==='prod' ? self::prod() : self::dev();
+        $this->runtime=$runtime ?? self::root().'/runtime/v2-'.$profile;
         $this->dependencyAvailable=$dependencyAvailable ? \Closure::fromCallable($dependencyAvailable) : static fn(string $exe,string $cwd):bool=>is_file($exe) && is_dir($cwd);
         $this->activeOwner=$activeOwner ? \Closure::fromCallable($activeOwner) : WindowsActiveTcpProof::owner(...);
     }
-    public static function specs():array { return self::DEV; }
-    public static function prodSpecs():array { return self::PROD; }
+    public static function specs():array { return self::dev(); }
+    public static function prodSpecs():array { return self::prod(); }
     private function schema():string { return 'ezs.native.'.$this->profile.'.v1'; }
     private static function portsOf(array $spec):array
     { return [$spec['port'],...($spec['additional_ports']??[])]; }
@@ -463,7 +463,7 @@ final class NativeWindowsLifecycle
         $result = [];
         foreach ($processes as $pid => $observed) {
             $exe = strtolower(str_replace('\\', '/', (string)($observed['executable'] ?? '')));
-            if ($exe !== strtolower(str_replace('\\', '/', self::PHP_CGI))) continue;
+            if ($exe !== strtolower(str_replace('\\', '/', self::php_cgi()))) continue;
             $listening=[];
             foreach ($ports as $port=>$owners) {
                 if (in_array((int)$pid, $owners, true)) $listening[]=(int)$port;
@@ -502,7 +502,7 @@ final class NativeWindowsLifecycle
     /** @return list<string> */
     private function groupNames(string $group): array
     {
-        $groups = $this->profile==='prod' ? ['prod'=>array_keys(self::PROD)] :
+        $groups = $this->profile==='prod' ? ['prod'=>array_keys(self::prod())] :
             ['root'=>['root_php','root_caddy'],...self::groups()];
         if (!isset($groups[$group])) {
             throw new \InvalidArgumentException('EZS_NATIVE_GROUP_REFUSED');
@@ -685,7 +685,7 @@ final class NativeWindowsLifecycle
         $command = array_merge([$exe], $tokens);
         // stdout/stderr de serveurs persistants : journaux durables, jamais dans H:/temp.
         // Les anciens fichiers déjà ouverts ne sont ni déplacés ni supprimés.
-        $logDir = self::ROOT.'/var/log/native';
+        $logDir = self::root().'/var/log/native';
         if (!is_dir($logDir) && !mkdir($logDir, 0700, true) && !is_dir($logDir))
             throw new \RuntimeException('EZS_PROC_LOG_DIR_FAILED');
         if (!is_writable($logDir))
@@ -697,13 +697,13 @@ final class NativeWindowsLifecycle
             2 => ['file', $logDir.'/'. $name .'.err.log', 'a'],
         ];
         $env=null;
-        if(strcasecmp(str_replace('\\','/',$cwd),'H:/EZScore')===0){
+        if(strcasecmp(str_replace('\\','/',$cwd),dirname(__DIR__, 4) . '/apps/ezstudio')===0){
             $env=getenv();
             if(!is_array($env))$env=[];
             $env['APP_ENV']='prod';
             $env['APP_DEBUG']='0';
             $env['EZSCORE_INSTANCE']='prod';
-        } elseif(strcasecmp(str_replace('\\','/',$cwd),self::ROOT.'/runtime_components/prod_gateway_php')===0){
+        } elseif(strcasecmp(str_replace('\\','/',$cwd),self::root().'/runtime_components/prod_gateway_php')===0){
             $env=getenv();
             if(!is_array($env))$env=[];
             $env['EZS_GATEWAY_RECIPE_CONFIG']='';

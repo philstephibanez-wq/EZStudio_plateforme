@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][ValidateSet('Preflight','InstallDisabled','Enable','Status','Disable','Remove')][string]$Action)
 $ErrorActionPreference='Stop'
-$root='H:\EZS_orchestrator'
+$root=(Resolve-Path "$PSScriptRoot\..").Path
 $name='EZS_ROOT_resident'
 $legacy='EZS_orchestrator_supervisor'
 $hidden=Join-Path $root 'scripts\ezs_supervisor_resident_hidden.vbs'

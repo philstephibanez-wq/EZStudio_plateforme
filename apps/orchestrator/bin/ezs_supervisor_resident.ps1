@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param([ValidateRange(15,300)][int]$IntervalSeconds=60)
 $ErrorActionPreference='Stop'
-$root='H:\EZS_orchestrator'
+$root=(Resolve-Path "$PSScriptRoot\..").Path
 $watchdog=Join-Path $root 'scripts\ezs_root_frankenphp_watchdog.ps1'
 $logDir=Join-Path $root 'var\log\supervision'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

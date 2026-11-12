@@ -1,0 +1,136 @@
+{% extends 'base.html.twig' %}
+{% block title %}CHORDS · EZStudio_lab{% endblock %}
+{% block body %}
+<div class="card hero">
+<div>
+<h1>CHORDS — matrice d'expérience</h1>
+<div class="meta">Choisir le run STEMS parent et versionner séparément les entrées CHORDS et les preuves NO-CHORD.</div>
+</div>
+</div>
+
+{% if songs %}
+<div class="card">
+<form method="get" action="{{ path('lab_chords_experiment') }}" class="row">
+<label>Chanson
+<select name="song" onchange="this.form.submit()">
+{% for song in songs %}
+<option value="{{ song.id }}" {{ selected_song and song.id == selected_song.id ? 'selected' : '' }}>
+{{ song.title }}{% if song.artist %} — {{ song.artist }}{% endif %}
+</option>
+{% endfor %}
+</select>
+</label>
+</form>
+</div>
+{% endif %}
+
+{% if selected_song %}
+<div class="card">
+<h2>Nouvelle branche CHORDS</h2>
+{% if stems_runs %}
+<form method="post" action="{{ path('lab_chords_experiment_create') }}" id="chords-form">
+<input type="hidden" name="song" value="{{ selected_song.id }}">
+
+<div class="row">
+<label>Run STEMS parent
+<select name="parent_stems_run_id" id="parent-stems-run">
+{% for sr in stems_runs %}
+<option value="{{ sr.id }}">{{ sr.public_id }} · {{ sr.engine_name ?: 'STEMS' }} · {{ sr.created_at }}</option>
+{% endfor %}
+</select>
+</label>
+
+<label>Signature
+<select name="signature">
+<option>Auto</option><option>2/4</option><option>3/4</option><option>4/4</option><option>6/8</option>
+</select>
+</label>
+
+<label>Moteur accords
+<select name="engine"><option value="lv-chordia">lv-chordia</option></select>
+</label>
+</div>
+
+{% for sr in stems_runs %}
+<div class="stems-selection" data-stems-run="{{ sr.id }}" style="{{ loop.first ? '' : 'display:none' }}">
+<h3>{{ sr.public_id }} — artefacts disponibles</h3>
+<table>
+<thead><tr><th>Stem</th><th>SHA-256</th><th>CHORDS</th><th>Preuve NO-CHORD</th></tr></thead>
+<tbody>
+{% for a in sr.artifacts %}
+{% set harmonic_default = a.role in ['bass','guitar','piano','other'] %}
+<tr>
+<td><strong>{{ a.role }}</strong><div class="meta"><code>{{ a.artifact_id }}</code></div></td>
+<td><code>{{ a.sha256|slice(0,16) }}…</code></td>
+<td><input type="checkbox" name="chord_inputs[]" value="{{ a.artifact_id }}" {{ harmonic_default ? 'checked' : '' }}></td>
+<td><input type="checkbox" name="no_chord_inputs[]" value="{{ a.artifact_id }}" {{ harmonic_default ? 'checked' : '' }}></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endfor %}
+
+<p class="meta">
+Les deux sélections sont indépendantes et font partie de le Preset du run. Modifier une seule case crée une nouvelle branche scientifique.
+</p>
+<button type="submit">Lancer l’analyse CHORDS versionnée</button>
+</form>
+{% else %}
+<p>Aucun run STEMS terminé avec artefacts du run. Terminer/synchroniser STEMS avant CHORDS.</p>
+<a class="button" href="{{ path('lab_stems',{song:selected_song.id}) }}">Ouvrir STEMS</a>
+{% endif %}
+</div>
+
+<div class="card">
+<h2>Runs CHORDS</h2>
+<table>
+<thead><tr><th>Run</th><th>État</th><th>Moteur</th><th>Créé</th><th>Preset</th></tr></thead>
+<tbody>
+{% for r in chords_runs %}
+<tr>
+<td><code>{{ r.public_id }}</code></td><td>{{ r.state }}</td><td>{{ r.engine_name ?: '—' }}</td><td>{{ r.created_at }}</td>
+<td><a class="button secondary" href="{{ path('scientific_run',{id:r.id}) }}">Ouvrir</a></td>
+</tr>
+{% else %}
+<tr><td colspan="5">Aucun run CHORDS.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<div class="card">
+<h2>Analyses CHORDS historiques</h2>
+<table>
+<thead><tr><th>Run</th><th>État</th><th>Engine</th><th>Analyse canonique</th></tr></thead>
+<tbody>
+{% for r in legacy_runs %}
+<tr>
+<td>#{{ r.id }}</td><td>{{ r.status }}</td><td>{{ r.engine_version }}</td>
+<td>{% if r.status == 'done' %}<a class="button secondary" href="{{ path('bench_view',{id:r.id}) }}">CHORDS</a>{% endif %}</td>
+</tr>
+{% else %}
+<tr><td colspan="4">Aucun run historique.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endif %}
+
+<script>
+(() => {
+  const select = document.getElementById('parent-stems-run');
+  if (!select) return;
+  const groups = [...document.querySelectorAll('.stems-selection')];
+  function sync() {
+    for (const g of groups) {
+      const active = g.dataset.stemsRun === select.value;
+      g.style.display = active ? '' : 'none';
+      for (const input of g.querySelectorAll('input')) input.disabled = !active;
+    }
+  }
+  select.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

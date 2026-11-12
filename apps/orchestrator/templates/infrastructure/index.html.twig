@@ -14,73 +14,35 @@
           <section id="dev-mode-card" class="card ezs-server-card border-primary" aria-labelledby="dev-title">
             <div class="card-header d-flex justify-content-between align-items-center"><h2 id="dev-title" class="h6 mb-0">DEV · EZScore</h2><div id="dev-maintenance-banner" class="ezs-prod-maintenance-banner d-none" role="status">EZScore DEV en maintenance</div><span id="dev-maintenance-badge" class="badge text-bg-warning d-none">MAINTENANCE ACTIVE</span><span id="state-dev" class="badge text-bg-secondary">Inconnu</span></div>
             <div class="card-body">
-              <div class="ezs-server-summary"><div>Public <strong>8502</strong></div><div>HTTP <strong id="http-dev">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-dev">Non mesurÃ©</strong></span></div><div>TCP <strong id="tcp-dev">—</strong></div></div>
-              <div class="ezs-server-actions"><a class="btn btn-outline-primary btn-sm" href="http://127.0.0.1:8502/fr/catalog" target="_blank" rel="noopener noreferrer">Ouvrir DEV</a><button type="button" id="dev-maintenance-button" class="btn btn-outline-warning btn-sm" disabled>Maintenance</button><button type="button" id="dev-normal-button" class="btn btn-outline-success btn-sm" disabled>Mode normal</button><span id="dev-web-mode-detail" class="small text-secondary d-none"></span><span id="dev-web-mode-label" class="small text-secondary" aria-live="polite">Indetermine</span></div>
-              <details><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8502 · HTTP <span id="tech-http-dev">—</span></dd><dt>Backend</dt><dd>8602 · <strong id="dev-backend">Non mesuré</strong></dd><dt>Autorité Orchestrator</dt><dd><strong id="dev-backend-ownership">Non vérifiée</strong></dd><dt>Action</dt><dd>Normal / Maintenance DEV, sans arrêt du serveur</dd><dt>État complémentaire</dt><dd>Consultation sans modification de processus</dd></dl></details>
+              <div class="ezs-server-summary"><div>Public <strong>8000</strong></div><div>HTTP <strong id="http-dev">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-dev">Non mesuré</strong></span></div><div>TCP <strong id="tcp-dev">—</strong></div></div>
+              <div class="ezs-server-actions"><a class="btn btn-outline-primary btn-sm" href="http://dev.ezstudio.local:8000/" target="_blank" rel="noopener noreferrer">Ouvrir DEV</a><button type="button" id="dev-maintenance-button" class="btn btn-outline-warning btn-sm" disabled>Maintenance</button><button type="button" id="dev-normal-button" class="btn btn-outline-success btn-sm" disabled>Mode normal</button><span id="dev-web-mode-detail" class="small text-secondary d-none"></span><span id="dev-web-mode-label" class="small text-secondary" aria-live="polite">Indéterminé</span></div>
+              <details><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8000 · HTTP <span id="tech-http-dev">—</span></dd><dt>Backend</dt><dd>8000 · <strong id="dev-backend">Non mesuré</strong></dd><dt>Autorité Orchestrator</dt><dd><strong id="dev-backend-ownership">Non vérifiée</strong></dd><dt>Action</dt><dd>Normal / Maintenance DEV, sans arrêt du serveur</dd><dt>État complémentaire</dt><dd>Consultation sans modification de processus</dd></dl></details>
             </div>
           </section>
           <section id="ezs-prod-card" class="card ezs-server-card border-warning" aria-labelledby="prod-title">
             <div class="card-header d-flex justify-content-between align-items-center"><div class="d-flex align-items-center gap-2 flex-wrap"><h2 id="prod-title" class="h6 mb-0">PROD · EZScore</h2><span id="prod-maintenance-badge" class="badge text-bg-warning ezs-prod-maintenance-badge d-none">⚠ MAINTENANCE ACTIVE</span></div><div id="prod-maintenance-banner" class="ezs-prod-maintenance-banner d-none" role="status">⚠ PROD EN MAINTENANCE — accès public suspendu</div><span id="prod-control-status" class="badge text-bg-secondary">État inconnu</span></div>
             <div class="card-body">
-              <div class="ezs-server-summary"><div>Public <strong>8501</strong></div><div>HTTP <strong id="http-prod">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-prod">Non mesurÃ©</strong></span></div><div>TCP <strong id="tcp-prod">—</strong></div></div>
-              <div class="ezs-server-actions"><a class="btn btn-outline-warning btn-sm" href="https://ezscore.logandplay.com/fr/catalog" target="_blank" rel="noopener noreferrer">Ouvrir PROD</a><button id="prod-maintenance-button" class="btn btn-outline-warning btn-sm" disabled title="Activation de la maintenance PROD">Maintenance</button><button id="prod-normal-button" class="btn btn-outline-success btn-sm" disabled title="Vérification du backend PROD">Mode normal</button></div>
-              <details><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8501 · Caddy : <strong id="prod-caddy-detail">—</strong></dd><dt>Mode</dt><dd><strong id="prod-maintenance">Indéterminée</strong></dd><dt>Serveur</dt><dd><strong id="prod-caddy">PROD distinct</strong></dd><dt>Backend</dt><dd>Symfony · vérifié avant mode normal</dd><dt>Autorité Orchestrator</dt><dd>Orchestrator local · protection CSRF</dd><dt>Action</dt><dd>Maintenance / mode normal sous conditions</dd><dt>État complémentaire</dt><dd>Maintenance : <strong id="prod-maintenance-detail">Indéterminée</strong><span class="ms-2 small text-body-secondary" id="prod-refresh-diagnostic" aria-live="polite">Mesure en attente</span></dd></dl></details>
+              <div class="ezs-server-summary"><div>Public <strong>8000</strong></div><div>HTTP <strong id="http-prod">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-prod">Non mesuré</strong></span></div><div>TCP <strong id="tcp-prod">—</strong></div></div>
+              <div class="ezs-server-actions"><a class="btn btn-outline-warning btn-sm" href="http://ezstudio.local:8000/" target="_blank" rel="noopener noreferrer">Ouvrir PROD</a><button id="prod-maintenance-button" class="btn btn-outline-warning btn-sm" disabled title="Activation de la maintenance PROD">Maintenance</button><button id="prod-normal-button" class="btn btn-outline-success btn-sm" disabled title="Vérification du backend PROD">Mode normal</button></div>
+              <details><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8000 · FrankenPHP : <strong id="prod-caddy-detail">—</strong></dd><dt>Mode</dt><dd><strong id="prod-maintenance">Indéterminée</strong></dd><dt>Serveur</dt><dd><strong id="prod-caddy">PROD unifié</strong></dd><dt>Backend</dt><dd>Symfony · vérifié avant mode normal</dd><dt>Autorité Orchestrator</dt><dd>Orchestrator local · protection CSRF</dd><dt>Action</dt><dd>Maintenance / mode normal sous conditions</dd><dt>État complémentaire</dt><dd>Maintenance : <strong id="prod-maintenance-detail">Indéterminée</strong><span class="ms-2 small text-body-secondary" id="prod-refresh-diagnostic" aria-live="polite">Mesure en attente</span></dd></dl></details>
             </div>
           </section>
           <section class="card ezs-server-card border-info" aria-labelledby="lab-title">
             <div class="card-header d-flex justify-content-between align-items-center"><h2 id="lab-title" class="h6 mb-0">LAB · EZStudio</h2><span id="state-lab" class="badge text-bg-secondary">Inconnu</span></div>
             <div class="card-body">
-              <div class="ezs-server-summary"><div>Interface <strong>8702</strong></div><div>HTTP <strong id="http-lab">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-lab">Non mesurÃ©</strong></span></div><div>TCP <strong id="tcp-lab">—</strong></div></div>
-              <div class="ezs-server-actions"><a class="btn btn-outline-info btn-sm" href="http://127.0.0.1:8702/" target="_blank" rel="noopener noreferrer">Ouvrir LAB</a></div>
-              <details open><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8702 · HTTP <span id="tech-http-lab">—</span></dd><dt>Backend</dt><dd>8701 · <strong id="lab-backend">Non mesuré</strong></dd><dt>Autorité Orchestrator</dt><dd>Lecture seule depuis cette interface</dd><dt>Action</dt><dd>Démarrer / Arrêter indisponibles</dd><dt>État complémentaire</dt><dd>Service LAB : état HTTP/TCP ci-dessus. Gestion des jobs dans Files &amp; Jobs.</dd></dl></details>
+              <div class="ezs-server-summary"><div>Interface <strong>8000</strong></div><div>HTTP <strong id="http-lab">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-lab">Non mesuré</strong></span></div><div>TCP <strong id="tcp-lab">—</strong></div></div>
+              <div class="ezs-server-actions"><a class="btn btn-outline-info btn-sm" href="http://lab.ezstudio.local:8000/" target="_blank" rel="noopener noreferrer">Ouvrir LAB</a></div>
+              <details open><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8000 · HTTP <span id="tech-http-lab">—</span></dd><dt>Backend</dt><dd>8000 · <strong id="lab-backend">Non mesuré</strong></dd><dt>Autorité Orchestrator</dt><dd>Lecture seule depuis cette interface</dd><dt>Action</dt><dd>Démarrer / Arrêter indisponibles</dd><dt>État complémentaire</dt><dd>Service LAB : état HTTP/TCP ci-dessus. Gestion des jobs dans Files &amp; Jobs.</dd></dl></details>
             </div>
           </section>
           <section class="card ezs-server-card border-success" aria-labelledby="assistant-title">
             <div class="card-header d-flex justify-content-between align-items-center"><h2 id="assistant-title" class="h6 mb-0">Assistant</h2><span id="state-assistant" class="badge text-bg-secondary">Inconnu</span></div>
             <div class="card-body">
-              <div class="ezs-server-summary"><div>Interface <strong>8712</strong></div><div>HTTP <strong id="http-assistant">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-assistant">Non mesurÃ©</strong></span></div><div>TCP <strong id="tcp-assistant">—</strong></div></div>
-              <div class="ezs-server-actions"><a class="btn btn-outline-success btn-sm" href="http://127.0.0.1:8712/" target="_blank" rel="noopener noreferrer">Ouvrir Assistant</a></div>
-              <details open><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8712 · HTTP <span id="tech-http-assistant">—</span></dd><dt>Backend</dt><dd>8713 · FastCGI ; IA 8720</dd><dt>Autorité Orchestrator</dt><dd>Lecture seule des sondes GET</dd><dt>Action</dt><dd>Aucun dispatch ni claim depuis cette interface</dd><dt>État complémentaire</dt><dd>Web : {% if assistant_readiness.web %}<span class="badge text-bg-success">Prêt</span>{% else %}<span class="badge text-bg-secondary">Indisponible</span>{% endif %} · IA : {% if assistant_readiness.inference %}<span class="badge text-bg-success">Prête</span>{% else %}<span class="badge text-bg-secondary">Non confirmée</span>{% endif %}</dd></dl></details>
+              <div class="ezs-server-summary"><div>Interface <strong>8000</strong></div><div>HTTP <strong id="http-assistant">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-assistant">Non mesuré</strong></span></div><div>TCP <strong id="tcp-assistant">—</strong></div></div>
+              <div class="ezs-server-actions"><a class="btn btn-outline-success btn-sm" href="http://assistant.ezstudio.local:8000/" target="_blank" rel="noopener noreferrer">Ouvrir Assistant</a></div>
+              <details open><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8000 · HTTP <span id="tech-http-assistant">—</span></dd><dt>Backend</dt><dd>8000 · FrankenPHP ; IA 8720</dd><dt>Autorité Orchestrator</dt><dd>Lecture seule des sondes GET</dd><dt>Action</dt><dd>Aucun dispatch ni claim depuis cette interface</dd><dt>État complémentaire</dt><dd>Web : {% if assistant_readiness.web %}<span class="badge text-bg-success">Prêt</span>{% else %}<span class="badge text-bg-secondary">Indisponible</span>{% endif %} · IA : {% if assistant_readiness.inference %}<span class="badge text-bg-success">Prête</span>{% else %}<span class="badge text-bg-secondary">Non confirmée</span>{% endif %}</dd></dl></details>
             </div>
           </section>
         </div>
-        <div class="ezs-footerline mt-3"><strong>Orchestrator</strong> <span class="badge text-bg-success">HTTP actif</span><span>v{{ orchestrator_version }}</span><span>Port local 8790</span><span>GPU : panneau gauche</span><span class="text-body-secondary">Queues & Jobs / Logs / Déploiement : fonctions Python en cours de migration</span></div>
     </main>
-    <div class="modal fade" id="prod-action-modal" tabindex="-1" aria-labelledby="prod-action-modal-title" aria-describedby="prod-action-modal-description" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2 class="modal-title fs-5" id="prod-action-modal-title">Confirmer l'action PROD</h2>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Annuler"></button>
-          </div>
-          <div class="modal-body">
-            <p id="prod-action-modal-description"></p>
-            <p class="small text-body-secondary mb-0">Cette commande agit sur EZScore PROD. Elle ne modifie pas DEV.</p>
-            <p id="prod-action-modal-error" class="text-danger mt-2 mb-0" role="alert" hidden></p>
-          </div>
-          <div class="modal-footer">
-            <button type="button" id="prod-action-cancel" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-            <button type="button" id="prod-action-confirm" class="btn btn-warning">Confirmer</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal fade" id="dev-mode-modal" tabindex="-1" aria-labelledby="dev-mode-modal-title" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title fs-5" id="dev-mode-modal-title">EZScore DEV - changement de mode</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Annuler"></button>
-                </div>
-                <div class="modal-body">
-                    <p id="dev-mode-description"></p>
-                    <p id="dev-mode-error" class="text-danger" role="alert" hidden></p>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Annuler</button>
-                    <button class="btn btn-warning" id="dev-mode-confirm" type="button">Confirmer</button>
-                </div>
-            </div>
-        </div>
-    </div>
 {% endblock %}

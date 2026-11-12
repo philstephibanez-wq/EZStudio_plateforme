@@ -17,7 +17,7 @@ final class DevGroupOperationsController
     public static function allowed(string $environment, string $host, string $ip): bool
     {
         return $environment === 'dev'
-            && in_array($host, ['127.0.0.1', 'localhost'], true)
+            && in_array($host, ['127.0.0.1', 'localhost', 'orchestrator.ezstudio.local'], true)
             && in_array($ip, ['127.0.0.1', '::1'], true);
     }
 

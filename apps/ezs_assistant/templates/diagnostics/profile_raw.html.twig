@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+{% block title %}Diagnostic brut PROFILE · Assistant{% endblock %}
+{% block body %}
+<h1>Diagnostic brut PROFILE</h1>
+<p>Archive privée GitHub · lecture seule · aucune interprétation des valeurs · aucune validation scientifique implicite.</p>
+<p>Run #{{ runId }} · Trace {{ traceId }} · Pièce {{ selected }} · SHA-256 <code>{{ sha256 }}</code></p>
+<form method="get" action="{{ path('assistant_raw_profile_diagnostic') }}">
+  <input type="hidden" name="run_id" value="{{ runId }}">
+  <input type="hidden" name="trace_id" value="{{ traceId }}">
+  <label for="raw-artifact">Pièce archivée</label>
+  <select id="raw-artifact" name="file">
+    {% for name in artifactNames %}
+      <option value="{{ name }}" {% if name == selected %}selected{% endif %}>{{ name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Afficher</button>
+</form>
+<p>Le contenu ci-dessous est le contenu UTF-8 exact de la pièce archivée après expurgation, dont l'empreinte a été vérifiée. Les parties de snapshots doivent être concaténées dans l'ordre pour reconstituer le JSON complet.</p>
+<button type="button" id="raw-copy">Copier</button>
+<button type="button" id="raw-export">Exporter la pièce</button>
+<pre id="raw-data" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:70vh;overflow:auto;padding:1em;border:1px solid #777">{{ rawText }}</pre>
+<script>
+(function(){
+  var node=document.getElementById('raw-data');
+  document.getElementById('raw-copy').addEventListener('click',function(){
+    navigator.clipboard.writeText(node.textContent);
+  });
+  document.getElementById('raw-export').addEventListener('click',function(){
+    var blob=new Blob([node.textContent],{type:'application/octet-stream'});
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download={{ selected|json_encode|raw }};a.click();URL.revokeObjectURL(a.href);
+  });
+})();
+</script>
+{% endblock %}
