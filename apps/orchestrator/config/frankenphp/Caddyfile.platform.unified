@@ -1,0 +1,215 @@
+# ============================================================================
+# EZS - CADDYFILE UNIFIE - ROOT / DEV / LAB / ASSISTANT / PROD
+# ============================================================================
+# Architecture cible : UN service Windows EZS_FrankenPHP,
+#                      UN processus FrankenPHP, DIX ports locaux.
+# Emplacement durable : H:/EZS_orchestrator/config/frankenphp/Caddyfile.platform.unified
+# Ne PAS charger simultanement Caddyfile.platform.r9 ou Caddyfile.prod.native
+# sur les memes ports. Ne pas lancer un service FrankenPHP PROD distinct.
+#
+# Carte des ports :
+#   8790        Orchestrator (ROOT)
+#   8502, 8602  EZScore DEV : frontal puis Symfony
+#   8702, 8701  EZStudio LAB : frontal puis Symfony
+#   8712, 8713  Assistant : frontal puis application
+#   8501, 8510, 8511  EZScore PROD : frontal, gateway puis Symfony
+#
+# Isolation : les applications partagent le processus PHP, et non leurs
+#             racines de fichiers ni leurs environnements applicatifs.
+# IMPORTANT : l'isolation process / crash entre DEV et PROD n'existe PAS ici.
+# Ce fichier doit etre valide localement avec `frankenphp.exe validate` avant
+# toute modification de la configuration du service Windows.
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# 0. Options generales du serveur
+# ---------------------------------------------------------------------------
+{
+    # Pas d'API d'administration Caddy exposee.
+    admin off
+
+    # TLS termine en amont : ces dix listeners sont HTTP sur loopback.
+    auto_https off
+}
+
+# ---------------------------------------------------------------------------
+# 1. ORCHESTRATOR / ROOT : 127.0.0.1:8790
+#    Point d'entree du centre de controle et de supervision.
+# ---------------------------------------------------------------------------
+:8790 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/public
+    encode gzip
+    php_server {
+        env APP_ENV dev
+        env APP_DEBUG 1
+    }
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+
+# ---------------------------------------------------------------------------
+# 2. EZSCORE DEV / FRONTAL : 127.0.0.1:8502
+#    - Maintenance sans arret de FrankenPHP : marqueur dev.maintenance
+#    - Medias sous /media/* : autorisation deleguee a Symfony DEV (:8602)
+#    - Autres requetes : proxy vers Symfony DEV (:8602)
+# ---------------------------------------------------------------------------
+:8502 {
+    bind 127.0.0.1
+
+    # Commutateur de maintenance : Caddy teste ce fichier a chaque requete.
+    # L'ajout/suppression du marqueur ne doit PAS redemarrer FrankenPHP.
+    @devMaintenance file {
+        root H:/EZS_orchestrator/runtime/web-modes
+        try_files dev.maintenance
+    }
+    handle @devMaintenance {
+        header Retry-After "120"
+        header Cache-Control "no-store"
+        header Content-Type "text/html; charset=utf-8"
+        respond "<!doctype html><html lang=fr><head><meta charset=utf-8><meta name=viewport content='width=device-width, initial-scale=1'><title>EZScore DEV - Maintenance</title></head><body style='font-family:system-ui;background:#18202c;color:#fff;max-width:42rem;margin:12vh auto;padding:2rem'><h1>EZScore DEV</h1><h2>Maintenance en cours</h2><p>La version de developpement est temporairement indisponible.</p></body></html>" 503
+    }
+
+    # La route media reste protegee : l'authentification est faite par DEV.
+    @media path /media/*
+    handle @media {
+        forward_auth 127.0.0.1:8602 {
+            uri /internal/media/auth
+        }
+        root * H:/EZScore_dev/var/storage/stems
+        uri strip_prefix /media
+        header Cache-Control "private, max-age=3600"
+        file_server
+    }
+
+    # Toutes les autres requetes DEV suivent le backend Symfony.
+    handle {
+        reverse_proxy 127.0.0.1:8602
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 3. EZSCORE DEV / SYMFONY : 127.0.0.1:8602
+#    Racine distincte de PROD. Environnement explicitement DEV.
+# ---------------------------------------------------------------------------
+:8602 {
+    bind 127.0.0.1
+    root * H:/EZScore_dev/public
+    encode gzip
+    php_server {
+        env APP_ENV dev
+        env APP_DEBUG 1
+    }
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+
+# ---------------------------------------------------------------------------
+# 4. EZSTUDIO LAB / FRONTAL : 127.0.0.1:8702
+#    Point d'entree local, proxy vers l'application LAB (:8701).
+# ---------------------------------------------------------------------------
+:8702 {
+    bind 127.0.0.1
+    reverse_proxy 127.0.0.1:8701
+}
+
+# ---------------------------------------------------------------------------
+# 5. EZSTUDIO LAB / APPLICATION : 127.0.0.1:8701
+# ---------------------------------------------------------------------------
+:8701 {
+    bind 127.0.0.1
+    root * H:/EZStudio_lab/public
+    encode gzip
+    php_server {
+        env APP_ENV dev
+        env APP_DEBUG 1
+    }
+    header X-Content-Type-Options nosniff
+}
+
+# ---------------------------------------------------------------------------
+# 6. ASSISTANT / FRONTAL : 127.0.0.1:8712
+#    Proxy vers le backend web Assistant (:8713).
+# ---------------------------------------------------------------------------
+:8712 {
+    bind 127.0.0.1
+    reverse_proxy 127.0.0.1:8713
+}
+
+# ---------------------------------------------------------------------------
+# 7. ASSISTANT / APPLICATION : 127.0.0.1:8713
+# ---------------------------------------------------------------------------
+:8713 {
+    bind 127.0.0.1
+    root * H:/EZStudioLab_assistant/public
+    encode gzip
+    php_server {
+        env APP_ENV dev
+        env APP_DEBUG 1
+    }
+    header X-Content-Type-Options nosniff
+}
+
+# ---------------------------------------------------------------------------
+# 8. EZSCORE PROD / FRONTAL PUBLIC : 127.0.0.1:8501
+#    - Origine HTTP locale derriere la terminaison TLS externe
+#    - /media/* : acces autorise par le gateway PROD (:8510)
+#    - Reste : proxy vers le gateway PROD (:8510)
+#    - Ne PAS rediriger vers les chemins ou services DEV.
+# ---------------------------------------------------------------------------
+:8501 {
+    bind 127.0.0.1
+    @media path /media/*
+    handle @media {
+        forward_auth 127.0.0.1:8510 {
+            uri /internal/media/auth
+        }
+        root * H:/EZScore/var/storage/stems
+        uri strip_prefix /media
+        header Cache-Control "private, max-age=3600"
+        file_server
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8510 {
+            # Le frontal HTTPS externe est termine en amont de ce listener.
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Port 443
+            header_up X-Forwarded-Host {http.request.host}
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 9. EZSCORE PROD / GATEWAY PHP : 127.0.0.1:8510
+#    router.php assure le routage et transmet la requete au backend PROD.
+#    L'URI originale est preservee dans X-EZS-Original-URI.
+# ---------------------------------------------------------------------------
+:8510 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/runtime_components/prod_gateway_php
+    route {
+        request_header X-EZS-Original-URI {http.request.orig_uri}
+        rewrite * /router.php
+        php {
+            env APP_ENV prod
+            env APP_DEBUG 0
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 10. EZSCORE PROD / SYMFONY : 127.0.0.1:8511
+#     Application de production ; racine H:/EZScore (jamais EZScore_dev).
+#     Desactivation du mode debug a ce point d'execution PHP.
+# ---------------------------------------------------------------------------
+:8511 {
+    bind 127.0.0.1
+    root * H:/EZScore/public
+    encode gzip
+    php_server {
+        env APP_ENV prod
+        env APP_DEBUG 0
+    }
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}

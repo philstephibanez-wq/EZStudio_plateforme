@@ -1,0 +1,3 @@
+twig:
+    default_path: '%kernel.project_dir%/apps/orchestrator/templates'
+    file_name_pattern: '*.twig'

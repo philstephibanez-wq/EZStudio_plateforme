@@ -78,7 +78,6 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     tags?: TagsType,
  *     resource_tags?: TagsType,
  *     decorates?: string,
- *     decorates_tag?: string,
  *     decoration_inner_name?: string,
  *     decoration_priority?: int,
  *     decoration_on_invalid?: 'exception'|'ignore'|null,
@@ -119,11 +118,6 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     stack: list<DefinitionType|AliasType|PrototypeType|array<class-string, ArgumentsType|null>>,
  *     public?: bool,
  *     deprecated?: DeprecationType,
- *     decorates?: string,
- *     decorates_tag?: string,
- *     decoration_inner_name?: string,
- *     decoration_priority?: int,
- *     decoration_on_invalid?: 'exception'|'ignore'|null,
  * }
  * @psalm-type ServicesConfig = array{
  *     _defaults?: DefaultsType,
@@ -154,7 +148,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         cookie_name?: scalar|Param|null, // The name of the cookie to use when using stateless protection. // Default: "csrf-token"
  *     },
  *     form?: bool|array{ // Form configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         csrf_protection?: bool|array{
  *             enabled?: scalar|Param|null, // Default: null
  *             token_id?: scalar|Param|null, // Default: null
@@ -174,7 +168,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         allow_revalidate?: bool|Param,
  *         stale_while_revalidate?: int|Param,
  *         stale_if_error?: int|Param,
- *         terminate_on_cache_hit?: bool|Param, // Deprecated: Setting the "framework.http_cache.terminate_on_cache_hit.terminate_on_cache_hit" configuration option is deprecated. It will be removed in version 9.0.
+ *         terminate_on_cache_hit?: bool|Param,
  *     },
  *     esi?: bool|array{ // ESI configuration
  *         enabled?: bool|Param, // Default: false
@@ -194,7 +188,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         only_exceptions?: bool|Param, // Default: false
  *         only_main_requests?: bool|Param, // Default: false
  *         dsn?: scalar|Param|null, // Default: "file:%kernel.cache_dir%/profiler"
- *         collect_serializer_data?: true|Param, // Deprecated: Setting the "framework.profiler.collect_serializer_data.collect_serializer_data" configuration option is deprecated. It will be removed in version 9.0. // Default: true
+ *         collect_serializer_data?: bool|Param, // Enables the serializer data collector and profiler panel. // Default: false
  *     },
  *     workflows?: bool|array{
  *         enabled?: bool|Param, // Default: false
@@ -238,6 +232,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         enabled?: bool|Param, // Default: false
  *         resource?: scalar|Param|null,
  *         type?: scalar|Param|null,
+ *         cache_dir?: scalar|Param|null, // Deprecated: Setting the "framework.router.cache_dir.cache_dir" configuration option is deprecated. It will be removed in version 8.0. // Default: "%kernel.build_dir%"
  *         default_uri?: scalar|Param|null, // The default URI used to generate URLs in a non-HTTP context. // Default: null
  *         http_port?: scalar|Param|null, // Default: 80
  *         https_port?: scalar|Param|null, // Default: 443
@@ -261,13 +256,15 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         gc_maxlifetime?: scalar|Param|null,
  *         save_path?: scalar|Param|null, // Defaults to "%kernel.cache_dir%/sessions" if the "handler_id" option is not null.
  *         metadata_update_threshold?: int|Param, // Seconds to wait between 2 session metadata updates. // Default: 0
+ *         sid_length?: int|Param, // Deprecated: Setting the "framework.session.sid_length.sid_length" configuration option is deprecated. It will be removed in version 8.0. No alternative is provided as PHP 8.4 has deprecated the related option.
+ *         sid_bits_per_character?: int|Param, // Deprecated: Setting the "framework.session.sid_bits_per_character.sid_bits_per_character" configuration option is deprecated. It will be removed in version 8.0. No alternative is provided as PHP 8.4 has deprecated the related option.
  *     },
  *     request?: bool|array{ // Request configuration
  *         enabled?: bool|Param, // Default: false
  *         formats?: array<string, Param|string|list<scalar|Param|null>>,
  *     },
  *     assets?: bool|array{ // Assets configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         strict_mode?: bool|Param, // Throw an exception if an entry is missing from the manifest.json. // Default: false
  *         version_strategy?: scalar|Param|null, // Default: null
  *         version?: scalar|Param|null, // Default: null
@@ -305,7 +302,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         },
  *     },
  *     translator?: bool|array{ // Translator configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         fallbacks?: Param|string|list<scalar|Param|null>,
  *         logging?: bool|Param, // Default: false
  *         formatter?: scalar|Param|null, // Default: "translator.formatter.default"
@@ -333,11 +330,12 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         }>,
  *     },
  *     validation?: bool|array{ // Validation configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
+ *         cache?: scalar|Param|null, // Deprecated: Setting the "framework.validation.cache.cache" configuration option is deprecated. It will be removed in version 8.0.
  *         enable_attributes?: bool|Param, // Default: true
  *         static_method?: Param|string|list<scalar|Param|null>,
  *         translation_domain?: scalar|Param|null, // Default: "validators"
- *         email_validation_mode?: "html5"|"html5-allow-no-tld"|"strict"|Param, // Default: "html5"
+ *         email_validation_mode?: "html5"|"html5-allow-no-tld"|"strict"|"loose"|Param, // Default: "html5"
  *         mapping?: array{
  *             paths?: list<scalar|Param|null>,
  *         },
@@ -346,10 +344,12 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             endpoint?: scalar|Param|null, // API endpoint for the NotCompromisedPassword Validator. // Default: null
  *         },
  *         disable_translation?: bool|Param, // Default: false
- *         property_metadata_existence_check?: bool|Param, // When enabled, validateProperty() and validatePropertyValue() throw an exception if no metadata is found for the given property. // Default: false
  *         auto_mapping?: array<string, array{ // Default: []
  *             services?: list<scalar|Param|null>,
  *         }>,
+ *     },
+ *     annotations?: bool|array{
+ *         enabled?: bool|Param, // Default: false
  *     },
  *     serializer?: bool|array{ // Serializer configuration
  *         enabled?: bool|Param, // Default: false
@@ -369,7 +369,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         }>,
  *     },
  *     property_access?: bool|array{ // Property access configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         magic_call?: bool|Param, // Default: false
  *         magic_get?: bool|Param, // Default: true
  *         magic_set?: bool|Param, // Default: true
@@ -377,12 +377,12 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         throw_exception_on_invalid_property_path?: bool|Param, // Default: true
  *     },
  *     type_info?: bool|array{ // Type info configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         aliases?: array<string, scalar|Param|null>,
  *     },
  *     property_info?: bool|array{ // Property info configuration
- *         enabled?: bool|Param, // Default: false
- *         with_constructor_extractor?: bool|Param, // Registers the constructor extractor. // Default: true
+ *         enabled?: bool|Param, // Default: true
+ *         with_constructor_extractor?: bool|Param, // Registers the constructor extractor.
  *     },
  *     cache?: array{ // Cache configuration
  *         prefix_seed?: scalar|Param|null, // Used to namespace cache keys when using several apps with the same shared backend. // Default: "_%kernel.project_dir%.%kernel.container_class%"
@@ -403,7 +403,6 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             provider?: scalar|Param|null, // Overwrite the setting from the default provider for this adapter.
  *             early_expiration_message_bus?: scalar|Param|null,
  *             clearer?: scalar|Param|null,
- *             marshaller?: scalar|Param|null, // The marshaller service to use for this pool.
  *         }>,
  *     },
  *     php_errors?: array{ // PHP errors handling configuration
@@ -427,8 +426,10 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         resources?: Param|string|array<string, scalar|Param|null>,
  *     },
  *     messenger?: bool|array{ // Messenger configuration
- *         enabled?: bool|Param, // Default: false
- *         routing?: array<string, Param|string|list<scalar|Param|null>>,
+ *         enabled?: bool|Param, // Default: true
+ *         routing?: array<string, Param|string|array{ // Default: []
+ *             senders?: list<scalar|Param|null>,
+ *         }>,
  *         serializer?: array{
  *             default_serializer?: scalar|Param|null, // Service id to use as the default serializer for the transports. // Default: "messenger.transport.native_php_serializer"
  *             symfony_serializer?: array{
@@ -471,7 +472,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     disallow_search_engine_index?: bool|Param, // Enabled by default when debug is enabled. // Default: true
  *     http_client?: bool|array{ // HTTP Client configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         max_host_connections?: int|Param, // The maximum number of connections to a single host.
  *         default_options?: array{
  *             headers?: array<string, mixed>,
@@ -504,7 +505,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *                 enabled?: bool|Param, // Default: false
  *                 cache_pool?: string|Param, // The taggable cache pool to use for storing the responses. // Default: "cache.http_client"
  *                 shared?: bool|Param, // Indicates whether the cache is shared (public) or private. // Default: true
- *                 max_ttl?: int|Param, // The maximum TTL (in seconds) allowed for cached responses. // Default: 86400
+ *                 max_ttl?: int|Param, // The maximum TTL (in seconds) allowed for cached responses. Null means no cap. // Default: null
  *             },
  *             retry_failed?: bool|array{
  *                 enabled?: bool|Param, // Default: false
@@ -520,7 +521,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *                 jitter?: float|Param, // Randomness in percent (between 0 and 1) to apply to the delay. // Default: 0.1
  *             },
  *         },
- *         mock_response_factory?: scalar|Param|null, // `true` to always return empty 200 responses, or the id of the service to use to generate mock responses - which should be either an invokable or an iterable.
+ *         mock_response_factory?: scalar|Param|null, // The id of the service that should generate mock responses. It should be either an invokable or an iterable.
  *         scoped_clients?: array<string, Param|string|array{ // Default: []
  *             scope?: scalar|Param|null, // The regular expression that the request URL must match before adding the other options. When none is provided, the base URI is used instead.
  *             base_uri?: scalar|Param|null, // The URI to resolve relative URLs, following rules in RFC 3985, section 2.
@@ -551,14 +552,13 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *                 md5?: mixed,
  *             },
  *             crypto_method?: scalar|Param|null, // The minimum version of TLS to accept; must be one of STREAM_CRYPTO_METHOD_TLSv*_CLIENT constants.
- *             mock_response_factory?: scalar|Param|null, // `true` to always return empty 200 responses, `false` to disable mocking, or the id of the service to use to generate mock responses (invokable or iterable).
  *             extra?: array<string, mixed>,
  *             rate_limiter?: scalar|Param|null, // Rate limiter name to use for throttling requests. // Default: null
  *             caching?: bool|array{ // Caching configuration.
  *                 enabled?: bool|Param, // Default: false
  *                 cache_pool?: string|Param, // The taggable cache pool to use for storing the responses. // Default: "cache.http_client"
  *                 shared?: bool|Param, // Indicates whether the cache is shared (public) or private. // Default: true
- *                 max_ttl?: int|Param, // The maximum TTL (in seconds) allowed for cached responses. // Default: 86400
+ *                 max_ttl?: int|Param, // The maximum TTL (in seconds) allowed for cached responses. Null means no cap. // Default: null
  *             },
  *             retry_failed?: bool|array{
  *                 enabled?: bool|Param, // Default: false
@@ -576,7 +576,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         }>,
  *     },
  *     mailer?: bool|array{ // Mailer configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         message_bus?: scalar|Param|null, // The message bus to use. Defaults to the default bus if the Messenger component is installed. // Default: null
  *         dsn?: scalar|Param|null, // Default: null
  *         transports?: array<string, scalar|Param|null>,
@@ -642,7 +642,6 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *                 interval?: scalar|Param|null, // Configures the rate interval. The value must be a number followed by "second", "minute", "hour", "day", "week" or "month" (or their plural equivalent).
  *                 amount?: int|Param, // Amount of tokens to add each interval. // Default: 1
  *             },
- *             anchor_at?: scalar|Param|null, // Aligns the "fixed_window" policy to a calendar (e.g. "2024-01-05 00:00:00 UTC" combined with `interval: 1 month` resets the counter on the 5th of each month). UTC if not specified. // Default: null
  *         }>,
  *     },
  *     uid?: bool|array{ // Uid configuration
@@ -652,12 +651,10 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         name_based_uuid_namespace?: scalar|Param|null,
  *         time_based_uuid_version?: 7|6|1|Param, // Default: 7
  *         time_based_uuid_node?: scalar|Param|null,
- *         uuid47_secret?: scalar|Param|null, // A high-entropy secret used by the "uuid47_transformer" service. Defaults to "kernel.secret". // Default: null
  *     },
  *     html_sanitizer?: bool|array{ // HtmlSanitizer configuration
  *         enabled?: bool|Param, // Default: false
  *         sanitizers?: array<string, array{ // Default: []
- *             default_action?: "drop"|"block"|"allow"|Param, // Defines how the sanitizer must behave by default.
  *             allow_safe_elements?: bool|Param, // Allows "safe" elements and attributes. // Default: false
  *             allow_static_elements?: bool|Param, // Allows all static elements and attributes from the W3C Sanitizer API standard. // Default: false
  *             allow_elements?: array<string, mixed>,
@@ -681,10 +678,6 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     webhook?: bool|array{ // Webhook configuration
  *         enabled?: bool|Param, // Default: false
  *         message_bus?: scalar|Param|null, // The message bus to use. // Default: "messenger.default_bus"
- *         event_header_name?: scalar|Param|null, // Default: "Webhook-Event"
- *         id_header_name?: scalar|Param|null, // Default: "Webhook-Id"
- *         signature_header_name?: scalar|Param|null, // Default: "Webhook-Signature"
- *         signing_algorithm?: scalar|Param|null, // Default: "sha256"
  *         routing?: array<string, array{ // Default: []
  *             service?: scalar|Param|null,
  *             secret?: scalar|Param|null, // The secret used to verify incoming request signatures. It must be set in production: with an empty value, depending on the parser, requests from any sender are accepted or every request is rejected. // Default: ""
@@ -695,34 +688,627 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     json_streamer?: bool|array{ // JSON streamer configuration
  *         enabled?: bool|Param, // Default: false
- *         default_options?: array{
- *             include_null_properties?: bool|Param, // Encode the properties with null value // Default: false
+ *     },
+ * }
+ * @psalm-type DoctrineConfig = array{
+ *     dbal?: array{
+ *         default_connection?: scalar|Param|null,
+ *         types?: array<string, Param|string|array{ // Default: []
+ *             class?: scalar|Param|null,
+ *             commented?: bool|Param, // Deprecated: The doctrine-bundle type commenting features were removed; the corresponding config parameter was deprecated in 2.0 and will be dropped in 3.0.
+ *         }>,
+ *         driver_schemes?: array<string, scalar|Param|null>,
+ *         connections?: array<string, array{ // Default: []
+ *             url?: scalar|Param|null, // A URL with connection information; any parameter value parsed from this string will override explicitly set parameters
+ *             dbname?: scalar|Param|null,
+ *             host?: scalar|Param|null, // Defaults to "localhost" at runtime.
+ *             port?: scalar|Param|null, // Defaults to null at runtime.
+ *             user?: scalar|Param|null, // Defaults to "root" at runtime.
+ *             password?: scalar|Param|null, // Defaults to null at runtime.
+ *             override_url?: bool|Param, // Deprecated: The "doctrine.dbal.override_url" configuration key is deprecated.
+ *             dbname_suffix?: scalar|Param|null, // Adds the given suffix to the configured database name, this option has no effects for the SQLite platform
+ *             application_name?: scalar|Param|null,
+ *             charset?: scalar|Param|null,
+ *             path?: scalar|Param|null,
+ *             memory?: bool|Param,
+ *             unix_socket?: scalar|Param|null, // The unix socket to use for MySQL
+ *             persistent?: bool|Param, // True to use as persistent connection for the ibm_db2 driver
+ *             protocol?: scalar|Param|null, // The protocol to use for the ibm_db2 driver (default to TCPIP if omitted)
+ *             service?: bool|Param, // True to use SERVICE_NAME as connection parameter instead of SID for Oracle
+ *             servicename?: scalar|Param|null, // Overrules dbname parameter if given and used as SERVICE_NAME or SID connection parameter for Oracle depending on the service parameter.
+ *             sessionMode?: scalar|Param|null, // The session mode to use for the oci8 driver
+ *             server?: scalar|Param|null, // The name of a running database server to connect to for SQL Anywhere.
+ *             default_dbname?: scalar|Param|null, // Override the default database (postgres) to connect to for PostgreSQL connection.
+ *             sslmode?: scalar|Param|null, // Determines whether or with what priority a SSL TCP/IP connection will be negotiated with the server for PostgreSQL.
+ *             sslrootcert?: scalar|Param|null, // The name of a file containing SSL certificate authority (CA) certificate(s). If the file exists, the server's certificate will be verified to be signed by one of these authorities.
+ *             sslcert?: scalar|Param|null, // The path to the SSL client certificate file for PostgreSQL.
+ *             sslkey?: scalar|Param|null, // The path to the SSL client key file for PostgreSQL.
+ *             sslcrl?: scalar|Param|null, // The file name of the SSL certificate revocation list for PostgreSQL.
+ *             pooled?: bool|Param, // True to use a pooled server with the oci8/pdo_oracle driver
+ *             MultipleActiveResultSets?: bool|Param, // Configuring MultipleActiveResultSets for the pdo_sqlsrv driver
+ *             use_savepoints?: bool|Param, // Use savepoints for nested transactions
+ *             instancename?: scalar|Param|null, // Optional parameter, complete whether to add the INSTANCE_NAME parameter in the connection. It is generally used to connect to an Oracle RAC server to select the name of a particular instance.
+ *             connectstring?: scalar|Param|null, // Complete Easy Connect connection descriptor, see https://docs.oracle.com/database/121/NETAG/naming.htm.When using this option, you will still need to provide the user and password parameters, but the other parameters will no longer be used. Note that when using this parameter, the getHost and getPort methods from Doctrine\DBAL\Connection will no longer function as expected.
+ *             driver?: scalar|Param|null, // Default: "pdo_mysql"
+ *             platform_service?: scalar|Param|null, // Deprecated: The "platform_service" configuration key is deprecated since doctrine-bundle 2.9. DBAL 4 will not support setting a custom platform via connection params anymore.
+ *             auto_commit?: bool|Param,
+ *             schema_filter?: scalar|Param|null,
+ *             logging?: bool|Param, // Default: true
+ *             profiling?: bool|Param, // Default: true
+ *             profiling_collect_backtrace?: bool|Param, // Enables collecting backtraces when profiling is enabled // Default: false
+ *             profiling_collect_schema_errors?: bool|Param, // Enables collecting schema errors when profiling is enabled // Default: true
+ *             disable_type_comments?: bool|Param,
+ *             server_version?: scalar|Param|null,
+ *             idle_connection_ttl?: int|Param, // Default: 600
+ *             driver_class?: scalar|Param|null,
+ *             wrapper_class?: scalar|Param|null,
+ *             keep_slave?: bool|Param, // Deprecated: The "keep_slave" configuration key is deprecated since doctrine-bundle 2.2. Use the "keep_replica" configuration key instead.
+ *             keep_replica?: bool|Param,
+ *             options?: array<string, mixed>,
+ *             mapping_types?: array<string, scalar|Param|null>,
+ *             default_table_options?: array<string, scalar|Param|null>,
+ *             schema_manager_factory?: scalar|Param|null, // Default: "doctrine.dbal.default_schema_manager_factory"
+ *             result_cache?: scalar|Param|null,
+ *             slaves?: array<string, array{ // Default: []
+ *                 url?: scalar|Param|null, // A URL with connection information; any parameter value parsed from this string will override explicitly set parameters
+ *                 dbname?: scalar|Param|null,
+ *                 host?: scalar|Param|null, // Defaults to "localhost" at runtime.
+ *                 port?: scalar|Param|null, // Defaults to null at runtime.
+ *                 user?: scalar|Param|null, // Defaults to "root" at runtime.
+ *                 password?: scalar|Param|null, // Defaults to null at runtime.
+ *                 override_url?: bool|Param, // Deprecated: The "doctrine.dbal.override_url" configuration key is deprecated.
+ *                 dbname_suffix?: scalar|Param|null, // Adds the given suffix to the configured database name, this option has no effects for the SQLite platform
+ *                 application_name?: scalar|Param|null,
+ *                 charset?: scalar|Param|null,
+ *                 path?: scalar|Param|null,
+ *                 memory?: bool|Param,
+ *                 unix_socket?: scalar|Param|null, // The unix socket to use for MySQL
+ *                 persistent?: bool|Param, // True to use as persistent connection for the ibm_db2 driver
+ *                 protocol?: scalar|Param|null, // The protocol to use for the ibm_db2 driver (default to TCPIP if omitted)
+ *                 service?: bool|Param, // True to use SERVICE_NAME as connection parameter instead of SID for Oracle
+ *                 servicename?: scalar|Param|null, // Overrules dbname parameter if given and used as SERVICE_NAME or SID connection parameter for Oracle depending on the service parameter.
+ *                 sessionMode?: scalar|Param|null, // The session mode to use for the oci8 driver
+ *                 server?: scalar|Param|null, // The name of a running database server to connect to for SQL Anywhere.
+ *                 default_dbname?: scalar|Param|null, // Override the default database (postgres) to connect to for PostgreSQL connection.
+ *                 sslmode?: scalar|Param|null, // Determines whether or with what priority a SSL TCP/IP connection will be negotiated with the server for PostgreSQL.
+ *                 sslrootcert?: scalar|Param|null, // The name of a file containing SSL certificate authority (CA) certificate(s). If the file exists, the server's certificate will be verified to be signed by one of these authorities.
+ *                 sslcert?: scalar|Param|null, // The path to the SSL client certificate file for PostgreSQL.
+ *                 sslkey?: scalar|Param|null, // The path to the SSL client key file for PostgreSQL.
+ *                 sslcrl?: scalar|Param|null, // The file name of the SSL certificate revocation list for PostgreSQL.
+ *                 pooled?: bool|Param, // True to use a pooled server with the oci8/pdo_oracle driver
+ *                 MultipleActiveResultSets?: bool|Param, // Configuring MultipleActiveResultSets for the pdo_sqlsrv driver
+ *                 use_savepoints?: bool|Param, // Use savepoints for nested transactions
+ *                 instancename?: scalar|Param|null, // Optional parameter, complete whether to add the INSTANCE_NAME parameter in the connection. It is generally used to connect to an Oracle RAC server to select the name of a particular instance.
+ *                 connectstring?: scalar|Param|null, // Complete Easy Connect connection descriptor, see https://docs.oracle.com/database/121/NETAG/naming.htm.When using this option, you will still need to provide the user and password parameters, but the other parameters will no longer be used. Note that when using this parameter, the getHost and getPort methods from Doctrine\DBAL\Connection will no longer function as expected.
+ *                 ...<string, mixed>
+ *             }>,
+ *             replicas?: array<string, array{ // Default: []
+ *                 url?: scalar|Param|null, // A URL with connection information; any parameter value parsed from this string will override explicitly set parameters
+ *                 dbname?: scalar|Param|null,
+ *                 host?: scalar|Param|null, // Defaults to "localhost" at runtime.
+ *                 port?: scalar|Param|null, // Defaults to null at runtime.
+ *                 user?: scalar|Param|null, // Defaults to "root" at runtime.
+ *                 password?: scalar|Param|null, // Defaults to null at runtime.
+ *                 override_url?: bool|Param, // Deprecated: The "doctrine.dbal.override_url" configuration key is deprecated.
+ *                 dbname_suffix?: scalar|Param|null, // Adds the given suffix to the configured database name, this option has no effects for the SQLite platform
+ *                 application_name?: scalar|Param|null,
+ *                 charset?: scalar|Param|null,
+ *                 path?: scalar|Param|null,
+ *                 memory?: bool|Param,
+ *                 unix_socket?: scalar|Param|null, // The unix socket to use for MySQL
+ *                 persistent?: bool|Param, // True to use as persistent connection for the ibm_db2 driver
+ *                 protocol?: scalar|Param|null, // The protocol to use for the ibm_db2 driver (default to TCPIP if omitted)
+ *                 service?: bool|Param, // True to use SERVICE_NAME as connection parameter instead of SID for Oracle
+ *                 servicename?: scalar|Param|null, // Overrules dbname parameter if given and used as SERVICE_NAME or SID connection parameter for Oracle depending on the service parameter.
+ *                 sessionMode?: scalar|Param|null, // The session mode to use for the oci8 driver
+ *                 server?: scalar|Param|null, // The name of a running database server to connect to for SQL Anywhere.
+ *                 default_dbname?: scalar|Param|null, // Override the default database (postgres) to connect to for PostgreSQL connection.
+ *                 sslmode?: scalar|Param|null, // Determines whether or with what priority a SSL TCP/IP connection will be negotiated with the server for PostgreSQL.
+ *                 sslrootcert?: scalar|Param|null, // The name of a file containing SSL certificate authority (CA) certificate(s). If the file exists, the server's certificate will be verified to be signed by one of these authorities.
+ *                 sslcert?: scalar|Param|null, // The path to the SSL client certificate file for PostgreSQL.
+ *                 sslkey?: scalar|Param|null, // The path to the SSL client key file for PostgreSQL.
+ *                 sslcrl?: scalar|Param|null, // The file name of the SSL certificate revocation list for PostgreSQL.
+ *                 pooled?: bool|Param, // True to use a pooled server with the oci8/pdo_oracle driver
+ *                 MultipleActiveResultSets?: bool|Param, // Configuring MultipleActiveResultSets for the pdo_sqlsrv driver
+ *                 use_savepoints?: bool|Param, // Use savepoints for nested transactions
+ *                 instancename?: scalar|Param|null, // Optional parameter, complete whether to add the INSTANCE_NAME parameter in the connection. It is generally used to connect to an Oracle RAC server to select the name of a particular instance.
+ *                 connectstring?: scalar|Param|null, // Complete Easy Connect connection descriptor, see https://docs.oracle.com/database/121/NETAG/naming.htm.When using this option, you will still need to provide the user and password parameters, but the other parameters will no longer be used. Note that when using this parameter, the getHost and getPort methods from Doctrine\DBAL\Connection will no longer function as expected.
+ *                 ...<string, mixed>
+ *             }>,
  *             ...<string, mixed>
+ *         }>,
+ *         ...<string, mixed>
+ *     },
+ *     orm?: array{
+ *         default_entity_manager?: scalar|Param|null,
+ *         auto_generate_proxy_classes?: scalar|Param|null, // Auto generate mode possible values are: "NEVER", "ALWAYS", "FILE_NOT_EXISTS", "EVAL", "FILE_NOT_EXISTS_OR_CHANGED", this option is ignored when the "enable_native_lazy_objects" option is true // Default: false
+ *         enable_lazy_ghost_objects?: bool|Param, // Enables the new implementation of proxies based on lazy ghosts instead of using the legacy implementation // Default: true
+ *         enable_native_lazy_objects?: bool|Param, // Enables the new native implementation of PHP lazy objects instead of generated proxies // Default: false
+ *         proxy_dir?: scalar|Param|null, // Configures the path where generated proxy classes are saved when using non-native lazy objects, this option is ignored when the "enable_native_lazy_objects" option is true // Default: "%kernel.build_dir%/doctrine/orm/Proxies"
+ *         proxy_namespace?: scalar|Param|null, // Defines the root namespace for generated proxy classes when using non-native lazy objects, this option is ignored when the "enable_native_lazy_objects" option is true // Default: "Proxies"
+ *         controller_resolver?: bool|array{
+ *             enabled?: bool|Param, // Default: true
+ *             auto_mapping?: bool|Param|null, // Set to false to disable using route placeholders as lookup criteria when the primary key doesn't match the argument name // Default: null
+ *             evict_cache?: bool|Param, // Set to true to fetch the entity from the database instead of using the cache, if any // Default: false
+ *         },
+ *         entity_managers?: array<string, array{ // Default: []
+ *             query_cache_driver?: Param|string|array{
+ *                 type?: scalar|Param|null, // Default: null
+ *                 id?: scalar|Param|null,
+ *                 pool?: scalar|Param|null,
+ *             },
+ *             metadata_cache_driver?: Param|string|array{
+ *                 type?: scalar|Param|null, // Default: null
+ *                 id?: scalar|Param|null,
+ *                 pool?: scalar|Param|null,
+ *             },
+ *             result_cache_driver?: Param|string|array{
+ *                 type?: scalar|Param|null, // Default: null
+ *                 id?: scalar|Param|null,
+ *                 pool?: scalar|Param|null,
+ *             },
+ *             entity_listeners?: array{
+ *                 entities?: array<string, array{ // Default: []
+ *                     listeners?: array<string, array{ // Default: []
+ *                         events?: list<array{ // Default: []
+ *                             type?: scalar|Param|null,
+ *                             method?: scalar|Param|null, // Default: null
+ *                         }>,
+ *                     }>,
+ *                 }>,
+ *                 ...<string, mixed>
+ *             },
+ *             connection?: scalar|Param|null,
+ *             class_metadata_factory_name?: scalar|Param|null, // Default: "Doctrine\\ORM\\Mapping\\ClassMetadataFactory"
+ *             default_repository_class?: scalar|Param|null, // Default: "Doctrine\\ORM\\EntityRepository"
+ *             auto_mapping?: scalar|Param|null, // Default: false
+ *             naming_strategy?: scalar|Param|null, // Default: "doctrine.orm.naming_strategy.default"
+ *             quote_strategy?: scalar|Param|null, // Default: "doctrine.orm.quote_strategy.default"
+ *             typed_field_mapper?: scalar|Param|null, // Default: "doctrine.orm.typed_field_mapper.default"
+ *             entity_listener_resolver?: scalar|Param|null, // Default: null
+ *             fetch_mode_subselect_batch_size?: scalar|Param|null,
+ *             repository_factory?: scalar|Param|null, // Default: "doctrine.orm.container_repository_factory"
+ *             schema_ignore_classes?: list<scalar|Param|null>,
+ *             report_fields_where_declared?: bool|Param, // Set to "true" to opt-in to the new mapping driver mode that was added in Doctrine ORM 2.16 and will be mandatory in ORM 3.0. See https://github.com/doctrine/orm/pull/10455. // Default: true
+ *             validate_xml_mapping?: bool|Param, // Set to "true" to opt-in to the new mapping driver mode that was added in Doctrine ORM 2.14. See https://github.com/doctrine/orm/pull/6728. // Default: false
+ *             second_level_cache?: array{
+ *                 region_cache_driver?: Param|string|array{
+ *                     type?: scalar|Param|null, // Default: null
+ *                     id?: scalar|Param|null,
+ *                     pool?: scalar|Param|null,
+ *                 },
+ *                 region_lock_lifetime?: scalar|Param|null, // Default: 60
+ *                 log_enabled?: bool|Param, // Default: true
+ *                 region_lifetime?: scalar|Param|null, // Default: 3600
+ *                 enabled?: bool|Param, // Default: true
+ *                 factory?: scalar|Param|null,
+ *                 regions?: array<string, array{ // Default: []
+ *                     cache_driver?: Param|string|array{
+ *                         type?: scalar|Param|null, // Default: null
+ *                         id?: scalar|Param|null,
+ *                         pool?: scalar|Param|null,
+ *                     },
+ *                     lock_path?: scalar|Param|null, // Default: "%kernel.cache_dir%/doctrine/orm/slc/filelock"
+ *                     lock_lifetime?: scalar|Param|null, // Default: 60
+ *                     type?: scalar|Param|null, // Default: "default"
+ *                     lifetime?: scalar|Param|null, // Default: 0
+ *                     service?: scalar|Param|null,
+ *                     name?: scalar|Param|null,
+ *                 }>,
+ *                 loggers?: array<string, array{ // Default: []
+ *                     name?: scalar|Param|null,
+ *                     service?: scalar|Param|null,
+ *                 }>,
+ *             },
+ *             hydrators?: array<string, scalar|Param|null>,
+ *             mappings?: array<string, Param|bool|string|array{ // Default: []
+ *                 mapping?: scalar|Param|null, // Default: true
+ *                 type?: scalar|Param|null,
+ *                 dir?: scalar|Param|null,
+ *                 alias?: scalar|Param|null,
+ *                 prefix?: scalar|Param|null,
+ *                 is_bundle?: bool|Param,
+ *             }>,
+ *             dql?: array{
+ *                 string_functions?: array<string, scalar|Param|null>,
+ *                 numeric_functions?: array<string, scalar|Param|null>,
+ *                 datetime_functions?: array<string, scalar|Param|null>,
+ *             },
+ *             filters?: array<string, Param|string|array{ // Default: []
+ *                 class?: scalar|Param|null,
+ *                 enabled?: bool|Param, // Default: false
+ *                 parameters?: array<string, mixed>,
+ *                 ...<string, mixed>
+ *             }>,
+ *             identity_generation_preferences?: array<string, scalar|Param|null>,
+ *         }>,
+ *         resolve_target_entities?: array<string, scalar|Param|null>,
+ *         ...<string, mixed>
+ *     },
+ * }
+ * @psalm-type DoctrineMigrationsConfig = array{
+ *     enable_service_migrations?: bool|Param, // Whether to enable fetching migrations from the service container. // Default: false
+ *     migrations_paths?: array<string, scalar|Param|null>,
+ *     services?: array<string, scalar|Param|null>,
+ *     factories?: array<string, scalar|Param|null>,
+ *     storage?: array{ // Storage to use for migration status metadata.
+ *         table_storage?: array{ // The default metadata storage, implemented as a table in the database.
+ *             table_name?: scalar|Param|null, // Default: null
+ *             version_column_name?: scalar|Param|null, // Default: null
+ *             version_column_length?: scalar|Param|null, // Default: null
+ *             executed_at_column_name?: scalar|Param|null, // Default: null
+ *             execution_time_column_name?: scalar|Param|null, // Default: null
  *         },
  *     },
+ *     migrations?: list<scalar|Param|null>,
+ *     connection?: scalar|Param|null, // Connection name to use for the migrations database. // Default: null
+ *     em?: scalar|Param|null, // Entity manager name to use for the migrations database (available when doctrine/orm is installed). // Default: null
+ *     all_or_nothing?: scalar|Param|null, // Run all migrations in a transaction. // Default: false
+ *     check_database_platform?: scalar|Param|null, // Adds an extra check in the generated migrations to allow execution only on the same platform as they were initially generated on. // Default: true
+ *     custom_template?: scalar|Param|null, // Custom template path for generated migration classes. // Default: null
+ *     organize_migrations?: scalar|Param|null, // Organize migrations mode. Possible values are: "BY_YEAR", "BY_YEAR_AND_MONTH", false // Default: false
+ *     enable_profiler?: bool|Param, // Whether or not to enable the profiler collector to calculate and visualize migration status. This adds some queries overhead. // Default: false
+ *     transactional?: bool|Param, // Whether or not to wrap migrations in a single transaction. // Default: true
+ * }
+ * @psalm-type DebugConfig = array{
+ *     max_items?: int|Param, // Max number of displayed items past the first level, -1 means no limit. // Default: 2500
+ *     min_depth?: int|Param, // Minimum tree depth to clone all the items, 1 is default. // Default: 1
+ *     max_string_length?: int|Param, // Max length of displayed strings, -1 means no limit. // Default: -1
+ *     dump_destination?: scalar|Param|null, // A stream URL where dumps should be written to. // Default: null
+ *     theme?: "dark"|"light"|Param, // Changes the color of the dump() output when rendered directly on the templating. "dark" (default) or "light". // Default: "dark"
+ * }
+ * @psalm-type TwigConfig = array{
+ *     form_themes?: list<scalar|Param|null>,
+ *     globals?: array<string, array{ // Default: []
+ *         id?: scalar|Param|null,
+ *         type?: scalar|Param|null,
+ *         value?: mixed,
+ *         ...<string, mixed>
+ *     }>,
+ *     autoescape_service?: scalar|Param|null, // Default: null
+ *     autoescape_service_method?: scalar|Param|null, // Default: null
+ *     base_template_class?: scalar|Param|null, // Deprecated: The child node "base_template_class" at path "twig.base_template_class" is deprecated.
+ *     cache?: scalar|Param|null, // Default: true
+ *     charset?: scalar|Param|null, // Default: "%kernel.charset%"
+ *     debug?: bool|Param, // Default: "%kernel.debug%"
+ *     strict_variables?: bool|Param, // Default: "%kernel.debug%"
+ *     auto_reload?: scalar|Param|null,
+ *     optimizations?: int|Param,
+ *     default_path?: scalar|Param|null, // The default path used to load templates. // Default: "%kernel.project_dir%/templates"
+ *     file_name_pattern?: Param|string|list<scalar|Param|null>,
+ *     paths?: array<string, mixed>,
+ *     date?: array{ // The default format options used by the date filter.
+ *         format?: scalar|Param|null, // Default: "F j, Y H:i"
+ *         interval_format?: scalar|Param|null, // Default: "%d days"
+ *         timezone?: scalar|Param|null, // The timezone used when formatting dates, when set to null, the timezone returned by date_default_timezone_get() is used. // Default: null
+ *     },
+ *     number_format?: array{ // The default format options for the number_format filter.
+ *         decimals?: int|Param, // Default: 0
+ *         decimal_point?: scalar|Param|null, // Default: "."
+ *         thousands_separator?: scalar|Param|null, // Default: ","
+ *     },
+ *     mailer?: array{
+ *         html_to_text_converter?: scalar|Param|null, // A service implementing the "Symfony\Component\Mime\HtmlToTextConverter\HtmlToTextConverterInterface". // Default: null
+ *     },
+ * }
+ * @psalm-type WebProfilerConfig = array{
+ *     toolbar?: bool|array{ // Profiler toolbar configuration
+ *         enabled?: bool|Param, // Default: false
+ *         ajax_replace?: bool|Param, // Replace toolbar on AJAX requests // Default: false
+ *     },
+ *     intercept_redirects?: bool|Param, // Default: false
+ *     excluded_ajax_paths?: scalar|Param|null, // Default: "^/((index|app(_[\\w]+)?)\\.php/)?_wdt"
+ * }
+ * @psalm-type SecurityConfig = array{
+ *     access_denied_url?: scalar|Param|null, // Default: null
+ *     session_fixation_strategy?: "none"|"migrate"|"invalidate"|Param, // Default: "migrate"
+ *     hide_user_not_found?: bool|Param, // Deprecated: The "hide_user_not_found" option is deprecated and will be removed in 8.0. Use the "expose_security_errors" option instead.
+ *     expose_security_errors?: \Symfony\Component\Security\Http\Authentication\ExposeSecurityLevel::None|\Symfony\Component\Security\Http\Authentication\ExposeSecurityLevel::AccountStatus|\Symfony\Component\Security\Http\Authentication\ExposeSecurityLevel::All|Param, // Default: "none"
+ *     erase_credentials?: bool|Param, // Default: true
+ *     access_decision_manager?: array{
+ *         strategy?: "affirmative"|"consensus"|"unanimous"|"priority"|Param,
+ *         service?: scalar|Param|null,
+ *         strategy_service?: scalar|Param|null,
+ *         allow_if_all_abstain?: bool|Param, // Default: false
+ *         allow_if_equal_granted_denied?: bool|Param, // Default: true
+ *     },
+ *     password_hashers?: array<string, Param|string|array{ // Default: []
+ *         algorithm?: scalar|Param|null,
+ *         migrate_from?: Param|string|list<scalar|Param|null>,
+ *         hash_algorithm?: scalar|Param|null, // Name of hashing algorithm for PBKDF2 (i.e. sha256, sha512, etc..) See hash_algos() for a list of supported algorithms. // Default: "sha512"
+ *         key_length?: scalar|Param|null, // Default: 40
+ *         ignore_case?: bool|Param, // Default: false
+ *         encode_as_base64?: bool|Param, // Default: true
+ *         iterations?: scalar|Param|null, // Default: 5000
+ *         cost?: int|Param, // Default: null
+ *         memory_cost?: scalar|Param|null, // Default: null
+ *         time_cost?: scalar|Param|null, // Default: null
+ *         id?: scalar|Param|null,
+ *     }>,
+ *     providers?: array<string, array{ // Default: []
+ *         id?: scalar|Param|null,
+ *         chain?: array{
+ *             providers?: Param|string|list<scalar|Param|null>,
+ *         },
+ *     }>,
+ *     firewalls?: array<string, array{ // Default: []
+ *         pattern?: scalar|Param|null,
+ *         host?: scalar|Param|null,
+ *         methods?: Param|string|list<scalar|Param|null>,
+ *         security?: bool|Param, // Default: true
+ *         user_checker?: scalar|Param|null, // The UserChecker to use when authenticating users in this firewall. // Default: "security.user_checker"
+ *         request_matcher?: scalar|Param|null,
+ *         access_denied_url?: scalar|Param|null,
+ *         access_denied_handler?: scalar|Param|null,
+ *         entry_point?: scalar|Param|null, // An enabled authenticator name or a service id that implements "Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface".
+ *         provider?: scalar|Param|null,
+ *         stateless?: bool|Param, // Default: false
+ *         lazy?: bool|Param, // Default: false
+ *         context?: scalar|Param|null,
+ *         logout?: array{
+ *             enable_csrf?: bool|Param|null, // Default: null
+ *             csrf_token_id?: scalar|Param|null, // Default: "logout"
+ *             csrf_parameter?: scalar|Param|null, // Default: "_csrf_token"
+ *             csrf_token_manager?: scalar|Param|null,
+ *             path?: scalar|Param|null, // Default: "/logout"
+ *             target?: scalar|Param|null, // Default: "/"
+ *             invalidate_session?: bool|Param, // Default: true
+ *             clear_site_data?: Param|string|list<"*"|"cache"|"cookies"|"storage"|"executionContexts"|Param>,
+ *             delete_cookies?: Param|string|array<string, array{ // Default: []
+ *                 path?: scalar|Param|null, // Default: null
+ *                 domain?: scalar|Param|null, // Default: null
+ *                 secure?: scalar|Param|null, // Default: false
+ *                 samesite?: scalar|Param|null, // Default: null
+ *                 partitioned?: scalar|Param|null, // Default: false
+ *             }>,
+ *         },
+ *         switch_user?: array{
+ *             provider?: scalar|Param|null,
+ *             parameter?: scalar|Param|null, // Default: "_switch_user"
+ *             role?: scalar|Param|null, // Default: "ROLE_ALLOWED_TO_SWITCH"
+ *             target_route?: scalar|Param|null, // Default: null
+ *         },
+ *         required_badges?: list<scalar|Param|null>,
+ *     }>,
+ *     access_control?: list<array{ // Default: []
+ *         request_matcher?: scalar|Param|null, // Default: null
+ *         requires_channel?: scalar|Param|null, // Default: null
+ *         path?: scalar|Param|null, // Use the urldecoded format. // Default: null
+ *         host?: scalar|Param|null, // Default: null
+ *         port?: int|Param, // Default: null
+ *         ips?: Param|string|list<scalar|Param|null>,
+ *         attributes?: array<string, scalar|Param|null>,
+ *         route?: scalar|Param|null, // Default: null
+ *         methods?: Param|string|list<scalar|Param|null>,
+ *         allow_if?: scalar|Param|null, // Default: null
+ *         roles?: Param|string|list<scalar|Param|null>,
+ *     }>,
+ *     role_hierarchy?: array<string, Param|string|list<scalar|Param|null>>,
+ * }
+ * @psalm-type MonologConfig = array{
+ *     use_microseconds?: scalar|Param|null, // Default: true
+ *     channels?: list<scalar|Param|null>,
+ *     handlers?: array<string, array{ // Default: []
+ *         type?: scalar|Param|null,
+ *         id?: scalar|Param|null,
+ *         enabled?: bool|Param, // Default: true
+ *         priority?: scalar|Param|null, // Default: 0
+ *         level?: scalar|Param|null, // Default: "DEBUG"
+ *         bubble?: bool|Param, // Default: true
+ *         interactive_only?: bool|Param, // Default: false
+ *         app_name?: scalar|Param|null, // Default: null
+ *         fill_extra_context?: bool|Param, // Default: false
+ *         include_stacktraces?: bool|Param, // Default: false
+ *         process_psr_3_messages?: array{
+ *             enabled?: bool|Param|null, // Default: null
+ *             date_format?: scalar|Param|null,
+ *             remove_used_context_fields?: bool|Param,
+ *             ...<string, mixed>
+ *         },
+ *         path?: scalar|Param|null, // Default: "%kernel.logs_dir%/%kernel.environment%.log"
+ *         file_permission?: scalar|Param|null, // Default: null
+ *         use_locking?: bool|Param, // Default: false
+ *         filename_format?: scalar|Param|null, // Default: "{filename}-{date}"
+ *         date_format?: scalar|Param|null, // Default: "Y-m-d"
+ *         ident?: scalar|Param|null, // Default: false
+ *         logopts?: scalar|Param|null, // Default: 1
+ *         facility?: scalar|Param|null, // Default: "user"
+ *         max_files?: scalar|Param|null, // Default: 0
+ *         action_level?: scalar|Param|null, // Default: "WARNING"
+ *         activation_strategy?: scalar|Param|null, // Default: null
+ *         stop_buffering?: bool|Param, // Default: true
+ *         passthru_level?: scalar|Param|null, // Default: null
+ *         excluded_404s?: list<scalar|Param|null>,
+ *         excluded_http_codes?: list<array{ // Default: []
+ *             code?: scalar|Param|null,
+ *             urls?: list<scalar|Param|null>,
+ *         }>,
+ *         accepted_levels?: list<scalar|Param|null>,
+ *         min_level?: scalar|Param|null, // Default: "DEBUG"
+ *         max_level?: scalar|Param|null, // Default: "EMERGENCY"
+ *         buffer_size?: scalar|Param|null, // Default: 0
+ *         flush_on_overflow?: bool|Param, // Default: false
+ *         handler?: scalar|Param|null,
+ *         url?: scalar|Param|null,
+ *         exchange?: scalar|Param|null,
+ *         exchange_name?: scalar|Param|null, // Default: "log"
+ *         room?: scalar|Param|null,
+ *         message_format?: scalar|Param|null, // Default: "text"
+ *         api_version?: scalar|Param|null, // Default: null
+ *         channel?: scalar|Param|null, // Default: null
+ *         bot_name?: scalar|Param|null, // Default: "Monolog"
+ *         use_attachment?: scalar|Param|null, // Default: true
+ *         use_short_attachment?: scalar|Param|null, // Default: false
+ *         include_extra?: scalar|Param|null, // Default: false
+ *         icon_emoji?: scalar|Param|null, // Default: null
+ *         webhook_url?: scalar|Param|null,
+ *         exclude_fields?: list<scalar|Param|null>,
+ *         team?: scalar|Param|null,
+ *         notify?: scalar|Param|null, // Default: false
+ *         nickname?: scalar|Param|null, // Default: "Monolog"
+ *         token?: scalar|Param|null,
+ *         region?: scalar|Param|null,
+ *         source?: scalar|Param|null,
+ *         use_ssl?: bool|Param, // Default: true
+ *         user?: mixed,
+ *         title?: scalar|Param|null, // Default: null
+ *         host?: scalar|Param|null, // Default: null
+ *         port?: scalar|Param|null, // Default: 514
+ *         config?: list<scalar|Param|null>,
+ *         members?: list<scalar|Param|null>,
+ *         connection_string?: scalar|Param|null,
+ *         timeout?: scalar|Param|null,
+ *         time?: scalar|Param|null, // Default: 60
+ *         deduplication_level?: scalar|Param|null, // Default: 400
+ *         store?: scalar|Param|null, // Default: null
+ *         connection_timeout?: scalar|Param|null,
+ *         persistent?: bool|Param,
+ *         dsn?: scalar|Param|null,
+ *         hub_id?: scalar|Param|null, // Default: null
+ *         client_id?: scalar|Param|null, // Default: null
+ *         auto_log_stacks?: scalar|Param|null, // Default: false
+ *         release?: scalar|Param|null, // Default: null
+ *         environment?: scalar|Param|null, // Default: null
+ *         message_type?: scalar|Param|null, // Default: 0
+ *         parse_mode?: scalar|Param|null, // Default: null
+ *         disable_webpage_preview?: bool|Param|null, // Default: null
+ *         disable_notification?: bool|Param|null, // Default: null
+ *         split_long_messages?: bool|Param, // Default: false
+ *         delay_between_messages?: bool|Param, // Default: false
+ *         topic?: int|Param, // Default: null
+ *         factor?: int|Param, // Default: 1
+ *         tags?: Param|string|list<scalar|Param|null>,
+ *         console_formater_options?: mixed, // Deprecated: "monolog.handlers..console_formater_options.console_formater_options" is deprecated, use "monolog.handlers..console_formater_options.console_formatter_options" instead.
+ *         console_formatter_options?: mixed, // Default: []
+ *         formatter?: scalar|Param|null,
+ *         nested?: bool|Param, // Default: false
+ *         publisher?: Param|string|array{
+ *             id?: scalar|Param|null,
+ *             hostname?: scalar|Param|null,
+ *             port?: scalar|Param|null, // Default: 12201
+ *             chunk_size?: scalar|Param|null, // Default: 1420
+ *             encoder?: "json"|"compressed_json"|Param,
+ *         },
+ *         mongo?: Param|string|array{
+ *             id?: scalar|Param|null,
+ *             host?: scalar|Param|null,
+ *             port?: scalar|Param|null, // Default: 27017
+ *             user?: scalar|Param|null,
+ *             pass?: scalar|Param|null,
+ *             database?: scalar|Param|null, // Default: "monolog"
+ *             collection?: scalar|Param|null, // Default: "logs"
+ *         },
+ *         mongodb?: Param|string|array{
+ *             id?: scalar|Param|null, // ID of a MongoDB\Client service
+ *             uri?: scalar|Param|null,
+ *             username?: scalar|Param|null,
+ *             password?: scalar|Param|null,
+ *             database?: scalar|Param|null, // Default: "monolog"
+ *             collection?: scalar|Param|null, // Default: "logs"
+ *         },
+ *         elasticsearch?: Param|string|array{
+ *             id?: scalar|Param|null,
+ *             hosts?: list<scalar|Param|null>,
+ *             host?: scalar|Param|null,
+ *             port?: scalar|Param|null, // Default: 9200
+ *             transport?: scalar|Param|null, // Default: "Http"
+ *             user?: scalar|Param|null, // Default: null
+ *             password?: scalar|Param|null, // Default: null
+ *         },
+ *         index?: scalar|Param|null, // Default: "monolog"
+ *         document_type?: scalar|Param|null, // Default: "logs"
+ *         ignore_error?: scalar|Param|null, // Default: false
+ *         redis?: Param|string|array{
+ *             id?: scalar|Param|null,
+ *             host?: scalar|Param|null,
+ *             password?: scalar|Param|null, // Default: null
+ *             port?: scalar|Param|null, // Default: 6379
+ *             database?: scalar|Param|null, // Default: 0
+ *             key_name?: scalar|Param|null, // Default: "monolog_redis"
+ *         },
+ *         predis?: Param|string|array{
+ *             id?: scalar|Param|null,
+ *             host?: scalar|Param|null,
+ *         },
+ *         from_email?: scalar|Param|null,
+ *         to_email?: Param|string|list<scalar|Param|null>,
+ *         subject?: scalar|Param|null,
+ *         content_type?: scalar|Param|null, // Default: null
+ *         headers?: list<scalar|Param|null>,
+ *         mailer?: scalar|Param|null, // Default: null
+ *         email_prototype?: Param|string|array{
+ *             id?: scalar|Param|null,
+ *             method?: scalar|Param|null, // Default: null
+ *         },
+ *         lazy?: bool|Param, // Default: true
+ *         verbosity_levels?: array{
+ *             VERBOSITY_QUIET?: scalar|Param|null, // Default: "ERROR"
+ *             VERBOSITY_NORMAL?: scalar|Param|null, // Default: "WARNING"
+ *             VERBOSITY_VERBOSE?: scalar|Param|null, // Default: "NOTICE"
+ *             VERBOSITY_VERY_VERBOSE?: scalar|Param|null, // Default: "INFO"
+ *             VERBOSITY_DEBUG?: scalar|Param|null, // Default: "DEBUG"
+ *         },
+ *         channels?: Param|string|array{
+ *             type?: scalar|Param|null,
+ *             elements?: list<scalar|Param|null>,
+ *             ...<string, mixed>
+ *         },
+ *         ...<string, mixed>
+ *     }>,
+ * }
+ * @psalm-type MakerConfig = array{
+ *     root_namespace?: scalar|Param|null, // Default: "App"
+ *     generate_final_classes?: bool|Param, // Default: true
+ *     generate_final_entities?: bool|Param, // Default: false
+ * }
+ * @psalm-type KnpuOauth2ClientConfig = array{
+ *     http_client?: scalar|Param|null, // Service id of HTTP client to use (must implement GuzzleHttp\ClientInterface) // Default: null
+ *     http_client_options?: array{
+ *         timeout?: int|Param,
+ *         proxy?: scalar|Param|null,
+ *         verify?: bool|Param, // Use only with proxy option set
+ *     },
+ *     clients?: array<string, array<string, mixed>>,
  * }
  * @psalm-type ConfigType = array{
  *     imports?: ImportsConfig,
  *     parameters?: ParametersConfig,
  *     services?: ServicesConfig,
  *     framework?: FrameworkConfig,
+ *     doctrine?: DoctrineConfig,
+ *     doctrine_migrations?: DoctrineMigrationsConfig,
+ *     twig?: TwigConfig,
+ *     web_profiler?: WebProfilerConfig,
+ *     security?: SecurityConfig,
+ *     monolog?: MonologConfig,
+ *     knpu_oauth2_client?: KnpuOauth2ClientConfig,
  *     "when@dev"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,
  *         services?: ServicesConfig,
  *         framework?: FrameworkConfig,
- *     },
- *     "when@prod"?: array{
- *         imports?: ImportsConfig,
- *         parameters?: ParametersConfig,
- *         services?: ServicesConfig,
- *         framework?: FrameworkConfig,
+ *         doctrine?: DoctrineConfig,
+ *         doctrine_migrations?: DoctrineMigrationsConfig,
+ *         debug?: DebugConfig,
+ *         twig?: TwigConfig,
+ *         web_profiler?: WebProfilerConfig,
+ *         security?: SecurityConfig,
+ *         monolog?: MonologConfig,
+ *         maker?: MakerConfig,
+ *         knpu_oauth2_client?: KnpuOauth2ClientConfig,
  *     },
  *     "when@test"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,
  *         services?: ServicesConfig,
  *         framework?: FrameworkConfig,
+ *         doctrine?: DoctrineConfig,
+ *         doctrine_migrations?: DoctrineMigrationsConfig,
+ *         twig?: TwigConfig,
+ *         web_profiler?: WebProfilerConfig,
+ *         security?: SecurityConfig,
+ *         monolog?: MonologConfig,
+ *         knpu_oauth2_client?: KnpuOauth2ClientConfig,
  *     },
  *     ...<string, ExtensionType|array{ // extra keys must follow the when@%env% pattern or match an extension alias
  *         imports?: ImportsConfig,
@@ -807,7 +1393,6 @@ namespace Symfony\Component\Routing\Loader\Configurator;
  * }
  * @psalm-type RoutesConfig = array{
  *     "when@dev"?: array<string, RouteConfig|ImportConfig|AliasConfig>,
- *     "when@prod"?: array<string, RouteConfig|ImportConfig|AliasConfig>,
  *     "when@test"?: array<string, RouteConfig|ImportConfig|AliasConfig>,
  *     ...<string, RouteConfig|ImportConfig|AliasConfig>
  * }

@@ -1,0 +1,8 @@
+framework:
+    messenger:
+        transports:
+            global_queue:
+                dsn: 'ezs-global://local'
+                retry_strategy:
+                    max_retries: 0
+        routing: { }

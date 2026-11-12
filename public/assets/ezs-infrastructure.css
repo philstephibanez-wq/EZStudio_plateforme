@@ -1,0 +1,52 @@
+/* EZS Orchestrator: Bootstrap 5 remains the visual source of truth. */
+body { min-height: 100vh; background: var(--bs-tertiary-bg); }
+main.container-fluid { max-width: 1600px; }
+
+:root{--ezs-perf-width:320px;color-scheme:dark}body{background:#0d1519;color:#edf4f7} .ezs-main{margin-left:var(--ezs-perf-width);max-width:none!important;padding-right:24px}.ezs-nav{margin-left:var(--ezs-perf-width);background:#121e26;padding:12px 24px;display:flex;gap:22px;border-bottom:1px solid #29404a}.ezs-nav a{color:#9fc5f8}.ezs-nav span{color:#81909c}.perf-panel{top:56px!important}.perf-drawer{background:#11171d!important;color:#e6edf4!important;border-right-color:#2d3742!important}.perf-kicker,.perf-device,.perf-chart-head span,.perf-scale,.perf-mini small,.perf-stats span,.perf-foot{color:#93a0ae!important}.perf-primary,.perf-mini{background:#171e26!important;border-color:#303b47!important}.perf-chart{background:#10161c!important;border-color:#303b47!important}.perf-grid line{stroke:#27323d!important}.perf-line{stroke:#6fa3d8!important}.perf-area{fill:#284563!important;opacity:.55!important}@media(max-width:1000px){.perf-panel{position:relative!important;top:auto!important;width:auto!important;height:auto!important;max-height:470px}.ezs-nav,.ezs-main{margin-left:0!important}.perf-drawer{max-height:470px}}
+
+.perf-panel{position:fixed;left:0;top:56px;bottom:0;width:var(--ezs-perf-width,320px);z-index:900;font-family:Arial,sans-serif}
+.perf-drawer{box-sizing:border-box;width:100%;height:100%;overflow:auto;background:#f7f8fa;border-right:1px solid #cfd4da;padding:14px 12px}
+.perf-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}.perf-kicker{font-size:10px;letter-spacing:.12em;color:#6b737c}.perf-head h2{font-size:26px;margin:2px 0}.perf-device{font-size:12px;color:#68707c}
+.perf-primary,.perf-mini{background:#fff;border:1px solid #d9dde3;border-radius:8px;padding:10px}.perf-primary{margin-bottom:9px}.perf-chart-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:5px}.perf-chart-head span{font-size:11px;color:#59616a}.perf-chart-head strong{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.perf-chart{display:block;width:100%;height:62px;border:1px solid #dce2e8;background:#fbfcfd}.perf-chart--large{height:120px}.perf-grid line{stroke:#e7ebef;stroke-width:1;vector-effect:non-scaling-stroke}.perf-line{fill:none;stroke:#4b78a8;stroke-width:1.6;vector-effect:non-scaling-stroke;stroke-linejoin:round}.perf-area{fill:#dce9f5;opacity:.6}
+.perf-scale{display:flex;justify-content:space-between;color:#7a828a;font-size:9px;margin-top:4px}.perf-mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.perf-mini small{display:block;color:#7b838c;font-size:9px;margin-top:4px}
+.perf-stats{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:14px;border-top:1px solid #d9dde3}.perf-stats>div{padding:9px 3px;border-bottom:1px solid #e4e7ea}.perf-stats span{display:block;color:#69717a;font-size:10px}.perf-stats strong{display:block;margin-top:2px;font-size:14px;font-variant-numeric:tabular-nums}
+.perf-foot{font-size:9px;color:#79818a;display:flex;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap}.perf-live-on{color:#218c4a!important}
+
+/* Server-block layout retained from Python Control Center, compact without long page. */
+.ezs-server-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ezs-server-card .card-body{padding:13px}.ezs-server-card .card-header{padding:10px 13px}.ezs-server-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:13px}.ezs-server-summary>div{border:1px solid var(--bs-border-color);border-radius:6px;padding:10px 8px;font-size:.76rem;color:var(--bs-secondary-color)}.ezs-server-summary strong{display:block;font-size:.9rem;color:var(--bs-body-color);margin-top:3px}.ezs-server-actions{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px}.ezs-server-card details{font-size:.78rem;color:var(--bs-secondary-color)}.ezs-statusline,.ezs-footerline{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:8px 10px;border:1px solid var(--bs-border-color);border-radius:6px;font-size:.85rem}.ezs-statusline #dev-health-feedback{margin-left:auto;font-size:.73rem}.ezs-main{padding-top:12px!important}@media(max-width:850px){.ezs-server-grid{grid-template-columns:1fr}.ezs-server-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* v1.3b16 — usable viewport width: avoid Bootstrap .container-fluid 100% plus left margin overflow. */
+:root { --ezs-perf-width: clamp(250px, 17vw, 290px); }
+html, body { max-width: 100%; overflow-x: clip; }
+.ezs-nav { margin-left: var(--ezs-perf-width); min-width: 0; padding: 9px 14px; }
+main.container-fluid.ezs-main {
+  box-sizing: border-box;
+  width: calc(100% - var(--ezs-perf-width));
+  max-width: none !important;
+  margin-left: var(--ezs-perf-width);
+  margin-right: 0;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.ezs-server-grid { min-width: 0; gap: 10px; }
+.ezs-server-card { min-width: 0; }
+.ezs-server-card .card-body { padding: 10px; }
+.ezs-server-summary { gap: 6px; margin-bottom: 9px; }
+.ezs-server-summary > div { min-width: 0; padding: 8px 7px; overflow-wrap: anywhere; }
+.ezs-server-actions { gap: 5px; }
+.ezs-statusline, .ezs-footerline { min-width: 0; }
+@media (max-width: 1000px) {
+  :root { --ezs-perf-width: 0px; }
+  .ezs-nav { margin-left: 0 !important; }
+  main.container-fluid.ezs-main { width: 100%; margin-left: 0 !important; }
+}
+
+.ezs-tech-grid{display:grid;grid-template-columns:minmax(8rem,34%) minmax(0,1fr);gap:.35rem .75rem}.ezs-tech-grid dt{color:var(--bs-secondary-color)}.ezs-tech-grid dd{margin:0;overflow-wrap:anywhere}.ezs-server-card details{margin-top:.6rem}@media(max-width:700px){.ezs-tech-grid{grid-template-columns:1fr}}
+
+/* EZS 4.2c86 — PROD business maintenance state, separate from service health. */
+.ezs-prod-maintenance-active{border:2px solid #efab38!important;box-shadow:0 0 0 2px rgba(239,171,56,.16)}
+.ezs-prod-maintenance-badge{font-size:.79rem;padding:.5rem .65rem;color:#191006!important;background:#ffbf4d!important}
+.ezs-prod-maintenance-banner{background:#59370a;color:#fff3db;border:1px solid #ffbf4d;border-radius:6px;padding:10px 12px;margin:0 0 10px;font-weight:700;letter-spacing:.015em}
+.ezs-prod-maintenance-pulse{font-weight:700;animation:ezs-prod-pulse 2.5s ease-in-out infinite}
+@keyframes ezs-prod-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,191,77,.12)}50%{box-shadow:0 0 0 5px rgba(255,191,77,.40)}}
+@media (prefers-reduced-motion: reduce){.ezs-prod-maintenance-pulse{animation:none}}

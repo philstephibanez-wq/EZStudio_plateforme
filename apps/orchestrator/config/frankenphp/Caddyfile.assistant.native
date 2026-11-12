@@ -1,0 +1,19 @@
+# R1N10 ASSISTANT isolated native FrankenPHP candidate.
+# Not yet wired: canonical Assistant start.ps1/stop.ps1 still control web + Llama.
+# To activate, change canonical Assistant Web lifecycle transactionally, preserving Llama coupling.
+{
+    admin off
+    auto_https off
+}
+http://127.0.0.1:8712 {
+    bind 127.0.0.1
+    reverse_proxy 127.0.0.1:8713
+}
+http://127.0.0.1:8713 {
+    bind 127.0.0.1
+    root * H:/EZStudioLab_assistant/public
+    encode gzip
+    php_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}

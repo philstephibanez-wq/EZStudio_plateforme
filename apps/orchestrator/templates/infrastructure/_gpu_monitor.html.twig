@@ -1,0 +1,34 @@
+<aside class="perf-panel" id="ezs-performance-panel"
+       data-telemetry-url="/api/v2/gpu/dashboard"
+       aria-label="Performance GPU">
+  <div class="perf-drawer">
+    <div class="perf-head"><div><div class="perf-kicker">PERFORMANCE</div><h2>GPU</h2><div class="perf-device" data-perf-name>NVIDIA</div></div></div>
+    <div class="perf-primary">
+      <div class="perf-chart-head"><span>Utilisation GPU</span><strong data-perf-util>—</strong></div>
+      <svg class="perf-chart perf-chart--large" viewBox="0 0 360 120" preserveAspectRatio="none">
+        <g class="perf-grid"><line x1="0" y1="30" x2="360" y2="30"/><line x1="0" y1="60" x2="360" y2="60"/><line x1="0" y1="90" x2="360" y2="90"/><line x1="90" y1="0" x2="90" y2="120"/><line x1="180" y1="0" x2="180" y2="120"/><line x1="270" y1="0" x2="270" y2="120"/></g>
+        <polygon class="perf-area" data-perf-area="util" points=""/><polyline class="perf-line" data-perf-line="util" points=""/>
+      </svg>
+      <div class="perf-scale"><span>120 secondes</span><span>100 %</span></div>
+    </div>
+    <div class="perf-mini-grid">
+      {% for key,label in {memory:'Mémoire GPU',power:'Puissance',temp:'Température',clock:'Horloge SM'} %}
+      <div class="perf-mini">
+        <div class="perf-chart-head"><span>{{ label }}</span><strong data-perf-{{ key }}>—</strong></div>
+        <svg class="perf-chart" viewBox="0 0 174 62" preserveAspectRatio="none">
+          <g class="perf-grid"><line x1="0" y1="31" x2="174" y2="31"/><line x1="58" y1="0" x2="58" y2="62"/><line x1="116" y1="0" x2="116" y2="62"/></g>
+          <polygon class="perf-area" data-perf-area="{{ key }}" points=""/><polyline class="perf-line" data-perf-line="{{ key }}" points=""/>
+        </svg>
+        <small data-perf-{{ key }}-detail>—</small>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="perf-stats">
+      <div><span>Utilisation</span><strong data-stat-util>—</strong></div><div><span>Mémoire dédiée</span><strong data-stat-memory>—</strong></div>
+      <div><span>Puissance</span><strong data-stat-power>—</strong></div><div><span>Température</span><strong data-stat-temp>—</strong></div>
+      <div><span>Horloge SM</span><strong data-stat-clock>—</strong></div><div><span>État</span><strong data-stat-state>—</strong></div>
+    </div>
+    <div class="perf-foot"><span data-perf-status>Initialisation télémétrie…</span><span>2 s · 120 s</span></div>
+  </div>
+</aside>
+

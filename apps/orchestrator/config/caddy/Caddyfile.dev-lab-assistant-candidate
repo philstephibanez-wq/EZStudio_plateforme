@@ -1,0 +1,83 @@
+{
+    admin off
+    auto_https off
+}
+
+# CANDIDATE V2 ROOT, NOT ACTIVE: validate against current DEV before controlled switch.
+# EZScore sites are identical to the active Caddyfile.dev.
+http://127.0.0.1:8790 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/public
+    encode gzip
+    php_fastcgi 127.0.0.1:8791 {
+        capture_stderr
+    }
+    file_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+
+# PREVIEW ONLY. OAuth and media deliberately cannot be exercised on this port.
+http://127.0.0.1:8852 {
+    bind 127.0.0.1
+    @protected path /media/* /internal/media/*
+    respond @protected "Media unavailable in isolated preview" 503
+    root * H:/EZScore_dev/public
+    encode gzip
+    php_fastcgi 127.0.0.1:8862 {
+        capture_stderr
+    }
+    file_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+
+# EZScore DEV candidate, FastCGI application + protected media.
+# forward_auth calls the SAME Caddy HTTP facade with a DIFFERENT path,
+# /internal/media/auth, which is handled by the PHP FastCGI route below.
+http://127.0.0.1:8502 {
+    bind 127.0.0.1
+    @media path /media/*
+    handle @media {
+        forward_auth 127.0.0.1:8502 {
+            uri /internal/media/auth
+        }
+        root * {$EZSCORE_MEDIA_ROOT}
+        uri strip_prefix /media
+        header Cache-Control "private, max-age=3600"
+        file_server
+    }
+    handle {
+        root * H:/EZScore_dev/public
+        encode gzip
+        php_fastcgi 127.0.0.1:8602 {
+            capture_stderr
+        }
+        file_server
+        header X-Content-Type-Options nosniff
+    }
+}
+
+# LAB DEV — MAIN only, shared Caddy, separate PHP-FastCGI.
+http://127.0.0.1:8702 {
+    bind 127.0.0.1
+    root * H:/EZStudio_lab/public
+    encode gzip
+    php_fastcgi 127.0.0.1:8701 {
+        capture_stderr
+    }
+    file_server
+    header X-Content-Type-Options nosniff
+}
+
+# Assistant DEV — MAIN only, no independent Caddy / no XPS routing.
+http://127.0.0.1:8712 {
+    bind 127.0.0.1
+    root * H:/EZStudioLab_assistant/public
+    encode gzip
+    php_fastcgi 127.0.0.1:8713 {
+        capture_stderr
+    }
+    file_server
+    header X-Content-Type-Options nosniff
+}

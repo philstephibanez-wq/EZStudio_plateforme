@@ -1,0 +1,13 @@
+<service>
+  <id>EZS_FrankenPHP</id>
+  <name>EZS FrankenPHP</name>
+  <description>EZS web pilot ROOT DEV LAB Assistant; PROD isolated until validation</description>
+  <executable>H:\FRANKENPHP\bin\frankenphp.exe</executable>
+  <arguments>run --config H:\EZS_orchestrator\config\frankenphp\Caddyfile.platform.r9 --adapter caddyfile</arguments>
+  <workingdirectory>H:\EZS_orchestrator</workingdirectory>
+  <env name="APP_ENV" value="dev"/>
+  <env name="APP_DEBUG" value="1"/>
+  <startmode>Automatic</startmode>
+  <logpath>H:\FRANKENPHP\services\EZS_FrankenPHP\logs</logpath>
+  <log mode="roll"/>
+</service>

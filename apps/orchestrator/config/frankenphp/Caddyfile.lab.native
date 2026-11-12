@@ -1,0 +1,17 @@
+# R1N10 LAB isolated native FrankenPHP candidate; activation ONLY with LAB intent RUNNING.
+{
+    admin off
+    auto_https off
+}
+http://127.0.0.1:8702 {
+    bind 127.0.0.1
+    reverse_proxy 127.0.0.1:8701
+}
+http://127.0.0.1:8701 {
+    bind 127.0.0.1
+    root * H:/EZStudio_lab/public
+    encode gzip
+    php_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}

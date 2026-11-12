@@ -1,0 +1,42 @@
+# R1N8 PROD dedicated native FrankenPHP instance (not ROOT).
+{
+    admin off
+    auto_https off
+}
+http://127.0.0.1:8501 {
+    bind 127.0.0.1
+    @media path /media/*
+    handle @media {
+        forward_auth 127.0.0.1:8510 {
+            uri /internal/media/auth
+        }
+        root * H:/EZScore/var/storage/stems
+        uri strip_prefix /media
+        header Cache-Control "private, max-age=3600"
+        file_server
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8510 {
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Port 443
+            header_up X-Forwarded-Host {http.request.host}
+        }
+    }
+}
+http://127.0.0.1:8510 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/runtime_components/prod_gateway_php
+    route {
+        request_header X-EZS-Original-URI {http.request.orig_uri}
+        rewrite * /router.php
+        php
+    }
+}
+http://127.0.0.1:8511 {
+    bind 127.0.0.1
+    root * H:/EZScore/public
+    encode gzip
+    php_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}

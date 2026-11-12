@@ -1,0 +1,25 @@
+{% extends '@shared/base.html.twig' %}
+
+{% block title %}{{ app_title }} - EZStudio Plateforme{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+    <div class="p-5 mb-4 bg-light rounded-3 border shadow-sm">
+        <div class="container-fluid py-3">
+            <span class="badge {{ app_badge }} mb-2">{{ app_id|upper }}</span>
+            <h1 class="display-5 fw-bold">{{ app_title }}</h1>
+            <p class="col-md-8 fs-4 text-muted">{{ app_description }}</p>
+            <hr class="my-4">
+            <p class="small text-secondary mb-3">
+                Application isolée chargée via <code>apps/{{ app_id }}/</code> et héritant du socle <code>@shared/base.html.twig</code>.
+            </p>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="http://orchestrator.ezstudio.local:8000" class="btn btn-outline-primary btn-sm">Orchestrator</a>
+                <a href="http://dev.ezstudio.local:8000" class="btn btn-outline-success btn-sm">EZStudio Dev</a>
+                <a href="http://lab.ezstudio.local:8000" class="btn btn-outline-warning btn-sm">EZS Lab</a>
+                <a href="http://assistant.ezstudio.local:8000" class="btn btn-outline-info btn-sm">EZS Assistant</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

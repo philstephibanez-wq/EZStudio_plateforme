@@ -1,0 +1,17 @@
+{
+    auto_https off
+    admin off
+}
+# Production gateway PHP, local only. Caddy public 8501 remains unchanged.
+:8510 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/runtime_components/prod_gateway_php
+    route {
+        rewrite * /router.php
+        php_fastcgi 127.0.0.1:18515 {
+            header_up X-EZS-Original-URI {http.request.orig_uri}
+            header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+            capture_stderr
+        }
+    }
+}

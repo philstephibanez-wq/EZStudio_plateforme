@@ -1,0 +1,54 @@
+# R1N6 canonical unified FrankenPHP candidate; activation guarded by cutover.ps1
+# A single FrankenPHP Windows service will own all sites.
+{
+    admin off
+    auto_https off
+}
+http://127.0.0.1:8790 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/public
+    encode gzip
+    php_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+# PROD public facade: preserve forward_auth / media / gateway.
+http://127.0.0.1:8501 {
+    bind 127.0.0.1
+    @media path /media/*
+    handle @media {
+        forward_auth 127.0.0.1:8510 {
+            uri /internal/media/auth
+        }
+        root * H:/EZScore/var/storage/stems
+        uri strip_prefix /media
+        header Cache-Control "private, max-age=3600"
+        file_server
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8510 {
+            header_up X-Forwarded-Proto https
+            header_up X-Forwarded-Port 443
+            header_up X-Forwarded-Host {http.request.host}
+        }
+    }
+}
+# Original gateway uses router.php for ALL requests. Native PHP, no FastCGI.
+http://127.0.0.1:8510 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/runtime_components/prod_gateway_php
+    route {
+        request_header X-EZS-Original-URI {http.request.orig_uri}
+        rewrite * /router.php
+        php
+    }
+}
+# Original Symfony backend. PHP native classic mode, no workers.
+http://127.0.0.1:8511 {
+    bind 127.0.0.1
+    root * H:/EZScore/public
+    encode gzip
+    php_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}

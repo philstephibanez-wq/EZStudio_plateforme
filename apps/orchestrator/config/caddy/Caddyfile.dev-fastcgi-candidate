@@ -1,0 +1,58 @@
+{
+    admin off
+    auto_https off
+}
+
+# Single isolated Caddy DEV instance: existing Orchestrator plus EZScore sandbox.
+http://127.0.0.1:8790 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/web/public
+    encode gzip
+    php_fastcgi 127.0.0.1:8791 {
+        capture_stderr
+    }
+    file_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+
+# PREVIEW ONLY. OAuth and media deliberately cannot be exercised on this port.
+http://127.0.0.1:8852 {
+    bind 127.0.0.1
+    @protected path /media/* /internal/media/*
+    respond @protected "Media unavailable in isolated preview" 503
+    root * H:/EZScore_dev/public
+    encode gzip
+    php_fastcgi 127.0.0.1:8862 {
+        capture_stderr
+    }
+    file_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+
+# EZScore DEV candidate, FastCGI application + protected media.
+# forward_auth calls the SAME Caddy HTTP facade with a DIFFERENT path,
+# /internal/media/auth, which is handled by the PHP FastCGI route below.
+http://127.0.0.1:8502 {
+    bind 127.0.0.1
+    @media path /media/*
+    handle @media {
+        forward_auth 127.0.0.1:8502 {
+            uri /internal/media/auth
+        }
+        root * {$EZSCORE_MEDIA_ROOT}
+        uri strip_prefix /media
+        header Cache-Control "private, max-age=3600"
+        file_server
+    }
+    handle {
+        root * H:/EZScore_dev/public
+        encode gzip
+        php_fastcgi 127.0.0.1:8602 {
+            capture_stderr
+        }
+        file_server
+        header X-Content-Type-Options nosniff
+    }
+}

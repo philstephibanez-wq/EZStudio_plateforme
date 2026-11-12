@@ -1,0 +1,23 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+    Ezs\Web\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+            - '../src/Module/Coordination/ExclusiveLease.php'
+            # Immutable message DTO: never register as a Symfony service.
+            - '../src/Module/Coordination/Messenger/QueueJobReference.php'
+            # Requires an explicit isolated store and trusted attestor; no auto-registration.
+            - '../src/Module/Coordination/ExpiredLeaseSweep.php'
+            # Requires a trusted independent observer and durable process ownership.
+            - '../src/Module/Coordination/ExecutorStopAttestor.php'
+            # Database path must come from a trusted canonical queue configuration.
+            - '../src/Module/Coordination/ExecutorOwnershipRegistry.php'
+            # Explicit synthetic CPU-only integration; never autostart a queue consumer.
+            - '../src/Module/Coordination/SyntheticCpuQueueRunner.php'
+            # Explicit isolated synthetic child exercise; never autostart a process.
+            - '../src/Module/Coordination/SyntheticChildProcessRunner.php'
+            # Read-only WMI observation needs an explicit trusted local node identity.
+            - '../src/Module/Coordination/WindowsExecutorObservation.php'

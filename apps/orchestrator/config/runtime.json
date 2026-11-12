@@ -1,0 +1,52 @@
+{
+  "schema": "ezs.orchestrator.config.v5",
+  "orchestrator_root": "H:\\EZS_orchestrator",
+  "servers": {
+    "dev": {
+      "root": "H:\\EZScore_dev",
+      "backend_port": 8602,
+      "public_port": 8502,
+      "allowed_envs": [
+        "dev",
+        "prod"
+      ],
+      "default_env": "dev",
+      "analysis_python": "H:\\EZScore_dev\\.venv-py313\\Scripts\\python.exe",
+      "web_php": "H:\\PHP\\php-8.5-x64\\php.exe"
+    },
+    "prod": {
+      "root": "H:\\EZScore",
+      "backend_port": 8511,
+      "gateway_port": 8510,
+      "public_port": 8501,
+      "allowed_envs": [
+        "prod"
+      ],
+      "default_env": "prod",
+      "analysis_python": "H:\\EZScore\\.venv-py313\\Scripts\\python.exe",
+      "web_php": "H:\\PHP\\php-8.5-x64\\php.exe"
+    },
+    "lab": {
+      "root": "H:\\EZStudio_lab",
+      "backend_port": 8701,
+      "public_port": 8702,
+      "allowed_envs": [
+        "dev"
+      ],
+      "default_env": "dev",
+      "analysis_python": "H:\\Python\\pythoncore-3.14-64\\python.exe",
+      "web_php": "H:\\PHP\\php-8.5-x64\\php.exe"
+    }
+  },
+  "analysis": {
+    "entrypoint": "analysis\\worker_entrypoint.py"
+  },
+  "resources": {
+    "gpu_slots": 1
+  },
+  "transport": {
+    "dev_backend_url": "http://127.0.0.1:8602",
+    "prod_backend_url": "http://127.0.0.1:8511",
+    "lab_backend_url": "http://127.0.0.1:8701"
+  }
+}

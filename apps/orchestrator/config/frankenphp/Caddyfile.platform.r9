@@ -1,0 +1,83 @@
+# R9 PILOT: ONE Windows service, ROOT + DEV + LAB + Assistant only.
+# PROD (8501/8510/8511) remains untouched until DEV pilot is validated.
+{
+    admin off
+    auto_https off
+}
+http://127.0.0.1:8790 {
+    bind 127.0.0.1
+    root * H:/EZS_orchestrator/public
+    encode gzip
+    php_server {
+        env APP_ENV dev
+        env APP_DEBUG 1
+    }
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+http://127.0.0.1:8502 {
+    bind 127.0.0.1
+    # Mode is a file-existence switch, evaluated per request. Never restarts FrankenPHP.
+    @devMaintenance file {
+        root H:/EZS_orchestrator/runtime/web-modes
+        try_files dev.maintenance
+    }
+    handle @devMaintenance {
+        header Retry-After "120"
+        header Cache-Control "no-store"
+        header Content-Type "text/html; charset=utf-8"
+        respond "<!doctype html><html lang=fr><head><meta charset=utf-8><meta name=viewport content='width=device-width, initial-scale=1'><title>EZScore DEV - Maintenance</title></head><body style='font-family:system-ui;background:#18202c;color:#fff;max-width:42rem;margin:12vh auto;padding:2rem'><h1>EZScore DEV</h1><h2>Maintenance en cours</h2><p>La version de developpement est temporairement indisponible.</p></body></html>" 503
+    }
+    @media path /media/*
+    handle @media {
+        forward_auth 127.0.0.1:8602 {
+            uri /internal/media/auth
+        }
+        root * H:/EZScore_dev/var/storage/stems
+        uri strip_prefix /media
+        header Cache-Control "private, max-age=3600"
+        file_server
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8602
+    }
+}
+http://127.0.0.1:8602 {
+    bind 127.0.0.1
+    root * H:/EZScore_dev/public
+    encode gzip
+    php_server {
+        env APP_ENV dev
+        env APP_DEBUG 1
+    }
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}
+http://127.0.0.1:8702 {
+    bind 127.0.0.1
+    reverse_proxy 127.0.0.1:8701
+}
+http://127.0.0.1:8701 {
+    bind 127.0.0.1
+    root * H:/EZStudio_lab/public
+    encode gzip
+    php_server {
+        env APP_ENV dev
+        env APP_DEBUG 1
+    }
+    header X-Content-Type-Options nosniff
+}
+http://127.0.0.1:8712 {
+    bind 127.0.0.1
+    reverse_proxy 127.0.0.1:8713
+}
+http://127.0.0.1:8713 {
+    bind 127.0.0.1
+    root * H:/EZStudioLab_assistant/public
+    encode gzip
+    php_server {
+        env APP_ENV dev
+        env APP_DEBUG 1
+    }
+    header X-Content-Type-Options nosniff
+}

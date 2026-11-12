@@ -1,0 +1,13 @@
+<service>
+  <id>EZS_FrankenPHP</id>
+  <name>EZS FrankenPHP</name>
+  <description>EZS canonical FrankenPHP service; ROOT only until separately validated multisite rollout</description>
+  <executable>H:\FRANKENPHP\bin\frankenphp.exe</executable>
+  <arguments>php-server --listen 127.0.0.1:8790 --root H:\EZS_orchestrator\public</arguments>
+  <workingdirectory>H:\EZS_orchestrator</workingdirectory>
+  <env name="APP_ENV" value="dev"/>
+  <env name="APP_DEBUG" value="1"/>
+  <startmode>Manual</startmode>
+  <logpath>H:\FRANKENPHP\services\EZS_FrankenPHP\logs</logpath>
+  <log mode="roll"/>
+</service>

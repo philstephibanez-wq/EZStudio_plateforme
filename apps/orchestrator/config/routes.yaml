@@ -1,0 +1,5 @@
+controllers:
+    resource:
+        path: ../src/Module/
+        namespace: Ezs\Web\Module
+    type: attribute

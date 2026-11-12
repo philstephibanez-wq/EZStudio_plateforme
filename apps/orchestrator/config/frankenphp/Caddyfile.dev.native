@@ -1,0 +1,29 @@
+# R1N8 DEV dedicated native FrankenPHP instance; ROOT/PROD untouched.
+{
+    admin off
+    auto_https off
+}
+http://127.0.0.1:8502 {
+    bind 127.0.0.1
+    @media path /media/*
+    handle @media {
+        forward_auth 127.0.0.1:8602 {
+            uri /internal/media/auth
+        }
+        root * {$EZSCORE_MEDIA_ROOT}
+        uri strip_prefix /media
+        header Cache-Control "private, max-age=3600"
+        file_server
+    }
+    handle {
+        reverse_proxy 127.0.0.1:8602
+    }
+}
+http://127.0.0.1:8602 {
+    bind 127.0.0.1
+    root * H:/EZScore_dev/public
+    encode gzip
+    php_server
+    header X-Content-Type-Options nosniff
+    header Cache-Control "no-store"
+}

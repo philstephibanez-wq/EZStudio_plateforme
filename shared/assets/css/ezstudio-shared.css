@@ -1,0 +1,26 @@
+:root {
+    --ez-primary: #0d6efd;
+    --ez-dark: #1e293b;
+    --ez-bg: #f8fafc;
+}
+
+body {
+    background-color: var(--ez-bg);
+    color: var(--ez-dark);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.navbar-brand {
+    letter-spacing: 0.3px;
+}
+
+.ez-card {
+    border: none;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    transition: transform 0.15s ease-in-out;
+}
+
+.ez-card:hover {
+    transform: translateY(-2px);
+}
