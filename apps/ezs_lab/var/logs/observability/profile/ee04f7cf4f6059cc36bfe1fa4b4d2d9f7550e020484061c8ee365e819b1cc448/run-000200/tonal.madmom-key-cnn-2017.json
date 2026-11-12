@@ -1,0 +1,78 @@
+{
+  "schema": "ezstudio.observability.profile-module.v1",
+  "scope": "observability-only",
+  "included_in_preset": false,
+  "audio_sha256": "ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448",
+  "session": "run-000200",
+  "module": {
+    "id": "tonal.madmom-key-cnn-2017",
+    "name": "Madmom Key CNN 2017 Ensemble",
+    "family": "tonal",
+    "declared_device": "cpu:numpy"
+  },
+  "started_at": "2026-11-12T21:41:57.086468+00:00",
+  "finished_at": "2026-11-12T21:42:03.057779+00:00",
+  "elapsed_seconds": 5.9706,
+  "status": "ok",
+  "sampling_interval_seconds": 1.0,
+  "summary": {
+    "gpu_util_percent": {
+      "mean": 0.0,
+      "max": 0.0,
+      "min": 0.0
+    },
+    "memory_used_mib": {
+      "mean": 1249.0,
+      "max": 1249.0,
+      "min": 1249.0
+    },
+    "temperature_c": {
+      "mean": 59.33,
+      "max": 60.0,
+      "min": 58.0
+    },
+    "power_w": {
+      "mean": 22.76,
+      "max": 30.75,
+      "min": 12.25
+    },
+    "sm_clock_mhz": {
+      "mean": 540.0,
+      "max": 960.0,
+      "min": 300.0
+    },
+    "sample_count": 3
+  },
+  "samples": [
+    {
+      "timestamp": 1794519717.1696143,
+      "gpu_util_percent": 0.0,
+      "memory_used_mib": 1249.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 60.0,
+      "power_w": 30.75,
+      "sm_clock_mhz": 960.0,
+      "pstate": "P2"
+    },
+    {
+      "timestamp": 1794519721.1645997,
+      "gpu_util_percent": 0.0,
+      "memory_used_mib": 1249.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 60.0,
+      "power_w": 25.28,
+      "sm_clock_mhz": 360.0,
+      "pstate": "P3"
+    },
+    {
+      "timestamp": 1794519722.2932506,
+      "gpu_util_percent": 0.0,
+      "memory_used_mib": 1249.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 58.0,
+      "power_w": 12.25,
+      "sm_clock_mhz": 300.0,
+      "pstate": "P8"
+    }
+  ]
+}

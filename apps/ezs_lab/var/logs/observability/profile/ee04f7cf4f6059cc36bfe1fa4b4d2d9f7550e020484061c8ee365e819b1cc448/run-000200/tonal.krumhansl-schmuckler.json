@@ -1,0 +1,68 @@
+{
+  "schema": "ezstudio.observability.profile-module.v1",
+  "scope": "observability-only",
+  "included_in_preset": false,
+  "audio_sha256": "ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448",
+  "session": "run-000200",
+  "module": {
+    "id": "tonal.krumhansl-schmuckler",
+    "name": "Krumhansl-Schmuckler Key",
+    "family": "tonal",
+    "declared_device": null
+  },
+  "started_at": "2026-11-12T21:41:54.858893+00:00",
+  "finished_at": "2026-11-12T21:41:56.941007+00:00",
+  "elapsed_seconds": 2.0816,
+  "status": "ok",
+  "sampling_interval_seconds": 1.0,
+  "summary": {
+    "gpu_util_percent": {
+      "mean": 25.5,
+      "max": 51.0,
+      "min": 0.0
+    },
+    "memory_used_mib": {
+      "mean": 1249.0,
+      "max": 1249.0,
+      "min": 1249.0
+    },
+    "temperature_c": {
+      "mean": 61.5,
+      "max": 62.0,
+      "min": 61.0
+    },
+    "power_w": {
+      "mean": 48.8,
+      "max": 49.85,
+      "min": 47.75
+    },
+    "sm_clock_mhz": {
+      "mean": 1890.0,
+      "max": 1890.0,
+      "min": 1890.0
+    },
+    "sample_count": 2
+  },
+  "samples": [
+    {
+      "timestamp": 1794519714.957414,
+      "gpu_util_percent": 51.0,
+      "memory_used_mib": 1249.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 61.0,
+      "power_w": 47.75,
+      "sm_clock_mhz": 1890.0,
+      "pstate": "P2"
+    },
+    {
+      "timestamp": 1794519716.0418355,
+      "gpu_util_percent": 0.0,
+      "memory_used_mib": 1249.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 62.0,
+      "power_w": 49.85,
+      "sm_clock_mhz": 1890.0,
+      "pstate": "P2"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+PROFILE_DRAIN_START job=233
+PROFILE_ONCE_PREFLIGHT_OK song=47 title=Sur la route de Memphis
+PROFILE_ONCE_PYTHON_START job=233 run=199
+PROFILE_ONCE_PROGRESS=3
+PROFILE_ONCE_PROGRESS=8
+PROFILE_ONCE_PROGRESS=22
+PROFILE_ONCE_PROGRESS=29
+PROFILE_ONCE_PROGRESS=43
+PROFILE_ONCE_PROGRESS=50
+EZSTUDIO_PROFILE_HPSS_REUSE fallback
+EZSTUDIO_PROFILE_TUNING_PROBE {"stage": "harmonic_extraction", "elapsed_seconds": 19.538084}
+EZSTUDIO_PROFILE_TUNING_PROBE {"stage": "global_tuning_estimates", "elapsed_seconds": 1.256489}
+EZSTUDIO_PROFILE_TUNING_PROBE {"stage": "chunk_tuning_estimates", "elapsed_seconds": 0.68507}
+EZSTUDIO_PROFILE_TUNING_PROBE {"stage": "summaries", "elapsed_seconds": 0.004893}
+EZSTUDIO_PROFILE_TUNING_PROBE {"stage": "global_cqt_scan", "elapsed_seconds": 5.029504}
+EZSTUDIO_PROFILE_TUNING_PROBE {"stage": "chunk_cqt_scans", "elapsed_seconds": 12.849652}
+EZSTUDIO_PROFILE_TUNING_PROBE {"stage": "consensus_and_projection", "elapsed_seconds": 0.000199}
+PROFILE_ONCE_PROGRESS=57
+
+Loading weights:   0%|          | 0/447 [00:00<?, ?it/s]
+Loading weights: 100%|██████████| 447/447 [00:00<00:00, 20747.34it/s]
+PROFILE_ONCE_PROGRESS=64
+WARNING: feature_extractor_cqt requires the libray 'nnAudio'
+
+Loading weights:   0%|          | 0/211 [00:00<?, ?it/s]
+Loading weights: 100%|██████████| 211/211 [00:00<00:00, 25439.75it/s]
+[transformers] `use_return_dict` is deprecated! Use `return_dict` instead!
+PROFILE_ONCE_PROGRESS=71
+WARNING: feature_extractor_cqt requires the libray 'nnAudio'
+
+Loading weights:   0%|          | 0/403 [00:00<?, ?it/s]
+Loading weights: 100%|██████████| 403/403 [00:00<00:00, 5826.91it/s]
+PROFILE_ONCE_PROGRESS=78
+PROFILE_ONCE_PROGRESS=85
+PROFILE_ONCE_COMPLETED job=233 run=199
+PROFILE_DRAIN_IDLE

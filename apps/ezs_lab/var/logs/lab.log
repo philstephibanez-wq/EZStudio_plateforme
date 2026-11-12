@@ -7,3 +7,24 @@
 2026-11-12T20:07:47.746432+00:00 profile_hpss_median_backend=medfilt2d
 2026-11-12T20:07:47.749532+00:00 process_start command=H:\Python\pythoncore-3.14-64\python.exe H:\EZStudio_plateforme\apps\ezs_lab\python\ezstudio\pipeline\profile\runner.py --source H:\EZStudio_plateforme\apps\ezs_lab\data\imports\8fcf5a01faf14a1e254718aeea2568123ff29d5fbd41043ebe3e304b6aaa7055.mp3 --audio-hash 8fcf5a01faf14a1e254718aeea2568123ff29d5fbd41043ebe3e304b6aaa7055 --output-path H:\EZStudio_plateforme\apps\ezs_lab\var\storage\profile\8fcf5a01faf14a1e254718aeea2568123ff29d5fbd41043ebe3e304b6aaa7055\run-000198\profile.json --progress-file H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\jobs\232\progress.json
 2026-11-12T20:10:18.437120+00:00 process_end returncode=0
+2026-11-12T21:11:06.810446+00:00 job_start id=233 kind=profile target=lab job_file=H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\profile-once\233\job.json
+2026-11-12T21:11:06.819512+00:00 profile_madmom_backend=cuda
+2026-11-12T21:11:06.821301+00:00 profile_tuning_probe=1
+2026-11-12T21:11:06.823136+00:00 profile_hpss_reuse=1
+2026-11-12T21:11:06.824379+00:00 profile_hpss_median_backend=medfilt2d
+2026-11-12T21:11:06.826311+00:00 process_start command=H:\Python\pythoncore-3.14-64\python.exe H:\EZStudio_plateforme\apps\ezs_lab\python\ezstudio\pipeline\profile\runner.py --source H:\EZStudio_plateforme\apps\ezs_lab\data\imports\ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448.mp3 --audio-hash ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448 --output-path H:\EZStudio_plateforme\apps\ezs_lab\var\storage\profile\ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448\run-000199\profile.json --progress-file H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\jobs\233\progress.json
+2026-11-12T21:13:56.256407+00:00 process_end returncode=0
+2026-11-12T21:41:15.835651+00:00 job_start id=234 kind=profile target=lab job_file=H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\profile-once\234\job.json
+2026-11-12T21:41:15.839185+00:00 profile_madmom_backend=cuda
+2026-11-12T21:41:15.841896+00:00 profile_tuning_probe=1
+2026-11-12T21:41:15.849932+00:00 profile_hpss_reuse=1
+2026-11-12T21:41:15.852117+00:00 profile_hpss_median_backend=medfilt2d
+2026-11-12T21:41:15.855983+00:00 process_start command=H:\Python\pythoncore-3.14-64\python.exe H:\EZStudio_plateforme\apps\ezs_lab\python\ezstudio\pipeline\profile\runner.py --source H:\EZStudio_plateforme\apps\ezs_lab\data\imports\ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448.mp3 --audio-hash ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448 --output-path H:\EZStudio_plateforme\apps\ezs_lab\var\storage\profile\ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448\run-000200\profile.json --progress-file H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\jobs\234\progress.json
+2026-11-12T21:43:23.514171+00:00 process_end returncode=0
+2026-11-12T22:08:56.097572+00:00 job_start id=235 kind=profile target=lab job_file=H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\profile-once\235\job.json
+2026-11-12T22:08:56.102160+00:00 profile_madmom_backend=cuda
+2026-11-12T22:08:56.103857+00:00 profile_tuning_probe=1
+2026-11-12T22:08:56.105264+00:00 profile_hpss_reuse=1
+2026-11-12T22:08:56.107197+00:00 profile_hpss_median_backend=medfilt2d
+2026-11-12T22:08:56.109620+00:00 process_start command=H:\Python\pythoncore-3.14-64\python.exe H:\EZStudio_plateforme\apps\ezs_lab\python\ezstudio\pipeline\profile\runner.py --source H:\EZStudio_plateforme\apps\ezs_lab\data\imports\ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448.mp3 --audio-hash ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448 --output-path H:\EZStudio_plateforme\apps\ezs_lab\var\storage\profile\ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448\run-000201\profile.json --progress-file H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\jobs\235\progress.json
+2026-11-12T22:11:29.511924+00:00 process_end returncode=0

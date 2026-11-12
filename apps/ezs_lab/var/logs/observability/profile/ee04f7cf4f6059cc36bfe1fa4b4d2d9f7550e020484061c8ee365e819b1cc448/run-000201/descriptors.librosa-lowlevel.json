@@ -1,0 +1,58 @@
+{
+  "schema": "ezstudio.observability.profile-module.v1",
+  "scope": "observability-only",
+  "included_in_preset": false,
+  "audio_sha256": "ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448",
+  "session": "run-000201",
+  "module": {
+    "id": "descriptors.librosa-lowlevel",
+    "name": "Librosa Low-Level Descriptors",
+    "family": "descriptors",
+    "declared_device": null
+  },
+  "started_at": "2026-11-12T22:09:32.629883+00:00",
+  "finished_at": "2026-11-12T22:09:33.515517+00:00",
+  "elapsed_seconds": 0.8846,
+  "status": "ok",
+  "sampling_interval_seconds": 1.0,
+  "summary": {
+    "gpu_util_percent": {
+      "mean": 4.0,
+      "max": 4.0,
+      "min": 4.0
+    },
+    "memory_used_mib": {
+      "mean": 1249.0,
+      "max": 1249.0,
+      "min": 1249.0
+    },
+    "temperature_c": {
+      "mean": 60.0,
+      "max": 60.0,
+      "min": 60.0
+    },
+    "power_w": {
+      "mean": 23.02,
+      "max": 23.02,
+      "min": 23.02
+    },
+    "sm_clock_mhz": {
+      "mean": 360.0,
+      "max": 360.0,
+      "min": 360.0
+    },
+    "sample_count": 1
+  },
+  "samples": [
+    {
+      "timestamp": 1794521372.730839,
+      "gpu_util_percent": 4.0,
+      "memory_used_mib": 1249.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 60.0,
+      "power_w": 23.02,
+      "sm_clock_mhz": 360.0,
+      "pstate": "P5"
+    }
+  ]
+}

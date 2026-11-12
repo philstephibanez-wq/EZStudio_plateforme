@@ -3,3 +3,8 @@ controllers:
         path: ../src/Module/
         namespace: Ezs\Web\Module
     type: attribute
+
+shared_profiler_export:
+    resource: '../../../shared/src/Controller/ProfilerExportController.php'
+    type: attribute
+

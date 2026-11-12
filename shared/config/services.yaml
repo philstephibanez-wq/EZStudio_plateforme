@@ -2,3 +2,7 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
+    Shared\Controller\ProfilerExportController:
+        tags: ['controller.service_arguments']
+    Shared\EventSubscriber\ProfilerExportLinkSubscriber:
+        tags: ['kernel.event_subscriber']

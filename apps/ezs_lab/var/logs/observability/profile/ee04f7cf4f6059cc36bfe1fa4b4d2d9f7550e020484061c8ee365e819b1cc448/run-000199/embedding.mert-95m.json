@@ -1,0 +1,88 @@
+{
+  "schema": "ezstudio.observability.profile-module.v1",
+  "scope": "observability-only",
+  "included_in_preset": false,
+  "audio_sha256": "ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448",
+  "session": "run-000199",
+  "module": {
+    "id": "embedding.mert-95m",
+    "name": "MERT Music Embedding 95M",
+    "family": "embedding",
+    "declared_device": "cuda:0"
+  },
+  "started_at": "2026-11-12T21:13:31.918917+00:00",
+  "finished_at": "2026-11-12T21:13:36.232553+00:00",
+  "elapsed_seconds": 4.3113,
+  "status": "ok",
+  "sampling_interval_seconds": 1.0,
+  "summary": {
+    "gpu_util_percent": {
+      "mean": 14.25,
+      "max": 38.0,
+      "min": 2.0
+    },
+    "memory_used_mib": {
+      "mean": 1587.5,
+      "max": 2347.0,
+      "min": 1241.0
+    },
+    "temperature_c": {
+      "mean": 61.75,
+      "max": 63.0,
+      "min": 61.0
+    },
+    "power_w": {
+      "mean": 29.72,
+      "max": 38.56,
+      "min": 19.59
+    },
+    "sm_clock_mhz": {
+      "mean": 952.5,
+      "max": 1560.0,
+      "min": 345.0
+    },
+    "sample_count": 4
+  },
+  "samples": [
+    {
+      "timestamp": 1794518011.9950855,
+      "gpu_util_percent": 38.0,
+      "memory_used_mib": 1241.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 63.0,
+      "power_w": 38.56,
+      "sm_clock_mhz": 1560.0,
+      "pstate": "P2"
+    },
+    {
+      "timestamp": 1794518013.080031,
+      "gpu_util_percent": 11.0,
+      "memory_used_mib": 1281.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 62.0,
+      "power_w": 38.55,
+      "sm_clock_mhz": 1560.0,
+      "pstate": "P2"
+    },
+    {
+      "timestamp": 1794518014.173387,
+      "gpu_util_percent": 2.0,
+      "memory_used_mib": 1481.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 61.0,
+      "power_w": 19.59,
+      "sm_clock_mhz": 345.0,
+      "pstate": "P5"
+    },
+    {
+      "timestamp": 1794518015.2824829,
+      "gpu_util_percent": 6.0,
+      "memory_used_mib": 2347.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 61.0,
+      "power_w": 22.17,
+      "sm_clock_mhz": 345.0,
+      "pstate": "P5"
+    }
+  ]
+}

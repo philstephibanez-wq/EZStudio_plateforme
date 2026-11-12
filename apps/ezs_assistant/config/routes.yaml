@@ -13,3 +13,8 @@ controllers:
         namespace: EZSAssistant\Controller
     type: attribute
 
+
+shared_profiler_export:
+    resource: '../../../shared/src/Controller/ProfilerExportController.php'
+    type: attribute
+

@@ -73,7 +73,7 @@ def run(context: ModuleContext) -> dict:
     passt_python = Path(
         os.getenv(
             "EZSTUDIO_PASST_PYTHON",
-            r"H:\EZStudio_plateforme\apps\ezs_lab\var\runtime\venvs\passt-r3b12\Scripts\python.exe",
+            r"H:\EZStudio_plateforme\var\runtime\venvs\passt-r3b12\Scripts\python.exe",
         )
     )
     if not passt_python.is_file():

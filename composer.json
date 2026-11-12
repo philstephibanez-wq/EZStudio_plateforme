@@ -79,6 +79,7 @@
   "autoload": {
     "psr-4": {
         "App\\": "src/",
+            "Shared\\": "shared/src/",
         "Ezs\\Web\\": "apps/orchestrator/src/",
         "EZStudioDev\\": "apps/ezstudio_dev/src/",
         "EZSLab\\": "apps/ezs_lab/src/",

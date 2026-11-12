@@ -1,0 +1,98 @@
+{
+  "schema": "ezstudio.observability.profile-module.v1",
+  "scope": "observability-only",
+  "included_in_preset": false,
+  "audio_sha256": "ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448",
+  "session": "run-000201",
+  "module": {
+    "id": "semantic.panns-cnn14",
+    "name": "PANNs CNN14 AudioSet",
+    "family": "semantic",
+    "declared_device": "cuda:0"
+  },
+  "started_at": "2026-11-12T22:10:25.671929+00:00",
+  "finished_at": "2026-11-12T22:10:31.594932+00:00",
+  "elapsed_seconds": 5.9216,
+  "status": "ok",
+  "sampling_interval_seconds": 1.0,
+  "summary": {
+    "gpu_util_percent": {
+      "mean": 18.8,
+      "max": 43.0,
+      "min": 0.0
+    },
+    "memory_used_mib": {
+      "mean": 1774.6,
+      "max": 3405.0,
+      "min": 1253.0
+    },
+    "temperature_c": {
+      "mean": 62.0,
+      "max": 63.0,
+      "min": 61.0
+    },
+    "power_w": {
+      "mean": 32.29,
+      "max": 41.96,
+      "min": 17.32
+    },
+    "sm_clock_mhz": {
+      "mean": 1095.0,
+      "max": 1695.0,
+      "min": 360.0
+    },
+    "sample_count": 5
+  },
+  "samples": [
+    {
+      "timestamp": 1794521425.7816927,
+      "gpu_util_percent": 42.0,
+      "memory_used_mib": 1253.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 62.0,
+      "power_w": 41.69,
+      "sm_clock_mhz": 1695.0,
+      "pstate": "P2"
+    },
+    {
+      "timestamp": 1794521426.8864179,
+      "gpu_util_percent": 0.0,
+      "memory_used_mib": 1253.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 63.0,
+      "power_w": 41.96,
+      "sm_clock_mhz": 1695.0,
+      "pstate": "P2"
+    },
+    {
+      "timestamp": 1794521428.2008386,
+      "gpu_util_percent": 0.0,
+      "memory_used_mib": 1401.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 62.0,
+      "power_w": 25.72,
+      "sm_clock_mhz": 360.0,
+      "pstate": "P3"
+    },
+    {
+      "timestamp": 1794521429.8996773,
+      "gpu_util_percent": 9.0,
+      "memory_used_mib": 1561.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 61.0,
+      "power_w": 17.32,
+      "sm_clock_mhz": 360.0,
+      "pstate": "P5"
+    },
+    {
+      "timestamp": 1794521430.9762175,
+      "gpu_util_percent": 43.0,
+      "memory_used_mib": 3405.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 62.0,
+      "power_w": 34.76,
+      "sm_clock_mhz": 1365.0,
+      "pstate": "P2"
+    }
+  ]
+}

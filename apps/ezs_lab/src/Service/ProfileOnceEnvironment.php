@@ -21,6 +21,7 @@ final class ProfileOnceEnvironment
         $models = 'H:/AIModels';
         $storage = $root.'/var/storage';
         $runtime = $root.'/var/runtime';
+        $sharedRuntime = 'H:/EZStudio_plateforme/var/runtime';
         $defaults = [
             'AI_MODELS_ROOT'=>$models,
             'BS_ROFORMER_MODELS_PATH'=>$models.'/audio/separation/bs-roformer',
@@ -31,13 +32,13 @@ final class ProfileOnceEnvironment
             'EZSTUDIO_TMP_ROOT'=>$root.'/var/tmp',
             'EZSTUDIO_LOG_ROOT'=>$root.'/var/logs',
             'EZSTUDIO_RUNTIME_ROOT'=>$storage,
-            'EZSTUDIO_DEP_ROOT'=>$runtime.'/deps',
-            'EZSTUDIO_PROFILE_DEP_ROOT'=>$runtime.'/deps/profile-r3b12',
-            'EZSTUDIO_PROFILE_R3B13_DEP_ROOT'=>$runtime.'/deps/profile-r3b13',
-            'EZSTUDIO_PROFILE_R3B10_DEP_ROOT'=>$runtime.'/deps/profile-r3b10',
-            'EZSTUDIO_PASST_PYTHON'=>$runtime.'/venvs/passt-r3b12/Scripts/python.exe',
+            'EZSTUDIO_DEP_ROOT'=>$sharedRuntime.'/deps',
+            'EZSTUDIO_PROFILE_DEP_ROOT'=>$sharedRuntime.'/deps/profile-r3b12',
+            'EZSTUDIO_PROFILE_R3B13_DEP_ROOT'=>$sharedRuntime.'/deps/profile-r3b13',
+            'EZSTUDIO_PROFILE_R3B10_DEP_ROOT'=>$sharedRuntime.'/deps/profile-r3b10',
+            'EZSTUDIO_PASST_PYTHON'=>$sharedRuntime.'/venvs/passt-r3b12/Scripts/python.exe',
             'EZSTUDIO_PASST_TORCH_HOME'=>$runtime.'/cache/passt-torch-home',
-            'PANNS_LABELS_CSV'=>$runtime.'/deps/panns-data/class_labels_indices.csv',
+            'PANNS_LABELS_CSV'=>$sharedRuntime.'/deps/panns-data/class_labels_indices.csv',
             'EZSTUDIO_TORCH_HOME'=>$runtime.'/cache/torch-home',
             'EZSTUDIO_STEMS_CACHE_ROOT'=>$storage.'/stems',
             'EZSTUDIO_OBSERVABILITY_ROOT'=>$root.'/var/logs/observability',

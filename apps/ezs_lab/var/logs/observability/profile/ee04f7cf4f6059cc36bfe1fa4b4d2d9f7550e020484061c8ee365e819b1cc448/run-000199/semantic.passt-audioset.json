@@ -1,0 +1,58 @@
+{
+  "schema": "ezstudio.observability.profile-module.v1",
+  "scope": "observability-only",
+  "included_in_preset": false,
+  "audio_sha256": "ee04f7cf4f6059cc36bfe1fa4b4d2d9f7550e020484061c8ee365e819b1cc448",
+  "session": "run-000199",
+  "module": {
+    "id": "semantic.passt-audioset",
+    "name": "PaSST AudioSet Transformer",
+    "family": "semantic",
+    "declared_device": "cuda:0"
+  },
+  "started_at": "2026-11-12T21:13:49.110333+00:00",
+  "finished_at": "2026-11-12T21:13:49.210578+00:00",
+  "elapsed_seconds": 0.0048,
+  "status": "error",
+  "sampling_interval_seconds": 1.0,
+  "summary": {
+    "gpu_util_percent": {
+      "mean": 12.0,
+      "max": 12.0,
+      "min": 12.0
+    },
+    "memory_used_mib": {
+      "mean": 1245.0,
+      "max": 1245.0,
+      "min": 1245.0
+    },
+    "temperature_c": {
+      "mean": 64.0,
+      "max": 64.0,
+      "min": 64.0
+    },
+    "power_w": {
+      "mean": 44.99,
+      "max": 44.99,
+      "min": 44.99
+    },
+    "sm_clock_mhz": {
+      "mean": 1770.0,
+      "max": 1770.0,
+      "min": 1770.0
+    },
+    "sample_count": 1
+  },
+  "samples": [
+    {
+      "timestamp": 1794518029.2098553,
+      "gpu_util_percent": 12.0,
+      "memory_used_mib": 1245.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 64.0,
+      "power_w": 44.99,
+      "sm_clock_mhz": 1770.0,
+      "pstate": "P2"
+    }
+  ]
+}

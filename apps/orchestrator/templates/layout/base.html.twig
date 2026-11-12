@@ -26,7 +26,7 @@
     </nav>
     {% block content %}{% endblock %}
 {% if app.environment == 'dev' %}
-<footer class="container-fluid py-2 border-top border-secondary-subtle small text-end"><a href="/_profiler" target="_blank" rel="noopener noreferrer" class="link-secondary text-decoration-none">Symfony Profiler</a></footer>
+<footer class="container-fluid py-2 border-top border-secondary-subtle small text-end"><a href="/_profiler" target="_blank" rel="noopener noreferrer" class="link-secondary text-decoration-none">Symfony Profiler</a> <a href="/_profiler-export" style="margin-left:10px;color:#c9d1d9;text-decoration:none;border:1px solid #464c54;padding:2px 8px;border-radius:4px">Export Profiler</a></footer>
 {% endif %}
 </body>
 </html>
