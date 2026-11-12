@@ -57,19 +57,6 @@
   <p role="status">Moteur non raccordé. Aucun fournisseur de recherche généraliste n'est configuré dans ce runtime.</p>
   <p class="small">Conformément au contrat #11, aucune recherche sur un catalogue unique ne remplace la découverte ouverte des ressources. Aucun résultat ni source ne sont inventés.</p>
 </section>
-{% if app.environment == 'dev' and app.request.host in ['127.0.0.1', 'localhost'] %}
-<details class="card" id="ezs-assistant-diagnostic" style="margin-top:14px">
-  <summary style="cursor:pointer;font-weight:700">Diagnostic technique Assistant — JSON brut expurgé</summary>
-  <p class="small">Observation uniquement : statut Assistant et inférence, sans démarrage ni annulation de jobs.</p>
-  <div style="display:flex;align-items:center;gap:8px;margin:12px 0;flex-wrap:wrap">
-    <button type="button" id="ezs-assistant-diagnostic-refresh">Actualiser</button>
-    <button type="button" id="ezs-assistant-diagnostic-copy">Copier JSON</button>
-    <span id="ezs-assistant-diagnostic-status" role="status">Non collecté</span>
-  </div>
-  <pre id="ezs-assistant-diagnostic-json" tabindex="0" style="overflow:auto;max-height:470px">{ "status": "NON_COLLECTE" }</pre>
-</details>
-<script src="/assistant/js/ezstudio-assistant-diagnostic.js?v=1.6a169" defer></script>
-{% endif %}
 <script>
 (function () {
     'use strict';

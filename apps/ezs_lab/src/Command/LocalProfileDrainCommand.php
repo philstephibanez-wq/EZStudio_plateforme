@@ -48,8 +48,9 @@ final class LocalProfileDrainCommand extends Command
                 $idle = 0;
                 $jobId = (int)$head['id'];
                 $output->writeln('PROFILE_DRAIN_START job='.$jobId);
-                $php = defined('PHP_BINARY') ? PHP_BINARY : 'php';
-                $child = new Process([$php, 'bin/console', 'lab:profile:once', '--job-id='.$jobId, '--apply'], $root);
+                $platformRoot = dirname(__DIR__, 4);
+                $php = is_file('H:/PHP/php-8.5-x64/php.exe') ? 'H:/PHP/php-8.5-x64/php.exe' : (defined('PHP_BINARY') ? PHP_BINARY : 'php');
+                $child = new Process([$php, 'bin/console', 'lab:profile:once', '--job-id='.$jobId, '--apply'], $platformRoot, ['APP_ID' => 'ezs_lab']);
                 $child->setTimeout(null);
                 $child->run(function ($type, $line) use ($output): void { $output->write($line); });
                 if (!$child->isSuccessful()) {

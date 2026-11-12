@@ -1,0 +1,58 @@
+{
+  "schema": "ezstudio.observability.profile-module.v1",
+  "scope": "observability-only",
+  "included_in_preset": false,
+  "audio_sha256": "8fcf5a01faf14a1e254718aeea2568123ff29d5fbd41043ebe3e304b6aaa7055",
+  "session": "run-000198",
+  "module": {
+    "id": "semantic.panns-cnn14",
+    "name": "PANNs CNN14 AudioSet",
+    "family": "semantic",
+    "declared_device": "cuda:0"
+  },
+  "started_at": "2026-11-12T20:10:14.435995+00:00",
+  "finished_at": "2026-11-12T20:10:14.543993+00:00",
+  "elapsed_seconds": 0.0061,
+  "status": "error",
+  "sampling_interval_seconds": 1.0,
+  "summary": {
+    "gpu_util_percent": {
+      "mean": 75.0,
+      "max": 75.0,
+      "min": 75.0
+    },
+    "memory_used_mib": {
+      "mean": 1245.0,
+      "max": 1245.0,
+      "min": 1245.0
+    },
+    "temperature_c": {
+      "mean": 62.0,
+      "max": 62.0,
+      "min": 62.0
+    },
+    "power_w": {
+      "mean": 47.4,
+      "max": 47.4,
+      "min": 47.4
+    },
+    "sm_clock_mhz": {
+      "mean": 1845.0,
+      "max": 1845.0,
+      "min": 1845.0
+    },
+    "sample_count": 1
+  },
+  "samples": [
+    {
+      "timestamp": 1794514214.5432408,
+      "gpu_util_percent": 75.0,
+      "memory_used_mib": 1245.0,
+      "memory_total_mib": 6144.0,
+      "temperature_c": 62.0,
+      "power_w": 47.4,
+      "sm_clock_mhz": 1845.0,
+      "pstate": "P2"
+    }
+  ]
+}

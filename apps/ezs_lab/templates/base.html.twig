@@ -135,24 +135,12 @@ pre.log{background:#111820;color:#d9e0e7;padding:12px;overflow:auto;max-height:4
 </header>
 {% include '_gpu_monitor.html.twig' %}
 <div class="wrap">{% block body %}{% endblock %}</div>
-{% if app.environment == 'dev' and app.request.host in ['127.0.0.1', 'localhost'] %}
-<aside id="ezstudio-dev-diagnostic-region" class="wrap" aria-label="Diagnostic des jobs LAB">
-  <details id="ezstudio-queue-diagnostic" class="card" data-url="{{ path('lab_local_queue_diagnostic') }}">
-    <summary style="cursor:pointer;font-weight:700">Diagnostic technique LAB — demandes, jobs et exécutions</summary>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0">
-      <button type="button" id="ezstudio-queue-diagnostic-refresh">Actualiser</button>
-      <button type="button" id="ezstudio-queue-diagnostic-copy" class="secondary">Copier le diagnostic JSON</button>
-      <span role="status" aria-live="polite" id="ezstudio-queue-diagnostic-status">Non collecté</span>
-    </div>
-    <pre id="ezstudio-queue-diagnostic-output" tabindex="0" class="log">{ "status": "NON_COLLECTE" }</pre>
-    <div class="meta">Observation locale uniquement, sans données audio privées ni commande sur les workers. L'état global non consulté reste inconnu.</div>
-  </details>
-</aside>
-{% endif %}
 
   <script src="/vendor/jquery/jquery-4.0.0.min.js"></script>
   <script src="/vendor/jquery-ui/jquery-ui-1.14.2.min.js"></script>
   <script src="/js/ezstudio-lab.js?v={{ lab_version|url_encode }}"></script>
-  {% if app.environment == 'dev' and app.request.host in ['127.0.0.1', 'localhost'] %}<script src="/js/ezstudio-queue-debug.js?v=1.6a38"></script>{% endif %}
+{% if app.environment == 'dev' %}
+<footer class="wrap" style="padding-top:8px;padding-bottom:16px;text-align:right;font-size:12px"><a href="/_profiler" target="_blank" rel="noopener noreferrer" style="color:#8b949e;text-decoration:none">Symfony Profiler</a></footer>
+{% endif %}
 </body>
 </html>

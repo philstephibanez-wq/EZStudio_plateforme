@@ -121,11 +121,15 @@ final class LocalProfileQueue
         $stamp = gmdate('Ymd_His').'_'.bin2hex(random_bytes(4));
         $out = str_replace('\\', '/', $dir.'/'.$stamp.'.out.log');
         $err = str_replace('\\', '/', $dir.'/'.$stamp.'.err.log');
+        $platformRoot = str_replace('\\', '/', dirname(__DIR__, 4));
         $script = '$ErrorActionPreference = "Stop"; '
-            .'$php = (Get-Command php.exe -ErrorAction Stop).Source; '
+            .'$env:APP_ID = "ezs_lab"; '
+            .'$php = "H:/PHP/php-8.5-x64/php.exe"; '
+            .'if (!(Test-Path $php)) { $php = (Get-Command php.exe -ErrorAction Stop).Source }; '
             .'$p = Start-Process -FilePath $php '
-            .'-ArgumentList "bin/console lab:profile:drain" '
-            .'-WorkingDirectory "'.str_replace('\\', '/', $root).'" '
+            .'-ArgumentList "bin/console", "lab:profile:drain" '
+            .'-WorkingDirectory "'.$platformRoot.'" '
+            .'-WindowStyle Hidden '
             .'-RedirectStandardOutput "'.$out.'" '
             .'-RedirectStandardError "'.$err.'" '
             .'-PassThru; '

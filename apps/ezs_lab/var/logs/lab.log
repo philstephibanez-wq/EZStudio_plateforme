@@ -1,0 +1,9 @@
+2026-11-12T20:04:22.113149+00:00 job_start id=232 kind=profile target=lab job_file=H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\profile-once\232\job.json
+2026-11-12T20:04:22.119084+00:00 worker_fatal RuntimeError:source_outside_lab_root:H:\EZStudio_lab\data\imports\8fcf5a01faf14a1e254718aeea2568123ff29d5fbd41043ebe3e304b6aaa7055.mp3
+2026-11-12T20:07:47.737256+00:00 job_start id=232 kind=profile target=lab job_file=H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\profile-once\232\job.json
+2026-11-12T20:07:47.741139+00:00 profile_madmom_backend=cuda
+2026-11-12T20:07:47.742899+00:00 profile_tuning_probe=1
+2026-11-12T20:07:47.744475+00:00 profile_hpss_reuse=1
+2026-11-12T20:07:47.746432+00:00 profile_hpss_median_backend=medfilt2d
+2026-11-12T20:07:47.749532+00:00 process_start command=H:\Python\pythoncore-3.14-64\python.exe H:\EZStudio_plateforme\apps\ezs_lab\python\ezstudio\pipeline\profile\runner.py --source H:\EZStudio_plateforme\apps\ezs_lab\data\imports\8fcf5a01faf14a1e254718aeea2568123ff29d5fbd41043ebe3e304b6aaa7055.mp3 --audio-hash 8fcf5a01faf14a1e254718aeea2568123ff29d5fbd41043ebe3e304b6aaa7055 --output-path H:\EZStudio_plateforme\apps\ezs_lab\var\storage\profile\8fcf5a01faf14a1e254718aeea2568123ff29d5fbd41043ebe3e304b6aaa7055\run-000198\profile.json --progress-file H:\EZStudio_plateforme\apps\ezs_lab\var\tmp\jobs\232\progress.json
+2026-11-12T20:10:18.437120+00:00 process_end returncode=0
