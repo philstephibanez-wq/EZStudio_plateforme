@@ -16,7 +16,7 @@ final class OrchestratorQueueClient
     /**
      * Envoie un job en REST à orchestrator (aucun accès direct SQLite).
      *
-     * @return array{ok:bool, queue_id:int, source:string, status:string, created_at:string}
+     * @return array{ok:bool, queue_id:int, source:string, status:string, progress:int, created_at:string}
      */
     public function dispatch(string $source, array $payload): array
     {
@@ -44,5 +44,44 @@ final class OrchestratorQueueClient
         }
 
         return $data;
+    }
+
+    public function reportProgress(int $jobId, int $progress): void
+    {
+        $url = rtrim($this->orchestratorBaseUrl, '/') . '/api/queue/' . $jobId . '/progress';
+        $bounded = max(0, min(100, $progress));
+
+        $this->httpClient->request('POST', $url, [
+            'headers' => [
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ],
+            'json' => ['progress' => $bounded],
+            'timeout' => 3.0,
+        ])->getStatusCode();
+    }
+
+    public function complete(int $jobId): void
+    {
+        $url = rtrim($this->orchestratorBaseUrl, '/') . '/api/queue/' . $jobId . '/complete';
+
+        $this->httpClient->request('POST', $url, [
+            'headers' => ['Accept' => 'application/json'],
+            'timeout' => 5.0,
+        ])->getStatusCode();
+    }
+
+    public function fail(int $jobId, ?string $errorMessage = null): void
+    {
+        $url = rtrim($this->orchestratorBaseUrl, '/') . '/api/queue/' . $jobId . '/fail';
+
+        $this->httpClient->request('POST', $url, [
+            'headers' => [
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ],
+            'json' => ['error' => $errorMessage],
+            'timeout' => 5.0,
+        ])->getStatusCode();
     }
 }

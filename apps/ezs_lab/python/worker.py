@@ -8,6 +8,21 @@ import sys
 import traceback
 from pathlib import Path
 
+import urllib.request
+
+def report_orchestrator_progress(percent: int) -> None:
+    job_id = os.environ.get("ORCHESTRATOR_JOB_ID", "").strip()
+    if not job_id.isdigit() or int(job_id) <= 0:
+        return
+    base_url = os.environ.get("ORCHESTRATOR_BASE_URL", "http://ezstudio.local:8000").rstrip("/")
+    url = f"{base_url}/api/queue/{job_id}/progress"
+    body = json.dumps({"progress": max(0, min(100, int(percent)))}).encode("utf-8")
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=2.0):
+            pass
+    except Exception:
+        pass
 from engine import analyze, ENGINE_VERSION
 from observability import build_observability_bundle
 
@@ -61,6 +76,7 @@ def main():
         )
         db.commit()
         write_progress_file(last_progress)
+        report_orchestrator_progress(last_progress)
 
     dep_root = Path(a.deps)
     os.environ["TORCH_HOME"] = str(dep_root.parent / "torch_cache")

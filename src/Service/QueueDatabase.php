@@ -47,7 +47,11 @@ final class QueueDatabase
 CREATE TABLE IF NOT EXISTS job_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     source VARCHAR(50) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    status VARCHAR(20) NOT NULL DEFAULT 'waiting',
+    progress INTEGER NOT NULL DEFAULT 0,
+    has_error INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT DEFAULT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
     payload CLOB NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME DEFAULT NULL
@@ -61,5 +65,29 @@ ON job_queue (source, status);
 SQL;
 
         $this->pdo->exec($sql);
+
+        $cols = [];
+        foreach ($this->pdo->query('PRAGMA table_info(job_queue)')->fetchAll(PDO::FETCH_ASSOC) as $col) {
+            $cols[(string) $col['name']] = true;
+        }
+
+        if (!isset($cols['progress'])) {
+            $this->pdo->exec('ALTER TABLE job_queue ADD COLUMN progress INTEGER NOT NULL DEFAULT 0');
+        }
+        if (!isset($cols['has_error'])) {
+            $this->pdo->exec('ALTER TABLE job_queue ADD COLUMN has_error INTEGER NOT NULL DEFAULT 0');
+        }
+        if (!isset($cols['error_message'])) {
+            $this->pdo->exec('ALTER TABLE job_queue ADD COLUMN error_message TEXT DEFAULT NULL');
+        }
+        if (!isset($cols['attempts'])) {
+            $this->pdo->exec('ALTER TABLE job_queue ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0');
+        }
+
+        // Migration douce des anciens statuts vers le contrat agnostique (waiting / progressing / ended)
+        $this->pdo->exec("UPDATE job_queue SET status = 'waiting' WHERE status IN ('pending', 'queued')");
+        $this->pdo->exec("UPDATE job_queue SET status = 'progressing' WHERE status = 'running'");
+        $this->pdo->exec("UPDATE job_queue SET status = 'ended', progress = 100, has_error = 0 WHERE status = 'completed'");
+        $this->pdo->exec("UPDATE job_queue SET status = 'ended', has_error = 1 WHERE status = 'failed'");
     }
 }

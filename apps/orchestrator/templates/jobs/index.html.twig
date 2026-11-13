@@ -1,67 +1,68 @@
 {% extends 'layout/base.html.twig' %}
 
-{% block title %}EZS Orchestrator — Files &amp; Jobs{% endblock %}
+{% block title %}EZS Orchestrator — Ordonnanceur{% endblock %}
 
 {% block content %}
 <main class="container-fluid py-4 ezs-main">
     <div class="ezs-statusline mb-3 d-flex justify-content-between align-items-center">
-        <span><strong>Files &amp; Jobs</strong> — file globale unique et historique distinct</span>
-        <span class="text-body-secondary">Actualisation toutes les 15 s (onglet visible)</span>
+        <span><strong>Ordonnanceur</strong> — ordonnancement agnostique (waiting / progressing % / ended)</span>
+        <span class="text-body-secondary">Actualisation toutes les 4 s (onglet visible)</span>
     </div>
 
     <section class="card mb-3" aria-labelledby="queue-title">
         <div class="card-header d-flex justify-content-between">
-            <strong id="queue-title">Queue globale — Orchestrator (autorité)</strong>
+            <strong id="queue-title">File globale — Orchestrator (1 job actif maximum)</strong>
             <span class="badge {{ global_queue.available ? 'text-bg-success' : 'text-bg-secondary' }}">{{ global_queue.available ? 'Base accessible' : 'Indisponible' }}</span>
         </div>
         <div class="card-body">
             {% if global_queue.available %}
-                <p class="text-body-secondary">Jobs admis dans la queue canonique SQLite (100 maximum). Un seul job est autorisé à la fois, dans l’ordre des demandes.</p>
+                <p class="text-body-secondary">Supervision purement agnostique : l’Ordonnanceur exécute séquentiellement les demandes des acteurs et suit leur pourcentage d’avancement.</p>
                 <p><strong>{{ global_queue.jobs|length }}</strong> jobs affichés
-                    — en attente : <strong>{{ global_queue.counts.queued }}</strong>
-                    — en cours : <strong>{{ global_queue.counts.running }}</strong>
-                    — terminés : <strong>{{ global_queue.counts.completed }}</strong>
-                    — échoués : <strong>{{ global_queue.counts.failed }}</strong>
-                    — annulés : <strong>{{ global_queue.counts.cancelled|default(0) }}</strong>
-
+                    — en attente : <strong>{{ global_queue.counts.waiting|default(0) }}</strong>
+                    — en progression : <strong>{{ global_queue.counts.progressing|default(0) }}</strong>
+                    — terminés (OK) : <strong>{{ global_queue.counts.ended_ok|default(0) }}</strong>
+                    — terminés (KO) : <strong>{{ global_queue.counts.ended_ko|default(0) }}</strong>
                 </p>
                 <div class="table-responsive">
                     <table class="table table-dark table-sm align-middle mb-0">
                         <thead><tr>
-                            <th>Job</th><th>Provenance</th><th>Référence source</th><th>Chanson</th><th>Type</th><th>État</th><th>Progression</th><th>Phase</th><th>Dernier événement</th>
+                            <th>Job</th><th>Acteur</th><th>État</th><th style="min-width: 180px;">Progression</th><th>Tentatives</th><th>Erreur</th><th>Dernier événement</th>
                         </tr></thead>
                         <tbody>
                         {% for job in global_queue.jobs %}
                             <tr>
-                                <td>{{ job.id }}</td><td>{{ job.producer }}</td><td>{{ job.external_id }}</td>
-                                <td>{{ job.song_title ?: '—' }}</td>
-                                <td>{{ job.kind }}</td>
+                                <td>#{{ job.id }}</td>
+                                <td><span class="badge text-bg-dark border">{{ job.actor }}</span></td>
                                 <td>
-
-                                    {% if job.state == 'completed' %}<span class="badge text-bg-success">Terminé</span>
-                                    {% elseif job.state == 'failed' %}<span class="badge text-bg-danger">Erreur</span>
-                                    {% elseif job.state == 'cancelled' %}<span class="badge text-bg-secondary">Annulé</span>
-                                    {% elseif job.state == 'running' %}<span class="badge text-bg-primary">En cours</span>
-                                    {% else %}<span class="badge text-bg-secondary">{{ job.state == 'queued' ? 'Demandé' : job.state }}</span>{% endif %}
+                                    {% if job.state == 'ended' and not job.has_error %}<span class="badge text-bg-success">Terminé (OK)</span>
+                                    {% elseif job.state == 'ended' and job.has_error %}<span class="badge text-bg-danger">Terminé (KO)</span>
+                                    {% elseif job.state == 'progressing' %}<span class="badge text-bg-primary">En progression</span>
+                                    {% else %}<span class="badge text-bg-secondary">Enregistré (en attente)</span>{% endif %}
                                 </td>
-                                <td>{% if job.state == 'completed' %}100 %{% elseif job.progress_percent is not null %}{{ job.progress_percent }} %{% elseif job.state == 'running' %}Indéterminée{% else %}—{% endif %}</td>
-                                <td>{{ job.phase ?: '—' }}</td>
-                                <td>{% if job.last_event_at is not null %}{{ job.last_event_at|date('d/m/Y H:i:s', 'Europe/Paris') }}{% else %}—{% endif %}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar {{ job.has_error ? 'bg-danger' : (job.state == 'ended' ? 'bg-success' : 'bg-primary') }}" style="width: {{ job.progress }}%;"></div>
+                                        </div>
+                                        <span class="small text-nowrap">{{ job.progress }} %</span>
+                                    </div>
+                                </td>
+                                <td>{{ job.attempts }}</td>
+                                <td class="small text-danger">{{ job.error_message ?: '—' }}</td>
+                                <td>{% if job.updated_at is not empty %}{{ job.updated_at|date('d/m/Y H:i:s', 'Europe/Paris') }}{% else %}—{% endif %}</td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="9">Aucun job admis dans la queue globale.</td></tr>
+                            <tr><td colspan="7">Aucun job enregistré dans l’Ordonnanceur.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>
                 </div>
             {% else %}
-                <p class="mb-0 text-body-secondary">Queue globale inaccessible : {{ global_queue.reason }}. Aucun état n'est déduit.</p>
+                <p class="mb-0 text-body-secondary">File globale inaccessible : {{ global_queue.reason }}.</p>
             {% endif %}
-            <p class="text-body-secondary mt-2 mb-0">Lecture seule : aucun claim, dispatch, récupération ou changement d'état depuis cette page.</p>
+            <p class="text-body-secondary mt-2 mb-0">Lecture seule : seul l’Ordonnanceur et les acteurs via REST modifient les états.</p>
         </div>
     </section>
-
-    <p class="text-body-secondary">Les archives V1 sont conservées, mais masquées sur cette page de supervision de la FIFO courante.</p>
 </main>
 <script>
 (function () {
@@ -71,15 +72,11 @@
             const response = await fetch('/jobs', {cache: 'no-store', credentials: 'same-origin'});
             if (!response.ok) return;
             const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
-            for (const titleId of ['queue-title']) {
-                const current = document.getElementById(titleId)?.closest('section');
-                const replacement = documentCopy.getElementById(titleId)?.closest('section');
-                if (current && replacement) current.replaceWith(document.importNode(replacement, true));
-            }
-        } catch (_) {
-            // The previous successful snapshot remains visible; never reload the GPU monitor.
-        }
-    }, 15000);
+            const current = document.getElementById('queue-title')?.closest('section');
+            const replacement = documentCopy.getElementById('queue-title')?.closest('section');
+            if (current && replacement) current.replaceWith(document.importNode(replacement, true));
+        } catch (_) {}
+    }, 4000);
 }());
 </script>
 {% endblock %}

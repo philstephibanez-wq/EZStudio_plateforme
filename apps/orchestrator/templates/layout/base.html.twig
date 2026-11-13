@@ -21,7 +21,7 @@
     {% include 'infrastructure/_gpu_monitor.html.twig' %}
     <nav class="ezs-nav" aria-label="Navigation principale">
         <a href="/" {% if active_page == 'infrastructure' %}aria-current="page"{% endif %}>Infrastructure</a>
-        <a href="/jobs" {% if active_page == 'jobs' %}aria-current="page"{% endif %}>Files &amp; Jobs · en migration</a>
+        <a href="/jobs" {% if active_page == 'jobs' %}aria-current="page"{% endif %}>Ordonnanceur</a>
         <span>Déploiements · en migration</span>
     </nav>
     {% block content %}{% endblock %}

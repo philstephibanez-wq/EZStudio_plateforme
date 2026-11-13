@@ -11,6 +11,21 @@ import subprocess
 import sys
 import uuid
 
+import urllib.request
+
+def report_orchestrator_progress(percent: int) -> None:
+    job_id = os.environ.get("ORCHESTRATOR_JOB_ID", "").strip()
+    if not job_id.isdigit() or int(job_id) <= 0:
+        return
+    base_url = os.environ.get("ORCHESTRATOR_BASE_URL", "http://ezstudio.local:8000").rstrip("/")
+    url = f"{base_url}/api/queue/{job_id}/progress"
+    body = json.dumps({"progress": max(0, min(100, int(percent)))}).encode("utf-8")
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=2.0):
+            pass
+    except Exception:
+        pass
 ROOT=Path(__file__).resolve().parents[1]
 STATE=ROOT/"runtime"/"state"/"profile-direct"
 sys.path.insert(0,str(ROOT/"runtime"))
@@ -24,7 +39,7 @@ def write(path, data):
 def run(job_id):
     request=STATE/(job_id+".request.json")
     result=STATE/(job_id+".result.json")
-    write(result,{"ok":True,"state":"running","job_id":job_id})
+    write(result,{"ok":True,"state":"running","job_id":job_id}); report_orchestrator_progress(15)
     try:
         from contextlib import redirect_stdout
         import io
@@ -38,7 +53,7 @@ def run(job_id):
             finally:
                 sys.stdin=original
         payload=json.loads(output.getvalue())
-        payload["state"]="completed"
+        report_orchestrator_progress(95); payload["state"]="completed"
         payload["job_id"]=job_id
         write(result,payload)
     except Exception as exc:

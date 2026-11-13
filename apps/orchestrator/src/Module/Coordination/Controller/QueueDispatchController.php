@@ -8,7 +8,6 @@ use App\Service\QueueManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Process\Process;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class QueueDispatchController extends AbstractController
@@ -36,6 +35,7 @@ final class QueueDispatchController extends AbstractController
             'queue_id' => $job->getId(),
             'source' => $job->getSource(),
             'status' => $job->getStatus(),
+            'progress' => $job->getProgress(),
             'created_at' => $job->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ], 201);
     }
@@ -43,7 +43,7 @@ final class QueueDispatchController extends AbstractController
     #[Route('/api/queue/claim', name: 'orchestrator_queue_claim', methods: ['POST'])]
     public function claim(QueueManager $queueManager): JsonResponse
     {
-        $job = $queueManager->claimNextPending();
+        $job = $queueManager->claimNextWaiting();
         if ($job === null) {
             return $this->json(['ok' => true, 'job' => null]);
         }
@@ -54,32 +54,74 @@ final class QueueDispatchController extends AbstractController
                 'id' => $job->getId(),
                 'source' => $job->getSource(),
                 'status' => $job->getStatus(),
+                'progress' => $job->getProgress(),
+                'attempts' => $job->getAttempts(),
                 'payload' => $job->getPayload(),
                 'created_at' => $job->getCreatedAt()->format(\DateTimeInterface::ATOM),
             ],
         ]);
     }
 
+    #[Route('/api/queue/{id}/progress', name: 'orchestrator_queue_progress', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function progress(int $id, Request $request, QueueManager $queueManager): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || !isset($data['progress']) || !is_numeric($data['progress'])) {
+            return $this->json(['ok' => false, 'error' => 'invalid_progress_payload'], 422);
+        }
+
+        $job = $queueManager->updateProgress($id, (int) $data['progress']);
+        if ($job === null) {
+            return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
+        }
+
+        return $this->json([
+            'ok' => true,
+            'queue_id' => $job->getId(),
+            'status' => $job->getStatus(),
+            'progress' => $job->getProgress(),
+        ]);
+    }
+
     #[Route('/api/queue/{id}/complete', name: 'orchestrator_queue_complete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function complete(int $id, QueueManager $queueManager): JsonResponse
     {
-        $job = $queueManager->markCompleted($id);
+        $job = $queueManager->markEnded($id, false, null);
         if ($job === null) {
             return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
         }
 
-        return $this->json(['ok' => true, 'queue_id' => $job->getId(), 'status' => $job->getStatus()]);
+        return $this->json([
+            'ok' => true,
+            'queue_id' => $job->getId(),
+            'status' => $job->getStatus(),
+            'progress' => $job->getProgress(),
+            'has_error' => $job->hasError(),
+        ]);
     }
 
     #[Route('/api/queue/{id}/fail', name: 'orchestrator_queue_fail', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function fail(int $id, QueueManager $queueManager): JsonResponse
+    public function fail(int $id, Request $request, QueueManager $queueManager): JsonResponse
     {
-        $job = $queueManager->markFailed($id);
+        $data = json_decode($request->getContent(), true);
+        $errorMessage = is_array($data) && isset($data['error']) ? trim((string) $data['error']) : null;
+        if ($errorMessage === '') {
+            $errorMessage = null;
+        }
+
+        $job = $queueManager->markEnded($id, true, $errorMessage);
         if ($job === null) {
             return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
         }
 
-        return $this->json(['ok' => true, 'queue_id' => $job->getId(), 'status' => $job->getStatus()]);
+        return $this->json([
+            'ok' => true,
+            'queue_id' => $job->getId(),
+            'status' => $job->getStatus(),
+            'progress' => $job->getProgress(),
+            'has_error' => $job->hasError(),
+            'error_message' => $job->getErrorMessage(),
+        ]);
     }
 
     private function wakeConsumer(): void

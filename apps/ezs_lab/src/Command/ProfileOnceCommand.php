@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EZSLab\Command;
 
+use App\Service\OrchestratorQueueClient;
 use EZSLab\Service\AnalysisRunRegistry;
 use EZSLab\Service\Database;
 use EZSLab\Service\ProfileExecutionService;
@@ -26,6 +27,7 @@ final class ProfileOnceCommand extends Command
         private readonly AnalysisRunRegistry $runs,
         private readonly ProfileExecutionService $profile,
         private readonly ?\EZSLab\Service\ProfileReportPublication $reports = null,
+        private readonly ?OrchestratorQueueClient $orchestratorQueue = null,
     ) {
         parent::__construct();
     }
@@ -35,6 +37,7 @@ final class ProfileOnceCommand extends Command
         $this->addOption('song-id', null, InputOption::VALUE_REQUIRED, 'ID de chanson LAB existante');
         $this->addOption('job-id', null, InputOption::VALUE_REQUIRED, 'Job PROFILE local prÃ©alablement admis');
         $this->addOption('python', null, InputOption::VALUE_REQUIRED, 'Python PROFILE (chemin absolu)');
+        $this->addOption('orchestrator-job-id', null, InputOption::VALUE_REQUIRED, 'ID job Orchestrator');
         $this->addOption('apply', null, InputOption::VALUE_NONE, 'ExÃ©cuter le job en queue aprÃ¨s claim atomique');
     }
 
@@ -99,6 +102,11 @@ final class ProfileOnceCommand extends Command
         $jobId = null;
         try {
             // Refuse coexistence with any LAB analysis already recorded running.
+            if ($queuedJob !== null && (string)($queuedJob['status'] ?? '') === 'running') {
+                $resetStmt = $this->database->pdo()->prepare("UPDATE analysis_jobs SET status='queued', progress=0, updated_at=? WHERE id=? AND status='running' AND kind='profile' AND dispatch_owner='lab'");
+                $resetStmt->execute([gmdate('c'), (int)$queuedJob['id']]);
+                $queuedJob = $this->database->analysisJob((int)$queuedJob['id']) ?: $queuedJob;
+            }
             $active = $this->database->pdo()->query("SELECT COUNT(*) FROM analysis_jobs WHERE status='running'")->fetchColumn();
             if ((int)$active > 0) {
                 $output->writeln('<error>PROFILE_ONCE_LAB_ALREADY_RUNNING</error>');
@@ -169,6 +177,10 @@ final class ProfileOnceCommand extends Command
                         $last = $percent;
                         $this->database->updateAnalysisJobProgress($jobId, $percent);
                         $this->profile->progressFromJob($jobId, $percent);
+                        $orchJobId = (int)($input->getOption('orchestrator-job-id') ?: getenv('ORCHESTRATOR_JOB_ID') ?: 0);
+                        if ($orchJobId > 0 && $this->orchestratorQueue !== null) {
+                            try { $this->orchestratorQueue->reportProgress($orchJobId, $percent); } catch (\Throwable) {}
+                        }
                         $output->writeln('PROFILE_ONCE_PROGRESS='.$percent);
                     }
                 }

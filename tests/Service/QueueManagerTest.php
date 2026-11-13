@@ -25,12 +25,14 @@ class QueueManagerTest extends KernelTestCase
         /** @var QueueManager $queueManager */
         $queueManager = $container->get(QueueManager::class);
 
-        $job = $queueManager->dispatch("test_regression_action", ["test_key" => "test_value"]);
+        $job = $queueManager->dispatch('test_regression_action', ['test_key' => 'test_value']);
 
-        $this->assertNotNull($job->getId(), "Le job doit posséder un ID généré en BDD.");
-        $this->assertEquals("pending", $job->getStatus(), "Le statut initial doit être pending.");
-        $this->assertEquals("test_regression_action", $job->getSource(), "La source du job doit correspondre.");
-        $this->assertEquals(["test_key" => "test_value"], $job->getPayload(), "Le payload JSON doit être correctement encodé/décodé.");
+        $this->assertNotNull($job->getId(), 'Le job doit posséder un ID généré en BDD.');
+        $this->assertEquals('waiting', $job->getStatus(), 'Le statut initial doit être waiting.');
+        $this->assertEquals(0, $job->getProgress());
+        $this->assertFalse($job->hasError());
+        $this->assertEquals('test_regression_action', $job->getSource());
+        $this->assertEquals(['test_key' => 'test_value'], $job->getPayload());
 
         $this->purgeTestRows($em);
     }
@@ -40,33 +42,48 @@ class QueueManagerTest extends KernelTestCase
         self::bootKernel();
         $container = static::getContainer();
         $em = $container->get(EntityManagerInterface::class);
+        $conn = $em->getConnection();
         $this->purgeTestRows($em);
 
-        /** @var QueueManager $queueManager */
-        $queueManager = $container->get(QueueManager::class);
+        // Isoler temporairement les jobs reels actifs pendant le test FIFO
+        $conn->executeStatement("UPDATE job_queue SET status = '__test_parked_' || status WHERE status IN ('waiting', 'progressing')");
 
-        $first = $queueManager->dispatch("test_unit_lifecycle", ["step" => 1]);
-        $second = $queueManager->dispatch("test_unit_lifecycle", ["step" => 2]);
+        try {
+            /** @var QueueManager $queueManager */
+            $queueManager = $container->get(QueueManager::class);
 
-        $claimed1 = $queueManager->claimNextPending();
-        $this->assertNotNull($claimed1);
-        $this->assertEquals($first->getId(), $claimed1->getId());
-        $this->assertEquals("running", $claimed1->getStatus());
+            $first = $queueManager->dispatch('test_unit_lifecycle', ['step' => 1]);
+            $second = $queueManager->dispatch('test_unit_lifecycle', ['step' => 2]);
 
-        $completed = $queueManager->markCompleted((int) $claimed1->getId());
-        $this->assertNotNull($completed);
-        $this->assertEquals("completed", $completed->getStatus());
+            $claimed1 = $queueManager->claimNextWaiting();
+            $this->assertNotNull($claimed1);
+            $this->assertEquals($first->getId(), $claimed1->getId());
+            $this->assertEquals('progressing', $claimed1->getStatus());
+            $this->assertEquals(1, $claimed1->getAttempts());
 
-        $claimed2 = $queueManager->claimNextPending();
-        $this->assertNotNull($claimed2);
-        $this->assertEquals($second->getId(), $claimed2->getId());
+            $prog = $queueManager->updateProgress((int) $claimed1->getId(), 55);
+            $this->assertEquals(55, $prog?->getProgress());
 
-        $failed = $queueManager->markFailed((int) $claimed2->getId());
-        $this->assertNotNull($failed);
-        $this->assertEquals("failed", $failed->getStatus());
+            $completed = $queueManager->markEnded((int) $claimed1->getId(), false, null);
+            $this->assertNotNull($completed);
+            $this->assertEquals('ended', $completed->getStatus());
+            $this->assertEquals(100, $completed->getProgress());
+            $this->assertFalse($completed->hasError());
 
-        $this->assertNull($queueManager->claimNextPending());
+            $claimed2 = $queueManager->claimNextWaiting();
+            $this->assertNotNull($claimed2);
+            $this->assertEquals($second->getId(), $claimed2->getId());
 
-        $this->purgeTestRows($em);
+            $failed = $queueManager->markEnded((int) $claimed2->getId(), true, 'boom');
+            $this->assertNotNull($failed);
+            $this->assertEquals('ended', $failed->getStatus());
+            $this->assertTrue($failed->hasError());
+            $this->assertEquals('boom', $failed->getErrorMessage());
+
+            $this->assertNull($queueManager->claimNextWaiting());
+        } finally {
+            $this->purgeTestRows($em);
+            $conn->executeStatement("UPDATE job_queue SET status = REPLACE(status, '__test_parked_', '') WHERE status LIKE '__test_parked_%'");
+        }
     }
 }
