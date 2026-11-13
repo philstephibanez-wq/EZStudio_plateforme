@@ -23,3 +23,5 @@
 /apps/ezs_assistant/runtime/reports/
 
 /apps/ezs_lab/data/*.sqlite*
+
+/config/reference.php
