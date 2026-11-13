@@ -1,6 +1,6 @@
-﻿<?php
+<?php
 
-namespace App\Command;
+namespace Ezs\Web\Command;
 
 use App\Service\QueueManager;
 use Symfony\Component\Console\Attribute\AsCommand;

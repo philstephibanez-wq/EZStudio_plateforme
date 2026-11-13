@@ -1,6 +1,6 @@
-﻿<?php
+<?php
 
-namespace App\Service;
+namespace Ezs\Web\Service;
 
 use App\Entity\JobQueue;
 use Doctrine\ORM\EntityManagerInterface;

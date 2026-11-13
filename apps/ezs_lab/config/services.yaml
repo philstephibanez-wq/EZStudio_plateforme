@@ -1,6 +1,8 @@
 parameters:
     app.database_path: '%kernel.project_dir%/apps/ezs_lab/data/benchmark.sqlite'
     ezs_lab.app_dir: '%kernel.project_dir%/apps/ezs_lab'
+    env(ORCHESTRATOR_BASE_URL): 'http://ezstudio.local'
+    orchestrator.base_url: '%env(ORCHESTRATOR_BASE_URL)%'
 
 services:
     _defaults:
@@ -8,6 +10,10 @@ services:
         autoconfigure: true
         bind:
             $databasePath: '%app.database_path%'
+
+    App\Service\OrchestratorQueueClient:
+        arguments:
+            $orchestratorBaseUrl: '%orchestrator.base_url%'
 
     EZSLab\:
         resource: '../src/'
