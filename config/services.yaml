@@ -19,4 +19,7 @@ services:
 
     App\Service\QueueDatabase:
         arguments:
-            $databasePath: '%app.queue_database_path%'
+            $databasePath: '%app.queue_database_path%'when@test:
+    services:
+        App\Service\QueueManager:
+            public: true

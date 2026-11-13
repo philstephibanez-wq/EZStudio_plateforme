@@ -2,6 +2,8 @@
 
 namespace EZSLab\Service;
 
+use App\Service\OrchestratorQueueClient;
+
 final class StemsExecutionService
 {
     private const STEM_NAMES = [

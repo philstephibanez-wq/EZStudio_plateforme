@@ -33,3 +33,9 @@ services:
             - '../src/Module/Coordination/SyntheticCpuQueueRunner.php'
             - '../src/Module/Coordination/SyntheticChildProcessRunner.php'
             - '../src/Module/Coordination/WindowsExecutorObservation.php'
+
+when@test:
+    services:
+        App\Service\QueueManager:
+            autowire: true
+            public: true

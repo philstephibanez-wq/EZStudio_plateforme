@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace EZSLab\Service;
 
+use App\Service\OrchestratorQueueClient;
 use Symfony\Component\Process\Process;
 
-/** Local admission only. One analysis_jobs queue; the scientific executor stays in LAB. */
+/** Local admission + REST dispatch to central Orchestrator queue. */
 final class LocalProfileQueue
 {
     public function __construct(
         private readonly Database $db,
         private readonly WorkbenchCatalog $catalog,
         private readonly AnalysisRunRegistry $runs,
+        private readonly OrchestratorQueueClient $orchestratorQueue,
     ) {}
 
-    /** @return array{job_id:int,run_id:int,created:bool} */
+    /** @return array{job_id:int,run_id:int,queue_id:?int,created:bool} */
     public function enqueue(int $songId): array
     {
         $song = $this->catalog->selectedSong($songId);
@@ -39,28 +41,33 @@ final class LocalProfileQueue
             $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
             if ($existing) {
                 $pdo->commit();
-                return ['job_id'=>(int)$existing['id'], 'run_id'=>(int)$existing['scientific_run_id'], 'created'=>false];
+                return [
+                    'job_id' => (int)$existing['id'],
+                    'run_id' => (int)$existing['scientific_run_id'],
+                    'queue_id' => null,
+                    'created' => false,
+                ];
             }
             $run = $this->runs->createRun((int)$song['id'], 'profile', [
-                'name'=>'ezstudio-profile-modules',
-                'version'=>'r3b31',
-                'model'=>'multi-engine-profile-modules',
+                'name' => 'ezstudio-profile-modules',
+                'version' => 'r3b31',
+                'model' => 'multi-engine-profile-modules',
             ], [
-                'audio_sha256'=>(string)$song['audio_sha256'],
-                'output_contract'=>'ezstudio.profile.v1',
-                'automatic_next_stage'=>false,
+                'audio_sha256' => (string)$song['audio_sha256'],
+                'output_contract' => 'ezstudio.profile.v1',
+                'automatic_next_stage' => false,
             ]);
             $runId = (int)$run['id'];
             $hash = (string)$song['audio_sha256'];
             $storage = rtrim((string)(getenv('EZSTUDIO_STORAGE_ROOT') ?: dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'storage'), '\\/');
             $output = $storage.DIRECTORY_SEPARATOR.'profile'.DIRECTORY_SEPARATOR.$hash.DIRECTORY_SEPARATOR.sprintf('run-%06d', $runId);
             $request = [
-                'scientific_run_id'=>$runId,
-                'audio_hash'=>$hash,
-                'output_dir'=>$output,
-                'output_path'=>$output.DIRECTORY_SEPARATOR.'profile.json',
-                'output_contract'=>'ezstudio.profile.v1',
-                'automatic_next_stage'=>false,
+                'scientific_run_id' => $runId,
+                'audio_hash' => $hash,
+                'output_dir' => $output,
+                'output_path' => $output.DIRECTORY_SEPARATOR.'profile.json',
+                'output_contract' => 'ezstudio.profile.v1',
+                'automatic_next_stage' => false,
             ];
             $now = gmdate('c');
             $stmt = $pdo->prepare('INSERT INTO analysis_jobs
@@ -76,7 +83,23 @@ final class LocalProfileQueue
             $this->runs->setLabel($runId, 'progress', '0');
             $this->runs->setState($runId, 'queued');
             $pdo->commit();
-            return ['job_id'=>$jobId,'run_id'=>$runId,'created'=>true];
+
+            // Dispatch REST vers la file centralisée d'orchestrator
+            $dispatched = $this->orchestratorQueue->dispatch('lab', [
+                'job' => 'profile',
+                'analysis_job_id' => $jobId,
+                'scientific_run_id' => $runId,
+                'song_id' => (int)$song['id'],
+                'source_path' => $source,
+                'request' => $request,
+            ]);
+
+            return [
+                'job_id' => $jobId,
+                'run_id' => $runId,
+                'queue_id' => (int)($dispatched['queue_id'] ?? 0),
+                'created' => true,
+            ];
         } catch (\Throwable $error) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $error;

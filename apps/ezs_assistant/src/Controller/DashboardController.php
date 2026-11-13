@@ -1,5 +1,6 @@
 <?php
 namespace EZSAssistant\Controller;
+use App\Service\OrchestratorQueueClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -107,7 +108,10 @@ final class DashboardController extends AbstractController {
     }
 
     #[Route('/api/profile/direct-research', name: 'assistant_profile_direct_research', methods: ['POST'])]
-    public function directResearch(\Symfony\Component\HttpFoundation\Request $request): JsonResponse {
+    public function directResearch(
+        \Symfony\Component\HttpFoundation\Request $request,
+        OrchestratorQueueClient $orchestratorQueue,
+    ): JsonResponse {
         $data = json_decode($request->getContent(), true);
         if (!is_array($data)) return $this->json(['ok'=>false,'error'=>'invalid_json'],400);
         $title = trim((string) ($data['title'] ?? ''));
@@ -117,24 +121,49 @@ final class DashboardController extends AbstractController {
             || !is_array($items) || count($items)<1 || count($items)>10) {
             return $this->json(['ok'=>false,'error'=>'invalid_research_request'],400);
         }
+
         $root = dirname(__DIR__, 2);
-        $python = $_ENV['EZSTUDIOLAB_ASSISTANT_PYTHON'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_PYTHON'] ?? 'python';
-        $process = new Process([$python, $root.'/runtime/profile_direct_job.py'], $root,
-            null, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-        $process->setTimeout(12.0);
+        $stateDir = $root.'/runtime/state/profile-direct';
+        if (!is_dir($stateDir) && !mkdir($stateDir, 0775, true) && !is_dir($stateDir)) {
+            return $this->json(['ok'=>false,'error'=>'state_directory_unavailable'],503);
+        }
+
+        $jobId = bin2hex(random_bytes(16));
+        $requestFile = $stateDir.'/'.$jobId.'.request.json';
+        $resultFile = $stateDir.'/'.$jobId.'.result.json';
+
         try {
-            $process->run();
-            $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
-            if (!is_array($result)) throw new \RuntimeException('invalid_python_response');
-            if (!$process->isSuccessful()) {
-                return $this->json(['ok'=>false,'error'=>$result['error'] ?? 'research_failed',
-                    'reason'=>$result['reason'] ?? 'Recherche indisponible'],503);
-            }
-            return $this->json($result);
+            file_put_contents(
+                $requestFile,
+                json_encode(['title' => $title, 'artist' => $artist, 'items' => $items], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+            );
+            file_put_contents(
+                $resultFile,
+                json_encode(['ok' => true, 'state' => 'queued', 'job_id' => $jobId], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+            );
+
+            $dispatched = $orchestratorQueue->dispatch('assistant', [
+                'job' => 'profile.direct_research',
+                'job_id' => $jobId,
+                'title' => $title,
+                'artist' => $artist,
+                'items' => $items,
+                'state_dir' => $stateDir,
+            ]);
+
+            return $this->json([
+                'ok' => true,
+                'state' => 'queued',
+                'job_id' => $jobId,
+                'queue_id' => (int)($dispatched['queue_id'] ?? 0),
+            ], 202);
         } catch (\Throwable $e) {
-            $this->logger->error('PROFILE direct research failed', ['exception'=>$e]);
-            return $this->json(['ok'=>false,'error'=>'research_execution_failed',
-                'reason'=>get_class($e)],503);
+            $this->logger->error('PROFILE direct research dispatch failed', ['exception' => $e]);
+            return $this->json([
+                'ok' => false,
+                'error' => 'research_dispatch_failed',
+                'reason' => $e->getMessage(),
+            ], 503);
         }
     }
 

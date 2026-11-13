@@ -2,6 +2,8 @@
 
 namespace EZSLab\Service;
 
+use App\Service\OrchestratorQueueClient;
+
 final class ChordsExecutionService
 {
     public function __construct(
