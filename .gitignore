@@ -12,3 +12,8 @@
 /data/*.sqlite-*
 /apps/*/var/storage/
 /apps/*/var/uploads/
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###

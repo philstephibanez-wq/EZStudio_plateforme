@@ -2,6 +2,15 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
+
+    App\Service\QueueManager:
+        public: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Kernel.php'
+
     Ezs\Web\:
         resource: '../src/'
         exclude:
