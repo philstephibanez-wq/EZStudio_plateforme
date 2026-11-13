@@ -19,6 +19,7 @@ final class StemsExecutionService
     public function __construct(
         private readonly Database $db,
         private readonly AnalysisRunRegistry $runRegistry,
+        private readonly OrchestratorQueueClient $orchestratorQueue,
     ) {}
 
     public function queue(
@@ -67,9 +68,37 @@ final class StemsExecutionService
         $this->runRegistry->setLabel($scientificRunId, 'technical_job_id', (string)$jobId);
         $this->runRegistry->setState($scientificRunId, 'queued');
 
+        $dispatched = $this->orchestratorQueue->dispatch('lab', [
+            'job' => 'stems',
+            'analysis_job_id' => $jobId,
+            'scientific_run_id' => $scientificRunId,
+            'song_id' => (int) $run['song_id'],
+            'source_path' => $source,
+            'audio_hash' => $audioHash,
+            'storage_root' => $storageRoot,
+            'force' => $force,
+            'engine_profile' => $engineProfile,
+            'previous_job_id' => $previousJobId,
+        ]);
+
+        $dispatched = $this->orchestratorQueue->dispatch('lab', [
+            'job' => 'stems',
+            'analysis_job_id' => $jobId,
+            'scientific_run_id' => $scientificRunId,
+            'song_id' => (int) $run['song_id'],
+            'source_path' => $source,
+            'audio_hash' => $audioHash,
+            'storage_root' => $storageRoot,
+            'force' => $force,
+            'engine_profile' => $engineProfile,
+            'previous_job_id' => $previousJobId,
+        ]);
+
         return [
             'scientific_run_id' => $scientificRunId,
             'job_id' => $jobId,
+            'queue_id' => (int) ($dispatched['queue_id'] ?? 0),
+            'queue_id' => (int) ($dispatched['queue_id'] ?? 0),
         ];
     }
 

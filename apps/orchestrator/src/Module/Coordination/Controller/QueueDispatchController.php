@@ -87,19 +87,12 @@ final class QueueDispatchController extends AbstractController
         if (($_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? '') === 'test') {
             return;
         }
-        $platformRoot = str_replace('\\', '/', dirname(__DIR__, 5));
-        $script = '$ErrorActionPreference = "SilentlyContinue"; '
-            . '$env:APP_ID = "orchestrator"; '
-            . '$php = "H:/PHP/php-8.5-x64/php.exe"; '
-            . 'if (!(Test-Path $php)) { $php = (Get-Command php.exe).Source }; '
-            . 'Start-Process -FilePath $php -ArgumentList "bin/console","orchestrator:queue:consume","--drain" '
-            . '-WorkingDirectory "' . $platformRoot . '" -WindowStyle Hidden | Out-Null';
-
-        $proc = new Process(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', $script]);
-        $proc->setTimeout(5);
-        try {
-            $proc->run();
-        } catch (\Throwable) {
+        $platformRoot = str_replace('/', '\\', dirname(__DIR__, 5));
+        $php = is_file('H:\\PHP\\php-8.5-x64\\php.exe') ? 'H:\\PHP\\php-8.5-x64\\php.exe' : 'php';
+        $cmd = sprintf('cmd /c "cd /d %s && set APP_ID=orchestrator && start "" /B "%s" bin\\console orchestrator:queue:consume --drain"', $platformRoot, $php);
+        $handle = @popen($cmd, 'r');
+        if (is_resource($handle)) {
+            @pclose($handle);
         }
     }
 }

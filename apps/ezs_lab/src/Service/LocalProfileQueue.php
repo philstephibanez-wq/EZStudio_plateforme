@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace EZSLab\Service;
 
 use App\Service\OrchestratorQueueClient;
-use Symfony\Component\Process\Process;
 
 /** Local admission + REST dispatch to central Orchestrator queue. */
 final class LocalProfileQueue
@@ -131,38 +130,5 @@ final class LocalProfileQueue
     public function hasActive(): bool
     {
         return (int)$this->db->pdo()->query(self::activeSql())->fetchColumn() > 0;
-    }
-
-    /** Start exactly one detached drain request. Process-scoped lock enforces one consumer. */
-    public function wake(): void
-    {
-        $root = dirname(__DIR__, 2);
-        $dir = $root.'/var/logs/profile-queue';
-        if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
-            throw new \RuntimeException('profile_queue_log_unavailable');
-        }
-        $stamp = gmdate('Ymd_His').'_'.bin2hex(random_bytes(4));
-        $out = str_replace('\\', '/', $dir.'/'.$stamp.'.out.log');
-        $err = str_replace('\\', '/', $dir.'/'.$stamp.'.err.log');
-        $platformRoot = str_replace('\\', '/', dirname(__DIR__, 4));
-        $script = '$ErrorActionPreference = "Stop"; '
-            .'$env:APP_ID = "ezs_lab"; '
-            .'$php = "H:/PHP/php-8.5-x64/php.exe"; '
-            .'if (!(Test-Path $php)) { $php = (Get-Command php.exe -ErrorAction Stop).Source }; '
-            .'$p = Start-Process -FilePath $php '
-            .'-ArgumentList "bin/console", "lab:profile:drain" '
-            .'-WorkingDirectory "'.$platformRoot.'" '
-            .'-WindowStyle Hidden '
-            .'-RedirectStandardOutput "'.$out.'" '
-            .'-RedirectStandardError "'.$err.'" '
-            .'-PassThru; '
-            .'if (!$p -or $p.Id -lt 1) { throw "profile_drain_spawn_failed" }; '
-            .'Write-Output ("PROFILE_DRAIN_SPAWNED_PID=" + $p.Id)';
-        $process = new Process(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-Command',$script], $root);
-        $process->setTimeout(20);
-        $process->run();
-        if (!$process->isSuccessful() || !str_contains($process->getOutput(), 'PROFILE_DRAIN_SPAWNED_PID=')) {
-            throw new \RuntimeException('profile_drain_spawn_failed');
-        }
     }
 }

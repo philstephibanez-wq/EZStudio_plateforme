@@ -245,8 +245,6 @@ SQL);
         }
         if ((string)$job['status'] === 'queued') {
             $updated = $db->requestAnalysisJobCancellation($id);
-            try { $queue->wake(); }
-            catch (\Throwable $error) { error_log('profile_queue_cancel_wake: '.$error->getMessage()); }
             return $this->json(['ok'=>true, 'job_id'=>$id, 'state'=>(string)$updated['status'],
                 'message'=>'Job retirÃ© de la file avant exÃ©cution.'],202,['Cache-Control'=>'no-store']);
         }
@@ -289,7 +287,6 @@ SQL);
         if ($songId === false || $songId === null) return new Response('Chanson invalide.',400);
         try {
             $created = $queue->enqueue((int)$songId);
-            $queue->wake();
         } catch (\DomainException $error) {
             return new Response($error->getMessage(),409);
         } catch (\Throwable $error) {

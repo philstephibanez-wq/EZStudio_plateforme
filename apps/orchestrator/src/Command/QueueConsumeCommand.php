@@ -150,6 +150,22 @@ final class QueueConsumeCommand extends Command
         throw new \RuntimeException(sprintf('unsupported_job:%s/%s', $source, $type));
     }
 
+    private function publishLabReports(string $platformRoot, OutputInterface $output): void
+    {
+        $python = is_file('H:/Python/pythoncore-3.14-64/python.exe') ? 'H:/Python/pythoncore-3.14-64/python.exe' : 'python';
+        $script = $platformRoot . '/apps/ezs_lab/scripts/publish_run_reports.py';
+        if (!is_file($script)) {
+            return;
+        }
+        $proc = new Process([$python, $script, '--producer', 'lab', '--limit', '5', '--state-dir', 'H:/EZStudio_Run_Reports_state'], $platformRoot . '/apps/ezs_lab');
+        $proc->setTimeout(60);
+        try {
+            $proc->run();
+            $output->write($proc->getOutput());
+        } catch (\Throwable) {
+        }
+    }
+
     /** @param list<string> $command @param array<string,string> $env */
     private function runSubprocess(array $command, string $cwd, array $env, int $timeout, OutputInterface $output): void
     {

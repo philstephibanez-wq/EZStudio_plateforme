@@ -74,13 +74,6 @@ final class WorkbenchController extends AbstractController
                 ++$skippedMissingSource;
             }
         }
-        // Only after admission: one dispatcher for all jobs.
-        if ($queued > 0) {
-            try { $queue->wake(); }
-            catch (\Throwable $error) {
-                return new Response('Jobs admis, dÃ©marrage local non confirmÃ© : '.$error->getMessage(),500);
-            }
-        }
         return new RedirectResponse($this->generateUrl('workbench_home', [
             'profile_all_queued'=>$queued,
             'profile_all_skipped_active'=>$skippedActive,
@@ -158,8 +151,6 @@ final class WorkbenchController extends AbstractController
             $job = $db->requestAnalysisJobCancellation($id);
             if ((string)($job['status'] ?? '') === 'cancelled'
                 && in_array((string)($job['kind'] ?? ''), ['profile','assistant.profile.review'], true)) {
-                try { $queue->wake(); }
-                catch (\Throwable $error) { error_log('profile_queue_cancel_wake: '.$error->getMessage()); }
             }
         } catch (\DomainException|\RuntimeException $e) {
             $code = preg_match('/^[a-z0-9_]+$/D',$e->getMessage()) ? $e->getMessage() : 'job_cancellation_refused';

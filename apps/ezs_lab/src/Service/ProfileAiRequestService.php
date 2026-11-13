@@ -223,9 +223,6 @@ SQL);
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
-        // Post-commit wake: a failed spawn cannot reverse a persisted review.
-        try { $this->localQueue?->wake(); }
-        catch (\Throwable) { /* durable FIFO remains; can be drained later */ }
         ($this->reports ?? new ProfileReportPublication())->publish($runId, 'assistant', (int) $revision['id']);
         return $revision;
     }
@@ -259,8 +256,6 @@ SQL);
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
-        try { $this->localQueue?->wake(); }
-        catch (\Throwable $e) { error_log('expertise_cancel_wake: '.$e->getMessage()); }
         return $this->executionState($runId,$jobId);
     }
 
@@ -284,9 +279,6 @@ SQL);
         $stmt=$this->pdo()->prepare($sql);
         $stmt->execute($args);
         if ($stmt->rowCount()!==1) throw new \RuntimeException('request_not_running');
-        // Schedule the next local PROFILE job, if the FIFO head now permits it.
-        try { $this->localQueue?->wake(); }
-        catch (\Throwable) { /* durable queued jobs remain; operator can run lab:profile:drain */ }
         $result = $this->latest($runId) ?? throw new \RuntimeException('result_not_found');
         if ($status === 'completed') {
             // A completed job may have no external revision at all (including
