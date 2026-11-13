@@ -25,3 +25,6 @@
 /apps/ezs_lab/data/*.sqlite*
 
 /config/reference.php
+
+__pycache__/
+*.py[cod]
