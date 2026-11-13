@@ -14,10 +14,10 @@ if ($h -or ($Action -in @("-h", "--help", "help", "/?"))) {
     Write-Host "  ezs <commande>"
     Write-Host ""
     Write-Host "Commandes disponibles :" -ForegroundColor Yellow
-    Write-Host "  start     Demarre FrankenPHP (8000), le consommateur Orchestrator et le worker Assistant"
-    Write-Host "  stop      Arrete proprement FrankenPHP, le consommateur Orchestrator et le worker Assistant"
+    Write-Host "  start     Demarre FrankenPHP (port 8000) et le consommateur centralise Orchestrator"
+    Write-Host "  stop      Arrete proprement FrankenPHP et le consommateur centralise Orchestrator"
     Write-Host "  restart   Redemarre l ensemble de la plateforme"
-    Write-Host "  status    Affiche l etat des services (FrankenPHP, Orchestrator Queue, Worker Python, Llama 8720)"
+    Write-Host "  status    Affiche l etat des services (FrankenPHP, Orchestrator Queue, Llama 8720)"
     Write-Host "  -h        Affiche cette aide"
     exit 0
 }
@@ -25,8 +25,6 @@ if ($h -or ($Action -in @("-h", "--help", "help", "/?"))) {
 $frankenBin = "H:\FRANKENPHP\bin\frankenphp.exe"
 $caddyConfig = "$PlatformRoot\config\frankenphp\Caddyfile"
 $phpBin = "H:\PHP\php-8.5-x64\php.exe"
-$pythonBin = "H:\Python\pythoncore-3.14-64\python.exe"
-$workerScript = "$PlatformRoot\apps\ezs_assistant\runtime\profile_ai_requests_worker.py"
 
 function Get-FrankenProcess {
     Get-CimInstance Win32_Process -Filter "Name = 'frankenphp.exe'" -ErrorAction SilentlyContinue |
@@ -38,15 +36,9 @@ function Get-OrchestratorQueueProcess {
         Where-Object { $_.CommandLine -match "orchestrator:queue:consume" }
 }
 
-function Get-AssistantWorkerProcess {
-    Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -match "profile_ai_requests_worker\.py" }
-}
-
 function Show-Status {
     $fp = Get-FrankenProcess
     $oq = Get-OrchestratorQueueProcess
-    $wk = Get-AssistantWorkerProcess
     $llamaOk = $false
     try {
         $r = Invoke-WebRequest -Uri ("http://127.0.0.1:" + 8720 + "/health") -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
@@ -56,7 +48,6 @@ function Show-Status {
     Write-Host "=== Statut EZStudio Plateforme ===" -ForegroundColor Cyan
     Write-Host ("Serveur Web FrankenPHP (8000) : " + $(if ($fp) { "ACTIF (PID $($fp.ProcessId -join ', '))" } else { "ARRETE" })) -ForegroundColor $(if ($fp) { "Green" } else { "Red" })
     Write-Host ("Orchestrator Queue Consumer   : " + $(if ($oq) { "ACTIF (PID $($oq.ProcessId -join ', '))" } else { "ARRETE" })) -ForegroundColor $(if ($oq) { "Green" } else { "Yellow" })
-    Write-Host ("Worker Assistant Python       : " + $(if ($wk) { "ACTIF (PID $($wk.ProcessId -join ', '))" } else { "ARRETE" })) -ForegroundColor $(if ($wk) { "Green" } else { "Yellow" })
     Write-Host ("Serveur IA Llama (8720)       : " + $(if ($llamaOk) { "ACTIF" } else { "ARRETE" })) -ForegroundColor $(if ($llamaOk) { "Green" } else { "Yellow" })
 }
 
@@ -73,17 +64,12 @@ switch ($Action.ToLower()) {
             Remove-Item Env:APP_ID -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 1
         }
-        if (-not (Get-AssistantWorkerProcess) -and (Test-Path $workerScript)) {
-            Start-Process -FilePath $pythonBin -ArgumentList "-B", "-u", $workerScript -WorkingDirectory "$PlatformRoot\apps\ezs_assistant" -WindowStyle Hidden
-            Start-Sleep -Seconds 1
-        }
         Show-Status
     }
     "stop" {
         Write-Host "[EZS] Arret de la plateforme..." -ForegroundColor Yellow
         Get-FrankenProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
         Get-OrchestratorQueueProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-        Get-AssistantWorkerProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
         Start-Sleep -Seconds 1
         Write-Host "[EZS] Plateforme arretee." -ForegroundColor Green
     }

@@ -93,6 +93,23 @@ final class QueueConsumeCommand extends Command
         $php = is_file('H:/PHP/php-8.5-x64/php.exe') ? 'H:/PHP/php-8.5-x64/php.exe' : 'php';
         $python = is_file('H:/Python/pythoncore-3.14-64/python.exe') ? 'H:/Python/pythoncore-3.14-64/python.exe' : 'python';
 
+        if ($source === 'assistant' && $type === 'profile.review') {
+            $jobId = (int) ($payload['job_id'] ?? 0);
+            $runId = (int) ($payload['run_id'] ?? 0);
+            if ($jobId <= 0 || $runId <= 0) {
+                throw new \RuntimeException('invalid_assistant_review_parameters');
+            }
+            $script = $platformRoot . '/apps/ezs_assistant/runtime/profile_ai_requests_worker.py';
+            $this->runSubprocess(
+                [$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId],
+                $platformRoot . '/apps/ezs_assistant',
+                [],
+                1800,
+                $output
+            );
+            return;
+        }
+
         if ($source === 'assistant' && $type === 'profile.direct_research') {
             $jobId = (string) ($payload['job_id'] ?? '');
             if (!preg_match('/^[a-f0-9]{32}$/', $jobId)) {
@@ -150,14 +167,14 @@ final class QueueConsumeCommand extends Command
         throw new \RuntimeException(sprintf('unsupported_job:%s/%s', $source, $type));
     }
 
-    private function publishLabReports(string $platformRoot, OutputInterface $output): void
+    private function publishReports(string $source, string $platformRoot, OutputInterface $output): void
     {
         $python = is_file('H:/Python/pythoncore-3.14-64/python.exe') ? 'H:/Python/pythoncore-3.14-64/python.exe' : 'python';
         $script = $platformRoot . '/apps/ezs_lab/scripts/publish_run_reports.py';
         if (!is_file($script)) {
             return;
         }
-        $proc = new Process([$python, $script, '--producer', 'lab', '--limit', '5', '--state-dir', 'H:/EZStudio_Run_Reports_state'], $platformRoot . '/apps/ezs_lab');
+        $proc = new Process([$python, $script, '--producer', $source, '--limit', '5', '--state-dir', 'H:/EZStudio_Run_Reports_state'], $platformRoot . '/apps/ezs_lab');
         $proc->setTimeout(60);
         try {
             $proc->run();

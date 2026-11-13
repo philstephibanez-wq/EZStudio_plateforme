@@ -3,6 +3,8 @@
 declare(strict_types=1);
 namespace EZSLab\Service;
 
+use App\Service\OrchestratorQueueClient;
+
 /** Canonical analysis_jobs-backed PROFILE AI requests. No sidecar queue. */
 final class ProfileAiRequestService
 {
@@ -11,6 +13,7 @@ final class ProfileAiRequestService
         private readonly Database $db,
         private readonly ?LocalProfileQueue $localQueue = null,
         private readonly ?ProfileReportPublication $reports = null,
+        private readonly ?OrchestratorQueueClient $orchestratorQueue = null,
     ) {}
 
     private function pdo(): \PDO { return $this->db->pdo(); }
@@ -56,7 +59,13 @@ final class ProfileAiRequestService
                     ->execute([$runId,(int)$run['song_id'],(string)($run['source_path']??''),self::KIND,$req,$now,$now]);
             }
             $pdo->commit();
-            return $this->latest($runId) ?? throw new \RuntimeException('ai_job_insert_failed');
+            $created = $this->latest($runId) ?? throw new \RuntimeException('ai_job_insert_failed');
+            $this->orchestratorQueue?->dispatch('assistant', [
+                'job' => 'profile.review',
+                'job_id' => (int) $created['job_id'],
+                'run_id' => $runId,
+            ]);
+            return $created;
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
