@@ -17,3 +17,7 @@
 /phpunit.xml
 /.phpunit.cache/
 ###< phpunit/phpunit ###
+
+/apps/*/var/logs/
+/apps/*/var/tmp/
+/apps/ezs_assistant/runtime/reports/
