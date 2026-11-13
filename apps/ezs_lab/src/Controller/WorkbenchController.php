@@ -149,6 +149,7 @@ final class WorkbenchController extends AbstractController
                 throw new \DomainException('archived_global_job_read_only');
             }
             $job = $db->requestAnalysisJobCancellation($id);
+            $queue->cancelInOrchestrator($job);
             if ((string)($job['status'] ?? '') === 'cancelled'
                 && in_array((string)($job['kind'] ?? ''), ['profile','assistant.profile.review'], true)) {
             }

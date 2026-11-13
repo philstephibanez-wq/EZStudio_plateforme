@@ -110,6 +110,19 @@ class QueueManager
         return $job;
     }
 
+    public function markCompletedIfActive(int $id): ?JobQueue
+    {
+        $this->entityManager->clear();
+        $job = $this->entityManager->find(JobQueue::class, $id);
+        if (!$job instanceof JobQueue) {
+            return null;
+        }
+        if ($job->getStatus() === JobQueue::STATUS_ENDED) {
+            return $job;
+        }
+        return $this->markEnded($id, false, null);
+    }
+
     public function markCompleted(int $id): ?JobQueue
     {
         return $this->markEnded($id, false, null);

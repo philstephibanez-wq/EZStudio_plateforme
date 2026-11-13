@@ -49,6 +49,10 @@ final class ProfileOnceCommand extends Command
             $jobId = filter_var($requestedJob, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             if ($jobId === false || $jobId === null) return Command::INVALID;
             $queuedJob = $this->database->analysisJob((int)$jobId);
+            if ($queuedJob && (string)($queuedJob['status'] ?? '') === 'cancelled') {
+                $output->writeln('PROFILE_ONCE_ALREADY_CANCELLED job='.(int)$jobId);
+                return Command::SUCCESS;
+            }
             if (!$queuedJob || (string)$queuedJob['kind'] !== 'profile'
                 || (string)($queuedJob['dispatch_owner'] ?? '') !== 'lab') {
                 $output->writeln('<error>PROFILE_QUEUED_JOB_NOT_FOUND</error>');

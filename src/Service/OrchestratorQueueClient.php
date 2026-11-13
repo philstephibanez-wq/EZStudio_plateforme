@@ -84,4 +84,13 @@ final class OrchestratorQueueClient
             'timeout' => 5.0,
         ])->getStatusCode();
     }
+    public function cancel(int $jobId): void
+    {
+        $url = rtrim($this->orchestratorBaseUrl, '/') . '/api/queue/' . $jobId . '/cancel';
+
+        $this->httpClient->request('POST', $url, [
+            'headers' => ['Accept' => 'application/json'],
+            'timeout' => 5.0,
+        ])->getStatusCode();
+    }
 }

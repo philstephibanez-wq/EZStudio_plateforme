@@ -245,6 +245,7 @@ SQL);
         }
         if ((string)$job['status'] === 'queued') {
             $updated = $db->requestAnalysisJobCancellation($id);
+            $queue->cancelInOrchestrator($updated);
             return $this->json(['ok'=>true, 'job_id'=>$id, 'state'=>(string)$updated['status'],
                 'message'=>'Job retirÃ© de la file avant exÃ©cution.'],202,['Cache-Control'=>'no-store']);
         }
@@ -265,6 +266,7 @@ SQL);
         if ((string)($updated['status'] ?? '') !== 'cancelling') {
             return $this->json(['ok'=>false, 'reason'=>'job_already_terminal'], 409);
         }
+        $queue->cancelInOrchestrator($updated);
         return $this->json([
             'ok'=>true, 'job_id'=>$id, 'state'=>'cancelling',
             'message'=>'Annulation demandÃ©e ; arrÃªt du worker non encore confirmÃ©.',

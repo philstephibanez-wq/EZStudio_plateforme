@@ -83,7 +83,7 @@ info>[Job #%d]
 
                 try {
                     $this->dispatchToActor($job, $platformRoot, $output);
-                    $this->queueManager->markEnded($id, false, null);
+                    $this->queueManager->markCompletedIfActive($id);
                     $this->publishReports($source, $platformRoot, $output);
                     $output->writeln(sprintf('
 <

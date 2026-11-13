@@ -124,6 +124,24 @@ final class QueueDispatchController extends AbstractController
         ]);
     }
 
+    #[Route('/api/queue/{id}/cancel', name: 'orchestrator_queue_cancel', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function cancel(int $id, QueueManager $queueManager): JsonResponse
+    {
+        $job = $queueManager->markEnded($id, true, 'Annulé');
+        if ($job === null) {
+            return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
+        }
+
+        return $this->json([
+            'ok' => true,
+            'queue_id' => $job->getId(),
+            'status' => $job->getStatus(),
+            'progress' => $job->getProgress(),
+            'has_error' => $job->hasError(),
+            'error_message' => $job->getErrorMessage(),
+        ]);
+    }
+
     private function wakeConsumer(): void
     {
         if (($_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? '') === 'test') {

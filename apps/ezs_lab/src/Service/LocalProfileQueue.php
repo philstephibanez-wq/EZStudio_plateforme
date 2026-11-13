@@ -105,6 +105,34 @@ final class LocalProfileQueue
         }
     }
 
+    public function cancelInOrchestrator(array $job): void
+    {
+        $runId = (int)($job['scientific_run_id'] ?? 0);
+        $queueId = 0;
+        if ($runId > 0) {
+            $labels = $this->runs->labels($runId);
+            $queueId = (int)($labels['orchestrator_queue_id'] ?? 0);
+        }
+        if ($queueId <= 0) {
+            $analysisJobId = (int)($job['id'] ?? 0);
+            $orchDb = dirname(__DIR__, 4) . '/data/orchestrator.sqlite';
+            if ($analysisJobId > 0 && is_file($orchDb)) {
+                try {
+                    $uri = 'file:' . str_replace(['%', '?', '#'], ['%25', '%3F', '%23'], str_replace('\\', '/', $orchDb)) . '?mode=ro';
+                    $pdo = new \PDO('sqlite:' . $uri);
+                    $stmt = $pdo->prepare("SELECT id FROM job_queue WHERE source = 'lab' AND status IN ('waiting', 'progressing') AND json_extract(payload, '$.analysis_job_id') = :jid ORDER BY id DESC LIMIT 1");
+                    $stmt->execute([':jid' => $analysisJobId]);
+                    $queueId = (int)$stmt->fetchColumn();
+                } catch (\Throwable) {}
+            }
+        }
+        if ($queueId > 0) {
+            try {
+                $this->orchestratorQueue->cancel($queueId);
+            } catch (\Throwable) {}
+        }
+    }
+
     /** One durable FIFO ordering across PROFILE and Assistant. Other LAB phases remain untouched. */
     public static function headSql(): string
     {
