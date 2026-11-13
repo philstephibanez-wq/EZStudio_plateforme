@@ -23,3 +23,8 @@
 - **Format de livrable obligatoire :** Tout livrable de code, de correctif ou de module doit impérativement être fourni sous la forme d'un **archive ZIP** accompagnée des **commandes complètes de décompression et d'installation** prêtes à l'emploi.
 - **Format de réponse technique en 9 points :** *Constat, Cause, Audit, Décision, Modifications, Livrable, Commandes, Validation, Suite*.
 - **Ergonomie et dialogues transversaux :** Interdiction absolue d'utiliser les modales natives (`window.alert`, `window.confirm`, `window.prompt`, `MsgBox`). Utilisation exclusive de modales HTML accessibles.
+
+Répertoire de travail:
+
+H:\EZStudio_plateforme (https://github.com/philstephibanez-wq/EZStudio_plateforme)
+H:\AIModels            modèles de IA
