@@ -21,3 +21,5 @@
 /apps/*/var/logs/
 /apps/*/var/tmp/
 /apps/ezs_assistant/runtime/reports/
+
+/apps/ezs_lab/data/*.sqlite*
