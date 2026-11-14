@@ -72,7 +72,7 @@ function initPerformance(){
   $r.find('[data-perf-name]').text(g.name||'NVIDIA GPU');$r.find('[data-perf-util]').text(fmt(g.utilization_percent)+' %');$r.find('[data-perf-memory]').text(fmt(g.memory_percent)+' %');$r.find('[data-perf-memory-detail]').text(mem);
   $r.find('[data-perf-power]').text(fmt(g.power_w,1)+' W');$r.find('[data-perf-power-detail]').text('limite '+fmt(g.power_limit_w)+' W');$r.find('[data-perf-temp]').text(fmt(g.temperature_c)+' °C');$r.find('[data-perf-temp-detail]').text('20–100 °C');$r.find('[data-perf-clock]').text(fmt(g.sm_clock_mhz)+' MHz');$r.find('[data-perf-clock-detail]').text(g.pstate||'—');
   $r.find('[data-stat-util]').text(fmt(g.utilization_percent)+' %');$r.find('[data-stat-memory]').text(mem);$r.find('[data-stat-power]').text(fmt(g.power_w,1)+' / '+fmt(g.power_limit_w)+' W');$r.find('[data-stat-temp]').text(fmt(g.temperature_c)+' °C');$r.find('[data-stat-clock]').text(fmt(g.sm_clock_mhz)+' MHz');$r.find('[data-stat-state]').text(g.pstate||'—');$r.find('[data-perf-status]').text('Télémétrie active').addClass('perf-live-on');
-  samples.push({
+  if(Array.isArray(data.history)&&data.history.length){samples=data.history.slice(-MAX);saveHistory(samples);}else{samples.push({
    t:Date.now(),
    util:num(g.utilization_percent),
    memory:num(g.memory_percent),
@@ -84,7 +84,7 @@ function initPerformance(){
    clock:num(g.sm_clock_mhz),
    pstate:g.pstate||'—',
    name:g.name||'NVIDIA GPU'
-  });samples=samples.slice(-MAX);saveHistory(samples);
+  });samples=samples.slice(-MAX);saveHistory(samples);}
   plot($r,samples,'util',360,120,g);plot($r,samples,'memory',174,62,g);plot($r,samples,'power',174,62,g);plot($r,samples,'temp',174,62,g);plot($r,samples,'clock',174,62,g);
  }
  function schedule(){if(stopped)return;clearTimeout(timer);timer=setTimeout(tick,2000);}

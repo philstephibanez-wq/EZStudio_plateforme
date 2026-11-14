@@ -1,0 +1,3 @@
+shared_gpu_telemetry:
+    resource: '../../../../src/Controller/SharedGpuController.php'
+    type: attribute
