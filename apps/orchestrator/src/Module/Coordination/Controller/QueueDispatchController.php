@@ -13,42 +13,48 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class QueueDispatchController extends AbstractController
 {
+    private function denyIfUnauthorized(Request $request): ?JsonResponse
+    {
+        $expected = trim((string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''));
+        if ($expected === '') { return null; }
+        $provided = trim((string) $request->headers->get('X-EZS-Queue-Token', ''));
+        if ($provided === '' || !hash_equals($expected, $provided)) {
+            return $this->json(['ok' => false, 'error' => 'unauthorized'], 401);
+        }
+        return null;
+    }
+
     #[Route('/api/queue/dispatch', name: 'orchestrator_queue_dispatch', methods: ['POST'])]
     public function dispatch(Request $request, QueueManager $queueManager): JsonResponse
     {
+        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
         $data = json_decode($request->getContent(), true);
-        if (!is_array($data)) {
-            return $this->json(['ok' => false, 'error' => 'invalid_json'], 400);
-        }
-
+        if (!is_array($data)) { return $this->json(['ok' => false, 'error' => 'invalid_json'], 400); }
         $source = trim((string) ($data['source'] ?? ''));
         $payload = $data['payload'] ?? null;
-
         if (!in_array($source, ['lab', 'assistant'], true) || !is_array($payload)) {
             return $this->json(['ok' => false, 'error' => 'invalid_dispatch_envelope'], 422);
         }
-
-        $job = $queueManager->dispatch($source, $payload);
-        $this->wakeConsumer();
-
+        $duplicate = $queueManager->findActiveDuplicate($source, $payload);
+        $job = $duplicate ?? $queueManager->dispatch($source, $payload);
+        if ($duplicate === null) { $this->wakeConsumer(); }
         return $this->json([
             'ok' => true,
             'queue_id' => $job->getId(),
             'source' => $job->getSource(),
             'status' => $job->getStatus(),
             'progress' => $job->getProgress(),
+            'deduplicated' => $duplicate !== null,
             'created_at' => $job->getCreatedAt()->format(\DateTimeInterface::ATOM),
-        ], 201);
+        ], $duplicate !== null ? 200 : 201);
     }
 
     #[Route('/api/queue/claim', name: 'orchestrator_queue_claim', methods: ['POST'])]
-    public function claim(QueueManager $queueManager): JsonResponse
+    public function claim(Request $request, QueueManager $queueManager): JsonResponse
     {
+        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
         $job = $queueManager->claimNextWaiting();
-        if ($job === null) {
-            return $this->json(['ok' => true, 'job' => null]);
-        }
-
+        if ($job === null) { return $this->json(['ok' => true, 'job' => null]); }
         return $this->json([
             'ok' => true,
             'job' => [
@@ -57,104 +63,72 @@ final class QueueDispatchController extends AbstractController
                 'status' => $job->getStatus(),
                 'progress' => $job->getProgress(),
                 'attempts' => $job->getAttempts(),
+                'worker_pid' => $job->getWorkerPid(),
                 'payload' => $job->getPayload(),
                 'created_at' => $job->getCreatedAt()->format(\DateTimeInterface::ATOM),
             ],
         ]);
     }
+    #[Route('/api/queue/{id}/attach-pid', name: 'orchestrator_queue_attach_pid', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function attachPid(int $id, Request $request, QueueManager $queueManager): JsonResponse
+    {
+        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
+        $data = json_decode($request->getContent(), true);
+        $pid = is_array($data) && isset($data['pid']) && is_numeric($data['pid']) ? (int) $data['pid'] : 0;
+        if ($pid <= 0) { return $this->json(['ok' => false, 'error' => 'invalid_worker_pid'], 422); }
+        $job = $queueManager->attachWorkerPid($id, $pid);
+        if ($job === null) { return $this->json(['ok' => false, 'error' => 'job_not_found'], 404); }
+        return $this->json(['ok' => true, 'queue_id' => $job->getId(), 'status' => $job->getStatus(), 'worker_pid' => $job->getWorkerPid()]);
+    }
 
     #[Route('/api/queue/{id}/progress', name: 'orchestrator_queue_progress', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function progress(int $id, Request $request, QueueManager $queueManager): JsonResponse
     {
+        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
         $data = json_decode($request->getContent(), true);
-        if (!is_array($data) || !isset($data['progress']) || !is_numeric($data['progress'])) {
-            return $this->json(['ok' => false, 'error' => 'invalid_progress_payload'], 422);
-        }
-
+        if (!is_array($data) || !isset($data['progress']) || !is_numeric($data['progress'])) { return $this->json(['ok' => false, 'error' => 'invalid_progress_payload'], 422); }
         $job = $queueManager->updateProgress($id, (int) $data['progress']);
-        if ($job === null) {
-            return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
-        }
-
-        return $this->json([
-            'ok' => true,
-            'queue_id' => $job->getId(),
-            'status' => $job->getStatus(),
-            'progress' => $job->getProgress(),
-            'cancelling' => $job->getStatus() === JobQueue::STATUS_CANCELLING,
-        ]);
+        if ($job === null) { return $this->json(['ok' => false, 'error' => 'job_not_found'], 404); }
+        return $this->json(['ok' => true, 'queue_id' => $job->getId(), 'status' => $job->getStatus(), 'progress' => $job->getProgress(), 'cancelling' => $job->getStatus() === JobQueue::STATUS_CANCELLING]);
     }
 
     #[Route('/api/queue/{id}/complete', name: 'orchestrator_queue_complete', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function complete(int $id, QueueManager $queueManager): JsonResponse
+    public function complete(int $id, Request $request, QueueManager $queueManager): JsonResponse
     {
+        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
         $job = $queueManager->markEnded($id, false, null);
-        if ($job === null) {
-            return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
-        }
-
-        return $this->json([
-            'ok' => true,
-            'queue_id' => $job->getId(),
-            'status' => $job->getStatus(),
-            'progress' => $job->getProgress(),
-            'has_error' => $job->hasError(),
-        ]);
+        if ($job === null) { return $this->json(['ok' => false, 'error' => 'job_not_found'], 404); }
+        return $this->json(['ok' => true, 'queue_id' => $job->getId(), 'status' => $job->getStatus(), 'progress' => $job->getProgress(), 'has_error' => $job->hasError()]);
     }
 
     #[Route('/api/queue/{id}/fail', name: 'orchestrator_queue_fail', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function fail(int $id, Request $request, QueueManager $queueManager): JsonResponse
     {
+        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
         $data = json_decode($request->getContent(), true);
         $errorMessage = is_array($data) && isset($data['error']) ? trim((string) $data['error']) : null;
-        if ($errorMessage === '') {
-            $errorMessage = null;
-        }
-
+        if ($errorMessage === '') { $errorMessage = null; }
         $job = $queueManager->markEnded($id, true, $errorMessage);
-        if ($job === null) {
-            return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
-        }
-
-        return $this->json([
-            'ok' => true,
-            'queue_id' => $job->getId(),
-            'status' => $job->getStatus(),
-            'progress' => $job->getProgress(),
-            'has_error' => $job->hasError(),
-            'error_message' => $job->getErrorMessage(),
-        ]);
+        if ($job === null) { return $this->json(['ok' => false, 'error' => 'job_not_found'], 404); }
+        return $this->json(['ok' => true, 'queue_id' => $job->getId(), 'status' => $job->getStatus(), 'progress' => $job->getProgress(), 'has_error' => $job->hasError(), 'error_message' => $job->getErrorMessage()]);
     }
 
     #[Route('/api/queue/{id}/cancel', name: 'orchestrator_queue_cancel', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function cancel(int $id, QueueManager $queueManager): JsonResponse
+    public function cancel(int $id, Request $request, QueueManager $queueManager): JsonResponse
     {
+        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
         $job = $queueManager->requestCancel($id);
-        if ($job === null) {
-            return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
-        }
-
-        return $this->json([
-            'ok' => true,
-            'queue_id' => $job->getId(),
-            'status' => $job->getStatus(),
-            'progress' => $job->getProgress(),
-            'has_error' => $job->hasError(),
-            'error_message' => $job->getErrorMessage(),
-        ]);
+        if ($job === null) { return $this->json(['ok' => false, 'error' => 'job_not_found'], 404); }
+        return $this->json(['ok' => true, 'queue_id' => $job->getId(), 'status' => $job->getStatus(), 'progress' => $job->getProgress(), 'has_error' => $job->hasError(), 'error_message' => $job->getErrorMessage()]);
     }
 
     private function wakeConsumer(): void
     {
-        if (($_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? '') === 'test') {
-            return;
-        }
+        if (($_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? '') === 'test') { return; }
         $platformRoot = str_replace('/', '\\', dirname(__DIR__, 5));
         $php = is_file('H:\\PHP\\php-8.5-x64\\php.exe') ? 'H:\\PHP\\php-8.5-x64\\php.exe' : 'php';
         $cmd = sprintf('cmd /c "cd /d %s && set APP_ID=orchestrator && start "" /B "%s" bin\\console orchestrator:queue:consume --drain"', $platformRoot, $php);
         $handle = @popen($cmd, 'r');
-        if (is_resource($handle)) {
-            @pclose($handle);
-        }
+        if (is_resource($handle)) { @pclose($handle); }
     }
 }

@@ -28,7 +28,7 @@ final class QueueConsumeCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('drain', null, InputOption::VALUE_NONE, 'Dépile tous les jobs waiting puis quitte')
+            ->addOption('drain', null, InputOption::VALUE_NONE, 'DÃ©pile tous les jobs waiting puis quitte')
             ->addOption('loop', null, InputOption::VALUE_NONE, 'Reste actif en boucle de scrutation');
     }
 
@@ -131,7 +131,7 @@ error>[Job #%d] ended (KO): %s
                     throw new \RuntimeException('invalid_assistant_review_parameters');
                 }
                 $script = $platformRoot . '/apps/ezs_assistant/runtime/profile_ai_requests_worker.py';
-                $this->runSubprocess([$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl], 1800, $output);
+                $this->runSubprocess([$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken], 1800, $output);
                 return;
             }
             if ($type === 'profile.direct_research') {
@@ -140,7 +140,7 @@ error>[Job #%d] ended (KO): %s
                     throw new \RuntimeException('invalid_assistant_job_id');
                 }
                 $script = $platformRoot . '/apps/ezs_assistant/runtime/profile_direct_job.py';
-                $this->runSubprocess([$python, $script, '--run', $jobId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl], 600, $output);
+                $this->runSubprocess([$python, $script, '--run', $jobId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken], 600, $output);
                 return;
             }
         }
@@ -150,7 +150,7 @@ error>[Job #%d] ended (KO): %s
                 $analysisJobId = (int) ($payload['analysis_job_id'] ?? $payload['job_id'] ?? 0);
                 $cmd = [$php, $platformRoot . '/bin/console', 'lab:profile:once', '--apply', '--orchestrator-job-id=' . $id];
                 if ($analysisJobId > 0) { $cmd[] = '--job-id=' . $analysisJobId; }
-                $this->runSubprocess($cmd, $platformRoot, ['APP_ID' => 'ezs_lab', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl], 1800, $output);
+                $this->runSubprocess($cmd, $platformRoot, ['APP_ID' => 'ezs_lab', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken], 1800, $output);
                 return;
             }
             if (in_array($type, ['stems', 'chords'], true)) {
@@ -164,7 +164,7 @@ error>[Job #%d] ended (KO): %s
                 $cmd = [$python, $labRoot . '/python/worker.py', '--db', $labRoot . '/data/benchmark.sqlite', '--run-id', (string) $runId, '--audio', $audio, '--signature', $signature, '--deps', $platformRoot . '/var/runtime/deps', '--keep-upload', '1'];
                 $selectionRequest = trim((string) ($payload['selection_request'] ?? ''));
                 if ($type === 'chords' && $selectionRequest !== '') { $cmd[] = '--selection-request'; $cmd[] = $selectionRequest; }
-                $this->runSubprocess($cmd, $labRoot . '/python', ['EZSTUDIO_DEP_ROOT' => $platformRoot . '/var/runtime/deps', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl], 3600, $output);
+                $this->runSubprocess($cmd, $labRoot . '/python', ['EZSTUDIO_DEP_ROOT' => $platformRoot . '/var/runtime/deps', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken], 3600, $output);
                 return;
             }
         }

@@ -23,10 +23,10 @@ class JobQueue
     private ?int $id = null;
 
     #[ORM\Column(length: 50)]
-    private string $source; // 'lab' ou 'assistant'
+    private string $source;
 
     #[ORM\Column(length: 20)]
-    private string $status = self::STATUS_WAITING; // waiting, progressing, ended
+    private string $status = self::STATUS_WAITING;
 
     #[ORM\Column(type: 'integer')]
     private int $progress = 0;
@@ -39,6 +39,9 @@ class JobQueue
 
     #[ORM\Column(type: 'integer')]
     private int $attempts = 0;
+
+    #[ORM\Column(name: 'worker_pid', type: 'integer', nullable: true)]
+    private ?int $workerPid = null;
 
     #[ORM\Column(type: 'json')]
     private array $payload = [];
@@ -57,6 +60,7 @@ class JobQueue
         $this->progress = 0;
         $this->hasError = false;
         $this->attempts = 0;
+        $this->workerPid = null;
         $this->createdAt = new DateTimeImmutable();
     }
 
@@ -103,6 +107,15 @@ class JobQueue
     public function incrementAttempts(): self
     {
         ++$this->attempts;
+        $this->updatedAt = new DateTimeImmutable();
+        return $this;
+    }
+
+    public function getWorkerPid(): ?int { return $this->workerPid; }
+
+    public function setWorkerPid(?int $workerPid): self
+    {
+        $this->workerPid = ($workerPid !== null && $workerPid > 0) ? $workerPid : null;
         $this->updatedAt = new DateTimeImmutable();
         return $this;
     }

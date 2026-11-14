@@ -11,18 +11,52 @@ use Symfony\Component\Workflow\WorkflowInterface;
 
 class QueueManager
 {
+    private $processAliveChecker = null;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         #[Target('job_lifecycle.state_machine')]
         private readonly WorkflowInterface $jobLifecycleStateMachine,
     ) {}
 
+    public function setProcessAliveChecker(?callable $checker): void
+    {
+        $this->processAliveChecker = $checker;
+    }
+
     public function dispatch(string $source, array $payload): JobQueue
     {
+        $existing = $this->findActiveDuplicate($source, $payload);
+        if ($existing instanceof JobQueue) { return $existing; }
         $job = new JobQueue($source, $payload);
         $this->entityManager->persist($job);
         $this->entityManager->flush();
+        return $job;
+    }
 
+    public function findActiveDuplicate(string $source, array $payload): ?JobQueue
+    {
+        $jobType = trim((string) ($payload['job'] ?? $payload['phase'] ?? $payload['type'] ?? ''));
+        $songId = $payload['song_id'] ?? null;
+        if ($jobType === '' || $songId === null || $songId === '' || !is_scalar($songId)) { return null; }
+        $conn = $this->entityManager->getConnection();
+        $id = $conn->fetchOne(
+            "SELECT id FROM job_queue WHERE source = :source AND status IN ('waiting', 'progressing', 'cancelling') AND COALESCE(json_extract(payload, '$.job'), json_extract(payload, '$.phase'), json_extract(payload, '$.type')) = :job_type AND CAST(json_extract(payload, '$.song_id') AS TEXT) = :song_id ORDER BY id ASC LIMIT 1",
+            ['source' => $source, 'job_type' => $jobType, 'song_id' => (string) $songId]
+        );
+        if ($id === false || $id === null) { return null; }
+        $this->entityManager->clear();
+        $found = $this->entityManager->find(JobQueue::class, (int) $id);
+        return $found instanceof JobQueue ? $found : null;
+    }
+    public function attachWorkerPid(int $id, int $pid): ?JobQueue
+    {
+        if ($pid <= 0) { return null; }
+        $this->entityManager->clear();
+        $job = $this->entityManager->find(JobQueue::class, $id);
+        if (!$job instanceof JobQueue || $job->isTerminal()) { return $job instanceof JobQueue ? $job : null; }
+        $job->setWorkerPid($pid);
+        $this->entityManager->flush();
         return $job;
     }
 
@@ -31,79 +65,36 @@ class QueueManager
         $conn = $this->entityManager->getConnection();
         $conn->beginTransaction();
         try {
-            $activeCount = (int) $conn->fetchOne(
-                "SELECT COUNT(*) FROM job_queue WHERE status IN ('progressing', 'cancelling')"
-            );
-            if ($activeCount > 0) {
-                $conn->commit();
-                return null;
-            }
-
-            $id = $conn->fetchOne(
-                "SELECT id FROM job_queue WHERE status = 'waiting' ORDER BY created_at ASC, id ASC LIMIT 1"
-            );
-            if ($id === false || $id === null) {
-                $conn->commit();
-                return null;
-            }
-
+            $activeCount = (int) $conn->fetchOne("SELECT COUNT(*) FROM job_queue WHERE status IN ('progressing', 'cancelling')");
+            if ($activeCount > 0) { $conn->commit(); return null; }
+            $id = $conn->fetchOne("SELECT id FROM job_queue WHERE status = 'waiting' ORDER BY created_at ASC, id ASC LIMIT 1");
+            if ($id === false || $id === null) { $conn->commit(); return null; }
             $this->entityManager->clear();
             $job = $this->entityManager->find(JobQueue::class, (int) $id);
-            if (!$job instanceof JobQueue || !$this->jobLifecycleStateMachine->can($job, 'start')) {
-                $conn->commit();
-                return null;
-            }
-
+            if (!$job instanceof JobQueue || !$this->jobLifecycleStateMachine->can($job, 'start')) { $conn->commit(); return null; }
             $this->jobLifecycleStateMachine->apply($job, 'start');
-            $job->setProgress(0);
-            $job->incrementAttempts();
+            $job->setProgress(0)->setWorkerPid(null)->incrementAttempts();
             $updated = $conn->executeStatement(
-                "UPDATE job_queue
-                 SET status = :status,
-                     progress = 0,
-                     attempts = :attempts,
-                     updated_at = :now
-                 WHERE id = :id AND status = 'waiting'",
-                [
-                    'status' => $job->getStatus(),
-                    'attempts' => $job->getAttempts(),
-                    'now' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-                    'id' => (int) $id,
-                ]
+                "UPDATE job_queue SET status = :status, progress = 0, worker_pid = NULL, attempts = :attempts, updated_at = :now WHERE id = :id AND status = 'waiting'",
+                ['status' => $job->getStatus(), 'attempts' => $job->getAttempts(), 'now' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'), 'id' => (int) $id]
             );
             $conn->commit();
-            if ($updated !== 1) {
-                return null;
-            }
-
-            return $job;
+            return $updated === 1 ? $job : null;
         } catch (\Throwable $e) {
-            if ($conn->isTransactionActive()) {
-                $conn->rollBack();
-            }
+            if ($conn->isTransactionActive()) { $conn->rollBack(); }
             throw $e;
         }
     }
-
-    public function claimNextPending(): ?JobQueue
-    {
-        return $this->claimNextWaiting();
-    }
+    public function claimNextPending(): ?JobQueue { return $this->claimNextWaiting(); }
 
     public function updateProgress(int $id, int $progress): ?JobQueue
     {
         $this->entityManager->clear();
         $job = $this->entityManager->find(JobQueue::class, $id);
-        if (!$job instanceof JobQueue) {
-            return null;
-        }
-        if ($job->getStatus() !== JobQueue::STATUS_PROGRESSING) {
-            return $job;
-        }
-
+        if (!$job instanceof JobQueue) { return null; }
+        if ($job->getStatus() !== JobQueue::STATUS_PROGRESSING) { return $job; }
         $job->setProgress($progress);
         $this->entityManager->flush();
-
         return $job;
     }
 
@@ -111,134 +102,95 @@ class QueueManager
     {
         $this->entityManager->clear();
         $job = $this->entityManager->find(JobQueue::class, $id);
-        if (!$job instanceof JobQueue) {
-            return null;
-        }
-        if ($job->isTerminal() || $job->getStatus() === JobQueue::STATUS_CANCELLING) {
-            return $job;
-        }
+        if (!$job instanceof JobQueue) { return null; }
+        if ($job->isTerminal() || $job->getStatus() === JobQueue::STATUS_CANCELLING) { return $job; }
         if ($this->jobLifecycleStateMachine->can($job, 'cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'cancel');
-            $job->setHasError(false);
-            $job->setErrorMessage('Annulé');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
             $this->entityManager->flush();
             return $job;
         }
         if ($this->jobLifecycleStateMachine->can($job, 'request_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'request_cancel');
-            $job->setHasError(false);
-            $job->setErrorMessage('Annulation demandée');
+            $job->setHasError(false)->setErrorMessage('Annulation demandée');
             $this->entityManager->flush();
             return $job;
         }
         return $job;
     }
-
     public function confirmCancel(int $id): ?JobQueue
     {
         $this->entityManager->clear();
         $job = $this->entityManager->find(JobQueue::class, $id);
-        if (!$job instanceof JobQueue) {
-            return null;
-        }
+        if (!$job instanceof JobQueue) { return null; }
+        $pid = $job->getWorkerPid();
+        if ($pid !== null && $pid > 0 && $this->isProcessAlive($pid)) { return $job; }
         if ($this->jobLifecycleStateMachine->can($job, 'confirm_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'confirm_cancel');
-            $job->setHasError(false);
-            $job->setErrorMessage('Annulé');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
             $this->entityManager->flush();
         }
         return $job;
     }
-
     public function markEnded(int $id, bool $hasError = false, ?string $errorMessage = null): ?JobQueue
     {
         $this->entityManager->clear();
         $job = $this->entityManager->find(JobQueue::class, $id);
-        if (!$job instanceof JobQueue) {
-            return null;
-        }
-        if ($job->isTerminal()) {
-            return $job;
-        }
+        if (!$job instanceof JobQueue) { return null; }
+        if ($job->isTerminal()) { return $job; }
         if ($job->getStatus() === JobQueue::STATUS_CANCELLING && $this->jobLifecycleStateMachine->can($job, 'confirm_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'confirm_cancel');
-            $job->setHasError(false);
-            $job->setErrorMessage('Annulé');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
             $this->entityManager->flush();
             return $job;
         }
         $transition = $hasError ? 'fail' : 'complete';
-        if (!$this->jobLifecycleStateMachine->can($job, $transition)) {
-            return $job;
-        }
+        if (!$this->jobLifecycleStateMachine->can($job, $transition)) { return $job; }
         $this->jobLifecycleStateMachine->apply($job, $transition);
-        $job->setHasError($hasError);
-        if ($hasError) {
-            $job->setErrorMessage($errorMessage);
-        } else {
-            $job->setProgress(100);
-            $job->setErrorMessage(null);
-        }
-
+        $job->setHasError($hasError)->setWorkerPid(null);
+        if ($hasError) { $job->setErrorMessage($errorMessage); } else { $job->setProgress(100)->setErrorMessage(null); }
         $this->entityManager->flush();
-
         return $job;
     }
 
-    public function markCompletedIfActive(int $id): ?JobQueue
-    {
-        $this->entityManager->clear();
-        $this->entityManager->clear();
-        $job = $this->entityManager->find(JobQueue::class, $id);
-        if (!$job instanceof JobQueue) {
-            return null;
-        }
-        if ($job->isTerminal()) {
-            return $job;
-        }
-        return $this->markEnded($id, false, null);
-    }
-
-    public function markCompleted(int $id): ?JobQueue
-    {
-        return $this->markEnded($id, false, null);
-    }
-
-    public function markFailed(int $id, ?string $errorMessage = null): ?JobQueue
-    {
-        return $this->markEnded($id, true, $errorMessage);
-    }
-
+    public function markCompletedIfActive(int $id): ?JobQueue { $this->entityManager->clear(); $job = $this->entityManager->find(JobQueue::class, $id); if (!$job instanceof JobQueue) { return null; } return $job->isTerminal() ? $job : $this->markEnded($id, false, null); }
+    public function markCompleted(int $id): ?JobQueue { return $this->markEnded($id, false, null); }
+    public function markFailed(int $id, ?string $errorMessage = null): ?JobQueue { return $this->markEnded($id, true, $errorMessage); }
     public function recoverInterruptedJobs(int $staleTimeoutSeconds = 0): int
     {
         $conn = $this->entityManager->getConnection();
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
-
-        if ($staleTimeoutSeconds <= 0) {
-            $count = $conn->executeStatement(
-                "UPDATE job_queue
-                 SET status = 'waiting',
-                     progress = 0,
-                     updated_at = :now
-                 WHERE status IN ('progressing', 'cancelling')",
-                ['now' => $now]
-            );
-            $this->entityManager->clear();
-            return (int) $count;
+        $sql = "SELECT id, status, worker_pid FROM job_queue WHERE status IN ('progressing', 'cancelling')";
+        $params = [];
+        if ($staleTimeoutSeconds > 0) {
+            $sql .= " AND COALESCE(updated_at, created_at) <= :threshold";
+            $params['threshold'] = (new \DateTimeImmutable(sprintf('-%d seconds', $staleTimeoutSeconds)))->format('Y-m-d H:i:s');
         }
-
-        $threshold = (new \DateTimeImmutable(sprintf('-%d seconds', $staleTimeoutSeconds)))->format('Y-m-d H:i:s');
-        $count = $conn->executeStatement(
-            "UPDATE job_queue
-             SET status = 'waiting',
-                 progress = 0,
-                 updated_at = :now
-             WHERE status IN ('progressing', 'cancelling')
-               AND COALESCE(updated_at, created_at) <= :threshold",
-            ['now' => $now, 'threshold' => $threshold]
-        );
+        $recovered = 0;
+        foreach ($conn->fetchAllAssociative($sql, $params) as $row) {
+            $id = (int) $row['id'];
+            $status = (string) $row['status'];
+            $pid = isset($row['worker_pid']) && $row['worker_pid'] !== null ? (int) $row['worker_pid'] : null;
+            if ($pid !== null && $pid > 0 && $this->isProcessAlive($pid)) { continue; }
+            if ($status === JobQueue::STATUS_CANCELLING) {
+                $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'cancelled', worker_pid = NULL, has_error = 0, error_message = 'Annulé', updated_at = :now WHERE id = :id AND status = 'cancelling'", ['now' => $now, 'id' => $id]);
+                continue;
+            }
+            $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'waiting', progress = 0, worker_pid = NULL, updated_at = :now WHERE id = :id AND status = 'progressing'", ['now' => $now, 'id' => $id]);
+        }
         $this->entityManager->clear();
+        return $recovered;
+    }
 
-        return (int) $count;
+    public function isProcessAlive(int $pid): bool
+    {
+        if ($pid <= 0) { return false; }
+        if ($this->processAliveChecker !== null) { return (bool) ($this->processAliveChecker)($pid); }
+        if (PHP_OS_FAMILY === 'Windows') {
+            $output = @shell_exec(sprintf('tasklist /FI "PID eq %d" /FO CSV /NH 2>NUL', $pid));
+            return is_string($output) && trim($output) !== '' && str_contains($output, sprintf('"%d"', $pid));
+        }
+        if (is_dir('/proc/' . $pid)) { return true; }
+        return function_exists('posix_kill') && @posix_kill($pid, 0);
     }
 }
