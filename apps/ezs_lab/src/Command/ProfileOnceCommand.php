@@ -26,8 +26,8 @@ final class ProfileOnceCommand extends Command
         private readonly WorkbenchCatalog $catalog,
         private readonly AnalysisRunRegistry $runs,
         private readonly ProfileExecutionService $profile,
+        private readonly OrchestratorQueueClient $orchestratorQueue,
         private readonly ?\EZSLab\Service\ProfileReportPublication $reports = null,
-        private readonly ?OrchestratorQueueClient $orchestratorQueue = null,
     ) {
         parent::__construct();
     }
@@ -182,7 +182,7 @@ final class ProfileOnceCommand extends Command
                         $this->database->updateAnalysisJobProgress($jobId, $percent);
                         $this->profile->progressFromJob($jobId, $percent);
                         $orchJobId = (int)($input->getOption('orchestrator-job-id') ?: getenv('ORCHESTRATOR_JOB_ID') ?: 0);
-                        if ($orchJobId > 0 && $this->orchestratorQueue !== null) {
+                        if ($orchJobId > 0 ) {
                             try { $this->orchestratorQueue->reportProgress($orchJobId, $percent); } catch (\Throwable) {}
                         }
                         $output->writeln('PROFILE_ONCE_PROGRESS='.$percent);

@@ -14,7 +14,7 @@ def report_orchestrator_progress(percent: int) -> None:
     job_id = os.environ.get("ORCHESTRATOR_JOB_ID", "").strip()
     if not job_id.isdigit() or int(job_id) <= 0:
         return
-    base_url = os.environ.get("ORCHESTRATOR_BASE_URL", "http://ezstudio.local:8000").rstrip("/")
+    base_url = os.environ.get("ORCHESTRATOR_BASE_URL", "http://ezstudio.local").rstrip("/")
     url = f"{base_url}/api/queue/{job_id}/progress"
     body = json.dumps({"progress": max(0, min(100, int(percent)))}).encode("utf-8")
     req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
