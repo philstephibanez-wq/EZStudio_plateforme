@@ -273,17 +273,20 @@ def process(run_id, client, check_cancel=None):
 def once(client, target_job_id=None, target_run_id=None):
     requests = api(PATH)['requests']
     if target_job_id is not None:
-        # Fail closed BEFORE any claim: only one FIFO entry, exact job and run.
-        if not isinstance(requests, list) or len(requests) != 1:
-            raise RuntimeError('one_shot_exclusive_fifo_head_required')
-        first = requests[0]
-        if (not isinstance(first, dict) or
-                type(first.get('job_id')) is not int or
-                type(first.get('run_id')) is not int or
-                first['job_id'] != target_job_id or
-                first['run_id'] != target_run_id):
-            raise RuntimeError('one_shot_fifo_identity_mismatch')
-        # The existing per-job LAB claim/state endpoints remain authoritative.
+        if not isinstance(requests, list):
+            raise RuntimeError('one_shot_invalid_requests_payload')
+        matched = [
+            r for r in requests
+            if isinstance(r, dict)
+            and type(r.get('job_id')) is int
+            and type(r.get('run_id')) is int
+            and r['job_id'] == target_job_id
+            and r['run_id'] == target_run_id
+        ]
+        if not matched:
+            print(f'LAB_PROFILE_IA_ONESHOT_SKIPPED job={target_job_id} run={target_run_id} reason=not_queued', flush=True)
+            return
+        requests = [matched[0]]
     if requests:
         print('LAB_PROFILE_IA_PENDING=' + str(len(requests)), flush=True)
     for item in requests:

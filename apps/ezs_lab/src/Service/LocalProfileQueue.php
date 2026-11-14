@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace EZSLab\Service;
 
+use App\Entity\JobQueue;
 use App\Service\OrchestratorQueueClient;
+use Symfony\Component\DependencyInjection\Attribute\Target;
+use Symfony\Component\Workflow\WorkflowInterface;
 
 /** Local admission + REST dispatch to central Orchestrator queue. */
 final class LocalProfileQueue
@@ -14,6 +17,8 @@ final class LocalProfileQueue
         private readonly WorkbenchCatalog $catalog,
         private readonly AnalysisRunRegistry $runs,
         private readonly OrchestratorQueueClient $orchestratorQueue,
+        #[Target('job_lifecycle.state_machine')]
+        private readonly WorkflowInterface $jobLifecycleStateMachine,
     ) {}
 
     /** @return array{job_id:int,run_id:int,queue_id:?int,created:bool} */
@@ -134,6 +139,24 @@ final class LocalProfileQueue
                 $this->orchestratorQueue->cancel($queueId);
             } catch (\Throwable) {}
         }
+    }
+
+public function lifecycleSubject(string $localStatus): JobQueue
+    {
+        $mapped = match ($localStatus) {
+            'queued', 'waiting' => JobQueue::STATUS_WAITING,
+            'running', 'progressing' => JobQueue::STATUS_PROGRESSING,
+            'cancelling' => JobQueue::STATUS_CANCELLING,
+            'cancelled' => JobQueue::STATUS_CANCELLED,
+            'completed', 'failed', 'error', 'ended' => JobQueue::STATUS_ENDED,
+            default => JobQueue::STATUS_WAITING,
+        };
+        return (new JobQueue('lab', []))->setStatus($mapped);
+    }
+
+    public function canTransition(string $localStatus, string $transition): bool
+    {
+        return $this->jobLifecycleStateMachine->can($this->lifecycleSubject($localStatus), $transition);
     }
 
     /** One durable FIFO ordering across PROFILE and Assistant. Other LAB phases remain untouched. */

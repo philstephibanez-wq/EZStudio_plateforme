@@ -20,6 +20,8 @@
                         <option value="active" {{ f.state == 'active' ? 'selected' }}>Actifs (attente + cours)</option>
                         <option value="waiting" {{ f.state == 'waiting' ? 'selected' }}>Enregistré (en attente)</option>
                         <option value="progressing" {{ f.state == 'progressing' ? 'selected' }}>En progression</option>
+                        <option value="cancelling" {{ f.state == 'cancelling' ? 'selected' }}>Annulation en cours</option>
+                        <option value="cancelled" {{ f.state == 'cancelled' ? 'selected' }}>Annulé</option>
                         <option value="ended_ok" {{ f.state == 'ended_ok' ? 'selected' }}>Terminé (OK)</option>
                         <option value="ended_ko" {{ f.state == 'ended_ko' ? 'selected' }}>Terminé (KO)</option>
                     </select></div>
@@ -54,10 +56,11 @@
                     — terminés (OK) : <strong>{{ global_queue.counts.ended_ok|default(0) }}</strong>
                     — terminés (KO) : <strong>{{ global_queue.counts.ended_ko|default(0) }}</strong>
                 </p>
+                {% set has_any_error = global_queue.jobs|filter(j => j.error_message is not empty)|length > 0 %}
                 <div class="table-responsive">
                     <table class="table table-dark table-sm align-middle mb-0">
                         <thead><tr>
-                            <th>Job</th><th>Acteur</th><th>Type</th><th>Chanson</th><th>État</th><th style="min-width: 170px;">Progression</th><th>Tentatives</th><th>Erreur</th><th>Dernier événement</th>
+                            <th>Job</th><th>Acteur</th><th>Type</th><th>Chanson</th><th>État</th><th style="min-width: 170px;">Progression</th><th>Tentatives</th>{% if has_any_error %}<th>Erreur</th>{% endif %}<th>Dernier événement</th>
                         </tr></thead>
                         <tbody>
                         {% for job in global_queue.jobs %}
@@ -70,6 +73,9 @@
                                     {% if job.state == 'ended' and not job.has_error %}<span class="badge text-bg-success">Terminé (OK)</span>
                                     {% elseif job.state == 'ended' and job.has_error %}<span class="badge text-bg-danger">Terminé (KO)</span>
                                     {% elseif job.state == 'progressing' %}<span class="badge text-bg-primary">En progression</span>
+                                    {% elseif job.state == 'cancelling' %}<span class="badge text-bg-warning">Annulation en cours</span>
+                                    {% elseif job.state == 'cancelled' %}<span class="badge text-bg-secondary">Annulé</span>
+                                    {% if job.subject is defined and (workflow_can(job.subject, 'cancel') or workflow_can(job.subject, 'request_cancel')) %}<span class="badge text-bg-dark border ms-1" title="Annulable via FSM">annulable</span>{% endif %}
                                     {% else %}<span class="badge text-bg-secondary">Enregistré (en attente)</span>{% endif %}
                                 </td>
                                 <td>
@@ -81,11 +87,11 @@
                                     </div>
                                 </td>
                                 <td>{{ job.attempts }}</td>
-                                <td class="small text-danger">{{ job.error_message ?: '—' }}</td>
+                                {% if has_any_error %}<td class="small text-danger">{{ job.error_message ?: '—' }}</td>{% endif %}
                                 <td>{% if job.updated_at is not empty %}{{ job.updated_at|date('d/m/Y H:i:s', 'Europe/Paris') }}{% else %}—{% endif %}</td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="9">Aucun job correspondant aux filtres.</td></tr>
+                            <tr><td colspan="{{ has_any_error ? 9 : 8 }}">Aucun job correspondant aux filtres.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>

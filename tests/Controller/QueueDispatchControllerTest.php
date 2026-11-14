@@ -106,4 +106,53 @@ class QueueDispatchControllerTest extends WebTestCase
             $em->getConnection()->executeStatement("UPDATE job_queue SET status = REPLACE(status, '__test_parked_', '') WHERE status LIKE '__test_parked_%'");
         }
     }
+
+    public function testJobLifecycleCancellationFsmAndTerminalLock(): void
+    {
+        $client = static::createClient();
+        $this->purgeTestRows();
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $em->getConnection()->executeStatement("UPDATE job_queue SET status = '__test_parked_' || status WHERE status IN ('waiting', 'progressing', 'cancelling')");
+        try {
+            // 1. Annulation directe depuis 'waiting' -> 'cancelled'
+            $client->request('POST', '/api/queue/dispatch', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+                'source' => 'lab',
+                'payload' => ['job' => 'profile', 'functional_test' => true],
+            ]));
+            $waitingId = (int) (json_decode((string) $client->getResponse()->getContent(), true)['queue_id'] ?? 0);
+
+            $client->request('POST', '/api/queue/' . $waitingId . '/cancel');
+            $cancelWaiting = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertEquals('cancelled', $cancelWaiting['status'] ?? null);
+
+            // Un complete tardif sur un job 'cancelled' ne doit jamais l'ecraser
+            $client->request('POST', '/api/queue/' . $waitingId . '/complete');
+            $afterComplete = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertEquals('cancelled', $afterComplete['status'] ?? null);
+
+            // 2. Annulation en cours depuis 'progressing' -> 'cancelling' -> 'cancelled'
+            $client->request('POST', '/api/queue/dispatch', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+                'source' => 'assistant',
+                'payload' => ['job' => 'profile.expertise', 'functional_test' => true],
+            ]));
+            $runningId = (int) (json_decode((string) $client->getResponse()->getContent(), true)['queue_id'] ?? 0);
+
+            $client->request('POST', '/api/queue/claim');
+            $claimed = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertEquals($runningId, $claimed['job']['id'] ?? null);
+            $this->assertEquals('progressing', $claimed['job']['status'] ?? null);
+
+            $client->request('POST', '/api/queue/' . $runningId . '/cancel');
+            $cancellingRes = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertEquals('cancelling', $cancellingRes['status'] ?? null);
+
+            // La cloture du worker confirme l'annulation ('cancelled') au lieu de passer a 'ended'
+            $client->request('POST', '/api/queue/' . $runningId . '/complete');
+            $confirmedCancel = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertEquals('cancelled', $confirmedCancel['status'] ?? null);
+        } finally {
+            $this->purgeTestRows();
+            $em->getConnection()->executeStatement("UPDATE job_queue SET status = REPLACE(status, '__test_parked_', '') WHERE status LIKE '__test_parked_%'");
+        }
+    }
 }

@@ -153,27 +153,26 @@ def execution_scope(run_id, job_id, trace, *, receipt_root=None, on_step=None):
         raise
     finally:
         try:
-            if trace is None:
-                return
-            steps = list(state['steps'])
-            summary = {'schema': 'ezstudio.profile-engine-diagnostic.v1',
-                       'run_id': run_id, 'job_id': job_id, 'trace_id': trace.trace_id[:12],
-                       'status': final, 'at_utc': _utc(),
-                       'duration_ms': round((time.perf_counter_ns()-begin_ns)/1e6, 3),
-                       'engine_count': len(steps), 'steps': steps,
-                       'item_count': len(state['items']), 'items': list(state['items']),
-                       'scope': 'observed_engine_calls_only',
-                       'remote_archive_status': 'not_yet_attempted'}
-            # The trace snapshot is included in GitHub by profile_raw_archive.package.
-            for name, write in (
-                ('snapshot', lambda: snap('profile.engine.summary', summary)),
-                ('local_summary', lambda: _local_summary(trace, summary, receipt_root)),
-            ):
-                try:
-                    write()
-                except Exception as exc:
-                    # Diagnostics must not convert a successful scientific review
-                    # into a failed LAB job; observable, redacted marker only.
-                    print('PROFILE_ENGINE_DIAG_ERROR=' + name + ':' + type(exc).__name__, flush=True)
+            if trace is not None:
+                steps = list(state['steps'])
+                summary = {'schema': 'ezstudio.profile-engine-diagnostic.v1',
+                           'run_id': run_id, 'job_id': job_id, 'trace_id': trace.trace_id[:12],
+                           'status': final, 'at_utc': _utc(),
+                           'duration_ms': round((time.perf_counter_ns()-begin_ns)/1e6, 3),
+                           'engine_count': len(steps), 'steps': steps,
+                           'item_count': len(state['items']), 'items': list(state['items']),
+                           'scope': 'observed_engine_calls_only',
+                           'remote_archive_status': 'not_yet_attempted'}
+                # The trace snapshot is included in GitHub by profile_raw_archive.package.
+                for name, write in (
+                    ('snapshot', lambda: snap('profile.engine.summary', summary)),
+                    ('local_summary', lambda: _local_summary(trace, summary, receipt_root)),
+                ):
+                    try:
+                        write()
+                    except Exception as exc:
+                        # Diagnostics must not convert a successful scientific review
+                        # into a failed LAB job; observable, redacted marker only.
+                        print('PROFILE_ENGINE_DIAG_ERROR=' + name + ':' + type(exc).__name__, flush=True)
         finally:
             _ACTIVE.reset(token)

@@ -1,0 +1,37 @@
+﻿framework:
+    workflows:
+        job_lifecycle:
+            type: 'state_machine'
+            audit_trail:
+                enabled: true
+            marking_store:
+                type: 'method'
+                property: 'status'
+            supports:
+                - App\Entity\JobQueue
+            initial_marking: waiting
+            places:
+                - waiting
+                - progressing
+                - cancelling
+                - cancelled
+                - ended
+            transitions:
+                start:
+                    from: waiting
+                    to: progressing
+                request_cancel:
+                    from: progressing
+                    to: cancelling
+                cancel:
+                    from: waiting
+                    to: cancelled
+                confirm_cancel:
+                    from: cancelling
+                    to: cancelled
+                complete:
+                    from: [progressing, cancelling]
+                    to: ended
+                fail:
+                    from: progressing
+                    to: ended

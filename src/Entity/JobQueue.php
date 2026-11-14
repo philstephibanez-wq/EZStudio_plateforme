@@ -13,6 +13,8 @@ class JobQueue
 {
     public const STATUS_WAITING = 'waiting';
     public const STATUS_PROGRESSING = 'progressing';
+    public const STATUS_CANCELLING = 'cancelling';
+    public const STATUS_CANCELLED = 'cancelled';
     public const STATUS_ENDED = 'ended';
 
     #[ORM\Id]
@@ -108,4 +110,5 @@ class JobQueue
     public function getPayload(): array { return $this->payload; }
     public function getCreatedAt(): DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): ?DateTimeImmutable { return $this->updatedAt; }
+    public function isTerminal(): bool { return in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_ENDED], true); }
 }

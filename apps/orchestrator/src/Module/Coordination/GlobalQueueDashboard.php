@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Ezs\Web\Module\Coordination;
 
+use App\Entity\JobQueue;
 use PDO;
 
 /** Agnostic global-queue read model on data/orchestrator.sqlite (waiting / progressing / ended). */
@@ -10,7 +11,7 @@ final class GlobalQueueDashboard
     public static function read(?string $path = null, array $filters = []): array
     {
         $path ??= dirname(__DIR__, 5) . '/data/orchestrator.sqlite';
-        $stateFilter = in_array((string) ($filters['state'] ?? 'all'), ['all', 'active', 'waiting', 'progressing', 'ended_ok', 'ended_ko'], true) ? (string) $filters['state'] : 'all';
+        $stateFilter = in_array((string) ($filters['state'] ?? 'all'), ['all', 'active', 'waiting', 'progressing', 'cancelling', 'cancelled', 'ended_ok', 'ended_ko'], true) ? (string) $filters['state'] : 'all';
         $actorFilter = in_array((string) ($filters['actor'] ?? 'all'), ['all', 'lab', 'assistant'], true) ? (string) $filters['actor'] : 'all';
         $categoryFilter = in_array((string) ($filters['category'] ?? 'all'), ['all', 'Analyse', 'Expertise'], true) ? (string) $filters['category'] : 'all';
         $limit = in_array((int) ($filters['limit'] ?? 30), [20, 30, 50, 100], true) ? (int) $filters['limit'] : 30;
@@ -24,13 +25,15 @@ final class GlobalQueueDashboard
             $db = new PDO('sqlite:' . $uri, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 2]);
             $db->exec('PRAGMA query_only=ON');
 
-            $counts = ['waiting' => 0, 'progressing' => 0, 'ended' => 0, 'ended_ok' => 0, 'ended_ko' => 0];
+            $counts = ['waiting' => 0, 'progressing' => 0, 'cancelling' => 0, 'cancelled' => 0, 'ended' => 0, 'ended_ok' => 0, 'ended_ko' => 0];
             foreach ($db->query('SELECT status, COALESCE(has_error, 0) AS has_error, COUNT(*) AS qty FROM job_queue GROUP BY status, COALESCE(has_error, 0)')->fetchAll(PDO::FETCH_ASSOC) as $c) {
                 $st = (string) ($c['status'] ?? '');
                 $qty = (int) ($c['qty'] ?? 0);
                 $err = ((int) ($c['has_error'] ?? 0)) === 1;
                 if ($st === 'waiting') { $counts['waiting'] += $qty; }
                 elseif ($st === 'progressing') { $counts['progressing'] += $qty; }
+                elseif ($st === 'cancelling') { $counts['cancelling'] += $qty; }
+                elseif ($st === 'cancelled') { $counts['cancelled'] += $qty; }
                 elseif ($st === 'ended') {
                     $counts['ended'] += $qty;
                     if ($err) { $counts['ended_ko'] += $qty; } else { $counts['ended_ok'] += $qty; }
@@ -39,7 +42,7 @@ final class GlobalQueueDashboard
 
             $sql = "SELECT id, source, status, COALESCE(progress, 0) AS progress, COALESCE(has_error, 0) AS has_error, error_message, COALESCE(attempts, 0) AS attempts, payload, created_at, updated_at
                     FROM job_queue
-                    ORDER BY CASE status WHEN 'progressing' THEN 0 WHEN 'waiting' THEN 1 ELSE 2 END, id DESC
+                    ORDER BY CASE status WHEN 'progressing' THEN 0 WHEN 'cancelling' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END, id DESC
                     LIMIT 500";
             $rawRows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
             $rows = [];
@@ -49,10 +52,12 @@ final class GlobalQueueDashboard
                 if ($actorFilter !== 'all' && $actor !== $actorFilter) { continue; }
 
                 $rawStatus = (string) ($r['status'] ?? 'waiting');
-                $state = in_array($rawStatus, ['waiting', 'progressing', 'ended'], true) ? $rawStatus : 'waiting';
+                $state = in_array($rawStatus, ['waiting', 'progressing', 'cancelling', 'cancelled', 'ended'], true) ? $rawStatus : 'waiting';
                 $hasError = ((int) ($r['has_error'] ?? 0)) === 1;
 
-                if ($stateFilter === 'active' && !in_array($state, ['waiting', 'progressing'], true)) { continue; }
+                if ($stateFilter === 'active' && !in_array($state, ['waiting', 'progressing', 'cancelling'], true)) { continue; }
+                if ($stateFilter === 'cancelling' && $state !== 'cancelling') { continue; }
+                if ($stateFilter === 'cancelled' && $state !== 'cancelled') { continue; }
                 if ($stateFilter === 'waiting' && $state !== 'waiting') { continue; }
                 if ($stateFilter === 'progressing' && $state !== 'progressing') { continue; }
                 if ($stateFilter === 'ended_ok' && !($state === 'ended' && !$hasError)) { continue; }
@@ -68,7 +73,9 @@ final class GlobalQueueDashboard
                 $progress = (int) ($r['progress'] ?? 0);
                 if ($state === 'ended' && !$hasError) { $progress = 100; }
 
+                $subject = (new JobQueue($actor, $payload))->setStatus($state);
                 $rows[] = [
+                    'subject' => $subject,
                     'id' => (int) $r['id'],
                     'actor' => $actor,
                     'category' => $category !== '' ? $category : null,

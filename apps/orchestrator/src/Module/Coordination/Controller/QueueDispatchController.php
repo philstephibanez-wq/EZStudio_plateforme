@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Ezs\Web\Module\Coordination\Controller;
 
+use App\Entity\JobQueue;
 use App\Service\QueueManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -80,6 +81,7 @@ final class QueueDispatchController extends AbstractController
             'queue_id' => $job->getId(),
             'status' => $job->getStatus(),
             'progress' => $job->getProgress(),
+            'cancelling' => $job->getStatus() === JobQueue::STATUS_CANCELLING,
         ]);
     }
 
@@ -127,7 +129,7 @@ final class QueueDispatchController extends AbstractController
     #[Route('/api/queue/{id}/cancel', name: 'orchestrator_queue_cancel', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function cancel(int $id, QueueManager $queueManager): JsonResponse
     {
-        $job = $queueManager->markEnded($id, true, 'Annulé');
+        $job = $queueManager->requestCancel($id);
         if ($job === null) {
             return $this->json(['ok' => false, 'error' => 'job_not_found'], 404);
         }
