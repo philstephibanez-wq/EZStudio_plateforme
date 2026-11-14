@@ -72,17 +72,6 @@ final class ChordsExecutionService
             'selection_request' => $requestPath,
         ]);
 
-        $dispatched = $this->orchestratorQueue->dispatch('lab', [
-            'job' => 'chords',
-            'analysis_job_id' => $jobId,
-            'scientific_run_id' => $scientificRunId,
-            'benchmark_run_id' => $benchmarkRunId,
-            'song_id' => (int) $run['song_id'],
-            'source_path' => $source,
-            'signature' => $signature,
-            'selection_request' => $requestPath,
-        ]);
-
         return [
             'scientific_run_id' => $scientificRunId,
             'benchmark_run_id' => $benchmarkRunId,

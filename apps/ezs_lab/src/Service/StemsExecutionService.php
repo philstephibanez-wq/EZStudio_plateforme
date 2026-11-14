@@ -80,20 +80,6 @@ final class StemsExecutionService
             'engine_profile' => $engineProfile,
             'previous_job_id' => $previousJobId,
         ]);
-
-        $dispatched = $this->orchestratorQueue->dispatch('lab', [
-            'job' => 'stems',
-            'analysis_job_id' => $jobId,
-            'scientific_run_id' => $scientificRunId,
-            'song_id' => (int) $run['song_id'],
-            'source_path' => $source,
-            'audio_hash' => $audioHash,
-            'storage_root' => $storageRoot,
-            'force' => $force,
-            'engine_profile' => $engineProfile,
-            'previous_job_id' => $previousJobId,
-        ]);
-
         return [
             'scientific_run_id' => $scientificRunId,
             'job_id' => $jobId,
