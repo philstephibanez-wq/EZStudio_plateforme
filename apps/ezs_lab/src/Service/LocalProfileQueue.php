@@ -86,6 +86,8 @@ final class LocalProfileQueue
             // Dispatch REST vers la file centralisée d'orchestrator
             $dispatched = $this->orchestratorQueue->dispatch('lab', [
                 'job' => 'profile',
+                'category' => 'Analyse',
+                'label' => trim((string)($song['title'] ?? '')),
                 'analysis_job_id' => $jobId,
                 'scientific_run_id' => $runId,
                 'song_id' => (int)$song['id'],

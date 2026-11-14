@@ -144,6 +144,8 @@ final class DashboardController extends AbstractController {
 
             $dispatched = $orchestratorQueue->dispatch('assistant', [
                 'job' => 'profile.direct_research',
+                'category' => 'Expertise',
+                'label' => trim($title . ($artist !== '' ? ' - ' . $artist : '')),
                 'job_id' => $jobId,
                 'title' => $title,
                 'artist' => $artist,

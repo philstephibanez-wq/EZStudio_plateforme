@@ -1,23 +1,53 @@
 {% extends 'layout/base.html.twig' %}
-
 {% block title %}EZS Orchestrator — Ordonnanceur{% endblock %}
-
 {% block content %}
 <main class="container-fluid py-4 ezs-main">
     <div class="ezs-statusline mb-3 d-flex justify-content-between align-items-center">
         <span><strong>Ordonnanceur</strong> — ordonnancement agnostique (waiting / progressing % / ended)</span>
         <span class="text-body-secondary">Actualisation toutes les 4 s (onglet visible)</span>
     </div>
-
     <section class="card mb-3" aria-labelledby="queue-title">
-        <div class="card-header d-flex justify-content-between">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <strong id="queue-title">File globale — Orchestrator (1 job actif maximum)</strong>
             <span class="badge {{ global_queue.available ? 'text-bg-success' : 'text-bg-secondary' }}">{{ global_queue.available ? 'Base accessible' : 'Indisponible' }}</span>
         </div>
         <div class="card-body">
             {% if global_queue.available %}
-                <p class="text-body-secondary">Supervision purement agnostique : l’Ordonnanceur exécute séquentiellement les demandes des acteurs et suit leur pourcentage d’avancement.</p>
-                <p><strong>{{ global_queue.jobs|length }}</strong> jobs affichés
+                {% set f = global_queue.filters|default({'state':'all','actor':'all','category':'all','limit':30}) %}
+                <form method="get" action="/jobs" class="row g-2 align-items-end mb-3">
+                    <div class="col-auto"><label class="form-label small text-body-secondary mb-1">État</label>
+                        <select name="state" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="all" {{ f.state == 'all' ? 'selected' }}>Tous</option>
+                            <option value="active" {{ f.state == 'active' ? 'selected' }}>Actifs (attente + cours)</option>
+                            <option value="waiting" {{ f.state == 'waiting' ? 'selected' }}>Enregistré (en attente)</option>
+                            <option value="progressing" {{ f.state == 'progressing' ? 'selected' }}>En progression</option>
+                            <option value="ended_ok" {{ f.state == 'ended_ok' ? 'selected' }}>Terminé (OK)</option>
+                            <option value="ended_ko" {{ f.state == 'ended_ko' ? 'selected' }}>Terminé (KO)</option>
+                        </select></div>
+                    <div class="col-auto"><label class="form-label small text-body-secondary mb-1">Acteur</label>
+                        <select name="actor" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="all" {{ f.actor == 'all' ? 'selected' }}>Tous</option>
+                            <option value="lab" {{ f.actor == 'lab' ? 'selected' }}>lab</option>
+                            <option value="assistant" {{ f.actor == 'assistant' ? 'selected' }}>assistant</option>
+                        </select></div>
+                    <div class="col-auto"><label class="form-label small text-body-secondary mb-1">Type</label>
+                        <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="all" {{ f.category == 'all' ? 'selected' }}>Tous</option>
+                            <option value="Analyse" {{ f.category == 'Analyse' ? 'selected' }}>Analyse</option>
+                            <option value="Expertise" {{ f.category == 'Expertise' ? 'selected' }}>Expertise</option>
+                        </select></div>
+                    <div class="col-auto"><label class="form-label small text-body-secondary mb-1">Afficher</label>
+                        <select name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
+                            <option value="20" {{ f.limit == 20 ? 'selected' }}>20</option>
+                            <option value="30" {{ f.limit == 30 ? 'selected' }}>30</option>
+                            <option value="50" {{ f.limit == 50 ? 'selected' }}>50</option>
+                            <option value="100" {{ f.limit == 100 ? 'selected' }}>100</option>
+                        </select></div>
+                    {% if f.state != 'all' or f.actor != 'all' or f.category != 'all' or f.limit != 30 %}
+                    <div class="col-auto"><a href="/jobs" class="btn btn-outline-secondary btn-sm">Réinitialiser</a></div>
+                    {% endif %}
+                </form>
+                <p><strong>{{ global_queue.jobs|length }}</strong> affichés (max {{ f.limit }})
                     — en attente : <strong>{{ global_queue.counts.waiting|default(0) }}</strong>
                     — en progression : <strong>{{ global_queue.counts.progressing|default(0) }}</strong>
                     — terminés (OK) : <strong>{{ global_queue.counts.ended_ok|default(0) }}</strong>
@@ -26,13 +56,15 @@
                 <div class="table-responsive">
                     <table class="table table-dark table-sm align-middle mb-0">
                         <thead><tr>
-                            <th>Job</th><th>Acteur</th><th>État</th><th style="min-width: 180px;">Progression</th><th>Tentatives</th><th>Erreur</th><th>Dernier événement</th>
+                            <th>Job</th><th>Acteur</th><th>Type</th><th>Chanson</th><th>État</th><th style="min-width: 170px;">Progression</th><th>Tentatives</th><th>Erreur</th><th>Dernier événement</th>
                         </tr></thead>
                         <tbody>
                         {% for job in global_queue.jobs %}
                             <tr>
                                 <td>#{{ job.id }}</td>
                                 <td><span class="badge text-bg-dark border">{{ job.actor }}</span></td>
+                                <td>{{ job.category ?: '—' }}</td>
+                                <td>{{ job.label ?: '—' }}</td>
                                 <td>
                                     {% if job.state == 'ended' and not job.has_error %}<span class="badge text-bg-success">Terminé (OK)</span>
                                     {% elseif job.state == 'ended' and job.has_error %}<span class="badge text-bg-danger">Terminé (KO)</span>
@@ -52,7 +84,7 @@
                                 <td>{% if job.updated_at is not empty %}{{ job.updated_at|date('d/m/Y H:i:s', 'Europe/Paris') }}{% else %}—{% endif %}</td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="7">Aucun job enregistré dans l’Ordonnanceur.</td></tr>
+                            <tr><td colspan="9">Aucun job correspondant aux filtres.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>
@@ -69,7 +101,7 @@
     window.setInterval(async function () {
         if (document.visibilityState !== 'visible') return;
         try {
-            const response = await fetch('/jobs', {cache: 'no-store', credentials: 'same-origin'});
+            const response = await fetch(window.location.href, {cache: 'no-store', credentials: 'same-origin'});
             if (!response.ok) return;
             const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
             const current = document.getElementById('queue-title')?.closest('section');
