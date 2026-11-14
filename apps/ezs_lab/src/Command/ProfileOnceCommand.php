@@ -183,7 +183,7 @@ final class ProfileOnceCommand extends Command
                         $this->profile->progressFromJob($jobId, $percent);
                         $orchJobId = (int)($input->getOption('orchestrator-job-id') ?: getenv('ORCHESTRATOR_JOB_ID') ?: 0);
                         if ($orchJobId > 0 ) {
-                            try { $this->orchestratorQueue->reportProgress($orchJobId, $percent); } catch (\Throwable) {}
+                            try { $this->orchestratorQueue->reportProgress($orchJobId, $percent); } catch (\Throwable $e) { $output->writeln("PROFILE_ONCE_ORCH_PROGRESS_ERR=".$e->getMessage()); }
                         }
                         $output->writeln('PROFILE_ONCE_PROGRESS='.$percent);
                     }

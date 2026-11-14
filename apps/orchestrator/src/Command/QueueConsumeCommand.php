@@ -121,7 +121,7 @@ error>[Job #%d] ended (KO): %s
 
         $php = is_file('H:/PHP/php-8.5-x64/php.exe') ? 'H:/PHP/php-8.5-x64/php.exe' : 'php';
         $python = is_file('H:/Python/pythoncore-3.14-64/python.exe') ? 'H:/Python/pythoncore-3.14-64/python.exe' : 'python';
-        $baseUrl = (string) ($_ENV['ORCHESTRATOR_BASE_URL'] ?? $_SERVER['ORCHESTRATOR_BASE_URL'] ?? 'http://ezstudio.local');
+        $baseUrl = (string) ($_ENV['ORCHESTRATOR_BASE_URL'] ?? $_SERVER['ORCHESTRATOR_BASE_URL'] ?? 'http://orchestrator.ezstudio.local:8000');
 
         if ($source === 'assistant') {
             if ($type === 'profile.review') {
