@@ -41,7 +41,7 @@
 </head>
     <body>
         <header><strong>EZStudioLab Assistant</strong><span style="opacity:.65"> · v{{ version|default('?') }}</span></header>
-        {% include "_gpu_monitor.html.twig" %}
+        {% include "@shared/_gpu_monitor.html.twig" %}
 <main>
             {% block body %}{% endblock %}
         </main>
