@@ -40,7 +40,7 @@ final class ProfileAiRequestService
         $pdo = $this->pdo();
         $pdo->exec('BEGIN IMMEDIATE');
         try {
-            $stmt=$pdo->prepare("SELECT sr.id,sr.song_id,s.source_path FROM scientific_runs sr JOIN songs s ON s.id=sr.song_id WHERE sr.id=? AND sr.item='profile' AND sr.state='done'");
+            $stmt=$pdo->prepare("SELECT sr.id,sr.song_id,s.source_path,s.title FROM scientific_runs sr JOIN songs s ON s.id=sr.song_id WHERE sr.id=? AND sr.item='profile' AND sr.state='done'");
             $stmt->execute([$runId]);
             $run=$stmt->fetch(\PDO::FETCH_ASSOC);
             if (!$run) throw new \RuntimeException('run_profile_non_termine');
@@ -60,11 +60,20 @@ final class ProfileAiRequestService
             }
             $pdo->commit();
             $created = $this->latest($runId) ?? throw new \RuntimeException('ai_job_insert_failed');
-            $this->orchestratorQueue?->dispatch('assistant', [
+            $songTitle = trim((string) ($run['title'] ?? ''));
+            if ($songTitle === '' && !empty($run['source_path'])) { $songTitle = pathinfo((string) $run['source_path'], PATHINFO_FILENAME); }
+            $dispatched = $this->orchestratorQueue?->dispatch('assistant', [
                 'job' => 'profile.review',
+                'category' => 'Expertise',
+                'label' => $songTitle !== '' ? $songTitle : ('Run #' . $runId),
                 'job_id' => (int) $created['job_id'],
                 'run_id' => $runId,
             ]);
+            $orchQueueId = (int) ($dispatched['queue_id'] ?? 0);
+            if ($orchQueueId > 0) {
+                $reqPatch = json_encode(['phase'=>'profile','scientific_run_id'=>$runId,'processor'=>'qwen','schema'=>'ezs.assistant.profile.job.v1','orchestrator_queue_id'=>$orchQueueId], JSON_UNESCAPED_UNICODE);
+                $pdo->prepare('UPDATE analysis_jobs SET request_json=? WHERE id=?')->execute([$reqPatch, (int) $created['job_id']]);
+            }
             return $created;
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -91,6 +100,14 @@ final class ProfileAiRequestService
             foreach (['job_id', 'run_id', 'progress', 'song_id'] as $key) {
                 if ($row[$key] !== null) $row[$key] = (int)$row[$key];
             }
+            $row['checkpoints'] = [];
+            try {
+                $cp = $this->pdo()->prepare('SELECT event_key, phase, outcome, detail_json, created_at FROM assistant_job_checkpoints WHERE job_id = ? ORDER BY id ASC');
+                $cp->execute([(int)$row['job_id']]);
+                foreach ($cp->fetchAll(\PDO::FETCH_ASSOC) as $c) {
+                    $row['checkpoints'][] = ['event_key'=>(string)$c['event_key'],'phase'=>(string)$c['phase'],'outcome'=>(string)$c['outcome'],'detail'=>json_decode((string)$c['detail_json'],true)?:[],'created_at'=>(string)$c['created_at']];
+                }
+            } catch (\Throwable) {}
             return $row;
         }, $stmt->fetchAll(\PDO::FETCH_ASSOC));
     }

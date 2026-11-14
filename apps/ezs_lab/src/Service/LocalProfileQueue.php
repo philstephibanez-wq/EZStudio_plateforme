@@ -115,6 +115,7 @@ final class LocalProfileQueue
             $labels = $this->runs->labels($runId);
             $queueId = (int)($labels['orchestrator_queue_id'] ?? 0);
         }
+        if ($queueId <= 0 && !empty($job['request_json'])) { $rq = json_decode((string)$job['request_json'], true); $queueId = (int)($rq['orchestrator_queue_id'] ?? 0); }
         if ($queueId <= 0) {
             $analysisJobId = (int)($job['id'] ?? 0);
             $orchDb = dirname(__DIR__, 4) . '/data/orchestrator.sqlite';

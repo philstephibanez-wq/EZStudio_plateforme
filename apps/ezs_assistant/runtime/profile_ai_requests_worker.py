@@ -308,7 +308,7 @@ def once(client, target_job_id=None, target_run_id=None):
             try:
                 emit('job.claimed', {'run_id': rid, 'claim': True})
                 snap('worker.startup_provenance', STARTUP_PROVENANCE)
-                with execution_scope(rid, job_id, trace):
+                with execution_scope(rid, job_id, trace, on_step=lambda step: api(PATH + '/' + str(job_id) + '/checkpoints', {'event_key': 'engine.' + step['engine'], 'phase': 'engine.' + step['engine'], 'outcome': 'ok' if step['status']=='OK' else step['status'].lower(), 'detail': step})):
                     outcome = process(rid, client, check_cancel=lambda: assert_running(rid, job_id))
                 assert_running(rid, job_id)
                 message = 'Révision IA #' + str(outcome['revision']) + ' enregistrée'
@@ -394,7 +394,15 @@ def main():
         try:
             once(client, target_job_id=args.job_id, target_run_id=args.run_id) if args.once else once(client)
         except Exception as exc:
-            print('QUEUE_ERROR ' + type(exc).__name__, flush=True)
+            if args.once and 'one_shot_target_not_processed' in str(exc):
+                while True:
+                    st = (api(PATH + '/' + str(args.run_id) + '/state?job_id=' + str(args.job_id)).get('request') or {}).get('status')
+                    if st == 'completed':
+                        return 0
+                    if st in ('error', 'cancelled'):
+                        return 1
+                    time.sleep(2)
+            print('QUEUE_ERROR ' + type(exc).__name__ + ': ' + str(exc), flush=True)
             if args.once:
                 return 2
         if args.once:

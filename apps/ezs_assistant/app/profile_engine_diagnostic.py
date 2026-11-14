@@ -78,6 +78,9 @@ def call_engine(engine, func, *args, **kwargs):
                         'duration_ms': round((time.perf_counter_ns()-begun)/1e6, 3)})
             state['steps'].append(end)
             emit('profile.engine.end', end)
+            if callable(state.get('on_step')):
+                try: state['on_step'](dict(end))
+                except Exception: pass
 
 
 def record_item(engine, item, started_ns=None):
@@ -135,14 +138,11 @@ def _local_summary(trace, summary, root):
 
 
 @contextmanager
-def execution_scope(run_id, job_id, trace, *, receipt_root=None):
+def execution_scope(run_id, job_id, trace, *, receipt_root=None, on_step=None):
     """One scoped, structured summary; trace snapshot precedes publish_trace()."""
     if type(run_id) is not int or run_id <= 0 or type(job_id) is not int or job_id <= 0:
         raise ValueError('invalid_execution_identity')
-    if trace is None:
-        yield
-        return
-    state = {'run_id': run_id, 'job_id': job_id, 'steps': [], 'items': []}
+    state = {'run_id': run_id, 'job_id': job_id, 'steps': [], 'items': [], 'on_step': on_step}
     token = _ACTIVE.set(state)
     begin_ns = time.perf_counter_ns()
     final = 'OK'
@@ -153,6 +153,8 @@ def execution_scope(run_id, job_id, trace, *, receipt_root=None):
         raise
     finally:
         try:
+            if trace is None:
+                return
             steps = list(state['steps'])
             summary = {'schema': 'ezstudio.profile-engine-diagnostic.v1',
                        'run_id': run_id, 'job_id': job_id, 'trace_id': trace.trace_id[:12],

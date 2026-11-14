@@ -1,77 +1,102 @@
 {% if selected_profile_run.state == 'done' %}
 <div class="card" id="profile-ai-request" data-url="{{ path('profile_ai_review_status', {id: selected_profile_run.id}) }}">
-  <h2>ASSISTANT · Révision musicale IA</h2>
+  <h2>ASSISTANT · Expertise musicale IA</h2>
   <div class="meta">Qwen sur XPS · run #{{ selected_profile_run.id }} · aucune modification du résultat scientifique ou des presets.</div>
   <form id="profile-ai-request-form" action="{{ path('profile_ai_review_request', {id: selected_profile_run.id}) }}" method="post" onsubmit="return false">
-    <button type="button" id="profile-ai-run-button">Réviser avec l’IA</button>
+    <button type="button" id="profile-ai-run-button">Expertiser avec l’IA</button>
+    <button type="button" id="profile-ai-cancel-button" style="display:none">Annuler l’expertise IA</button>
   </form>
-  <div class="profile-ai-progress" aria-label="Progression de la révision IA">
+  <div class="profile-ai-progress" aria-label="Progression de l’expertise IA">
     <progress id="profile-ai-progress" max="100" value="0" style="width:100%;height:16px"></progress>
+    <div id="profile-ai-step-current" style="margin-top:6px;font-weight:600;font-size:.9rem"></div>
+    <ol id="profile-ai-step-history" style="margin:6px 0 0 18px;padding:0;font-size:.85rem;line-height:1.45"></ol>
     <div class="meta" role="status" id="profile-ai-request-state">Consultation…</div>
     <div class="meta" id="profile-ai-current-item" aria-live="polite" hidden></div>
   </div>
-  <button type="button" id="profile-ai-refresh-results" hidden>Afficher la révision enregistrée</button>
 </div>
 <script>
 (function () {
- const root=document.getElementById('profile-ai-request');
- const form=document.getElementById('profile-ai-request-form');
- const state=document.getElementById('profile-ai-request-state');
- const button=document.getElementById('profile-ai-run-button');
- const progress=document.getElementById('profile-ai-progress');
- const currentItem=document.getElementById('profile-ai-current-item');
- const refreshLink=document.getElementById('profile-ai-refresh-results');
- if (!root || !form || !state || !button || !progress || !currentItem) return;
+  const root=document.getElementById('profile-ai-request'), form=document.getElementById('profile-ai-request-form'), state=document.getElementById('profile-ai-request-state'), button=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), progress=document.getElementById('profile-ai-progress'), stepCurrent=document.getElementById('profile-ai-step-current'), stepHistory=document.getElementById('profile-ai-step-history'), currentItem=document.getElementById('profile-ai-current-item');
+  const engineLabels={identity_resolver:'Résolution d’identité musicale (MusicBrainz / IA)',recording_duration:'Vérification de durée catalogue',public_source_research:'Recherche sur sources publiques',review_payload_builder:'Construction du dossier d’expertise',independent_verifier:'Vérification indépendante des assertions',assertion_web_investigator:'Investigation web des assertions',local_ai_document_review:'Revue documentaire IA locale (Qwen 2.5 1.5B)',documentary_verdict_merger:'Synthèse finale des verdicts'};
+  if (!root || !form || !state || !button || !progress || !currentItem) return;
+  let activeJobId=0, wasActive=false;
 
- function show(item) {
-   const s=item?.status || 'non demandée';
-   const number=Number(item?.progress);
-   const known=item?.progress!==null && item?.progress!==undefined && Number.isFinite(number) && number>=0 && number<=100;
-   if (s==='completed') progress.value=100;
-   else if (s==='running' && (!known || number<=1)) progress.removeAttribute('value');
-   else if (s==='running' && known) progress.value=number;
-   else progress.value=0;
-   const info=s==='completed' ? 'Révision IA terminée' :
-     s==='running' ? 'Analyse IA en cours'+(known && number>1 ? ' · '+Math.round(number)+' %' : '') :
-     s==='queued' ? 'Révision IA en attente' :
-     s==='cancelling' ? 'Annulation de la révision IA demandée' :
-     s==='cancelled' ? 'Révision IA annulée' :
-     s==='error' ? 'Erreur de révision IA' : 'Aucune révision en cours';
-   state.textContent=info+(item?.job_id ? ' · Job #'+item.job_id : '')+(item?.message ? ' · '+item.message : '');
-   // The worker will expose the actual item only once sequenced analysis is implemented.
-   const itemName=typeof item?.current_item==='string' ? item.current_item.trim() : '';
-   const step=Number(item?.item_index), total=Number(item?.item_total);
-   const stepLabel=Number.isInteger(step) && Number.isInteger(total) && step>0 && total>=step ? ' · '+step+'/'+total : '';
-   currentItem.textContent=s==='running' && itemName ? 'Item analysé : '+itemName.slice(0,160)+stepLabel : '';
-   currentItem.hidden=!currentItem.textContent;
-   button.disabled=s==='running'||s==='queued'||s==='cancelling';
-   // Never reload automatically: a completed job remains completed across visits.
-   // The revision is persisted; the user can refresh results exactly once on demand.
-   if (refreshLink) refreshLink.hidden=s!=='completed';
+  function applyFsm(s) {
+    const busy = (s==='running' || s==='queued');
+    const cancelling = (s==='cancelling');
+    button.style.display = (busy || cancelling) ? 'none' : '';
+    button.disabled = (busy || cancelling);
+    if (cancelBtn) {
+      cancelBtn.style.display = (busy || cancelling) ? '' : 'none';
+      cancelBtn.disabled = cancelling;
+      cancelBtn.textContent = cancelling ? 'Annulation en cours…' : 'Annuler l’expertise IA';
+    }
+  }
 
- }
- async function refresh() {
-   try {
-     const r=await fetch(root.dataset.url,{credentials:'same-origin',cache:'no-store'});
-     if (!r.ok) throw new Error('HTTP '+r.status);
-     const j=await r.json();show(j.request);
-   } catch (e) {state.textContent='Suivi indisponible : '+e.message;progress.removeAttribute('value');currentItem.hidden=true;}
- }
- // Force a new document fetch rather than a same-page hash jump on stale DOM.
- // The run remains selected in the URL; the server reads the persisted LAB revision.
- if (refreshLink) refreshLink.addEventListener('click',function(){
-   window.location.hash='profile-ai-revisions';
-   window.location.reload();
- });
- button.addEventListener('click',async function(e){
-   e.preventDefault();button.disabled=true;state.textContent='Demande en cours…';progress.removeAttribute('value');currentItem.hidden=true;
-   try {
+  function show(item) {
+    activeJobId=Number(item?.job_id || 0);
+    const s=item?.status || 'idle';
+    if (s==='running' || s==='queued' || s==='cancelling') { wasActive=true; }
+    applyFsm(s);
+    const number=Number(item?.progress);
+    const known=item?.progress!==null && item?.progress!==undefined && Number.isFinite(number) && number>=0 && number<=100;
+    const pct=s==='completed' ? 100 : (known ? Math.round(number) : 0);
+    if (s==='completed') progress.value=100;
+    else if (s==='running' && (!known || number<=1)) progress.removeAttribute('value');
+    else if (s==='running' && known) progress.value=number;
+    else progress.value=0;
+    const info=s==='completed' ? 'Expertise IA terminée' : s==='running' ? 'Expertise IA en cours'+(known && number>1 ? ' · '+pct+' %' : '') : s==='queued' ? 'Expertise IA en attente' : s==='cancelling' ? 'Annulation de l’expertise IA demandée' : s==='cancelled' ? 'Expertise IA annulée' : s==='error' ? 'Erreur d’expertise IA' : 'Aucune expertise en cours';
+    state.textContent=info+(item?.job_id ? ' · Job #'+item.job_id : '')+(item?.message ? ' · '+item.message : '');
+    const cps=Array.isArray(item?.checkpoints) ? item.checkpoints : [];
+    if (stepHistory) {
+      stepHistory.innerHTML='';
+      cps.forEach(function(cp){
+        const cleanKey=String(cp.phase || cp.event_key || '').replace(/^engine\./,'');
+        const label=engineLabels[cleanKey] || cleanKey;
+        const ms=cp.detail && cp.detail.duration_ms ? ' (' + Math.round(Number(cp.detail.duration_ms)) + ' ms)' : '';
+        const li=document.createElement('li');
+        li.textContent=label + ' [' + cleanKey + '] · ' + (cp.outcome || 'ok') + ms;
+        stepHistory.appendChild(li);
+      });
+    }
+    if (stepCurrent) {
+      if (s==='running' || s==='queued') {
+        const last=cps.length ? cps[cps.length-1] : null;
+        const lastKey=last ? String(last.phase || last.event_key || '').replace(/^engine\./,'') : '';
+        stepCurrent.textContent=pct + ' % · ' + (lastKey ? ('Dernier moteur : ' + (engineLabels[lastKey] || lastKey)) : 'Initialisation du moteur IA…');
+      } else if (s==='completed') { stepCurrent.textContent='100 % · Expertise IA terminée (' + cps.length + ' étapes moteurs)'; }
+      else { stepCurrent.textContent=''; }
+    }
+    if (wasActive && s==='completed') {
+      wasActive=false;
+      fetch(window.location.href, {credentials:'same-origin', cache:'no-store'}).then(r=>r.text()).then(html=>{
+        const doc=new DOMParser().parseFromString(html, 'text/html');
+        ['profile-ai-revisions','diag-unified-container'].forEach(id=>{ const cur=document.getElementById(id), nxt=doc.getElementById(id); if (cur && nxt) cur.innerHTML=nxt.innerHTML; });
+      });
+    }
+  }
+  async function refresh() {
+    try {
+      const r=await fetch(root.dataset.url,{credentials:'same-origin',cache:'no-store'});
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json();show(j.request);
+    } catch (e) {state.textContent='Suivi indisponible : '+e.message;progress.value=0;}
+  }
+  if (cancelBtn) cancelBtn.addEventListener('click', async function(){
+    if (!activeJobId) return;
+    applyFsm('cancelling');
+    try { await fetch('/analysis/jobs/' + activeJobId + '/cancel', {method:'POST', credentials:'same-origin', headers:{'Accept':'application/json'}}); refresh(); }
+    catch(e) { refresh(); }
+  });
+  button.addEventListener('click',async function(e){
+    e.preventDefault();applyFsm('queued');state.textContent='Demande d’expertise en cours…';progress.removeAttribute('value');
+    try {
       const r=await fetch(form.action,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Profile-AI-Action':'request','Accept':'application/json'}});
       const j=await r.json();if(!r.ok) throw new Error(j.error||'HTTP '+r.status);
       show(j.request);
-   } catch(err){state.textContent='Erreur : '+err.message;progress.value=0;currentItem.hidden=true;button.disabled=false;}
- });
- refresh();setInterval(refresh,5000);
+    } catch(err){state.textContent='Erreur : '+err.message;progress.value=0;applyFsm('idle');}
+  });
+  refresh();setInterval(refresh,2500);
 })();
 </script>
 {% endif %}

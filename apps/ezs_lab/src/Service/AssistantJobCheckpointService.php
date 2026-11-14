@@ -2,8 +2,10 @@
 declare(strict_types=1);
 namespace EZSLab\Service;
 
+use App\Service\OrchestratorQueueClient;
+
 final class AssistantJobCheckpointService {
-    public function __construct(private readonly Database $db) {}
+    public function __construct(private readonly Database $db, private readonly ?OrchestratorQueueClient $orchestratorQueue = null) {}
 
     public function save(int $jobId, array $payload): array {
         $job=(new ProfileAiRequestService($this->db))->contextForJob($jobId);
@@ -57,7 +59,21 @@ final class AssistantJobCheckpointService {
         if (!$row || $row['phase']!==$phase || $row['outcome']!==$outcome || $row['detail_json']!==$json) {
             throw new \RuntimeException('checkpoint_idempotency_conflict');
         }
+        $this->syncProgress($pdo, $jobId, $key, $phase);
         return $this->view($row);
+    }
+
+    private function syncProgress(\PDO $pdo, int $jobId, string $key, string $phase): void {
+        $map = ['identity_resolver'=>15,'recording_duration'=>25,'public_source_research'=>45,'review_payload_builder'=>55,'independent_verifier'=>70,'assertion_web_investigator'=>82,'local_ai_document_review'=>94,'documentary_verdict_merger'=>98];
+        $percent = 0;
+        foreach ($map as $eng => $pct) { if (stripos($key, $eng) !== false || stripos($phase, $eng) !== false) { $percent = $pct; break; } }
+        if ($percent <= 0) { $cnt = (int)$pdo->query('SELECT COUNT(*) FROM assistant_job_checkpoints WHERE job_id=' . $jobId)->fetchColumn(); $percent = min(95, max(5, $cnt * 12)); }
+        $pdo->prepare('UPDATE analysis_jobs SET progress = MAX(COALESCE(progress,0), ?), updated_at = ? WHERE id = ?')->execute([$percent, gmdate('c'), $jobId]);
+        $req = json_decode((string)$pdo->query('SELECT COALESCE(request_json,\'\') FROM analysis_jobs WHERE id=' . $jobId)->fetchColumn(), true);
+        $orchId = (int)($req['orchestrator_queue_id'] ?? 0);
+        if ($orchId > 0) {
+            try { $this->orchestratorQueue?->reportProgress($orchId, $percent); } catch (\Throwable) {}
+        }
     }
 
     public function history(int $jobId): array {

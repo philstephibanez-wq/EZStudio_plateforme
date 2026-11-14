@@ -947,4 +947,41 @@ document.getElementById('song-identity-form')?.addEventListener('submit', async 
 
 {% endif %}
 {% endif %}
+
+    <div id="diag-unified-container">
+        {% set ai_req_dump = profile_ai_request ?? null %}
+        {% set full_diag_bundle = {
+            'song': selected_song ?? null,
+            'scientific_run': selected_profile_run ?? null,
+            'presets_and_config': selected_profile_run.config ?? (selected_profile_run.config_json ?? null),
+            'ai_request': ai_req_dump,
+            'external_revisions': profile_external_revisions ?? []
+        } %}
+        <details style="margin:12px 0">
+            <summary style="cursor:pointer"><strong>Console diagnostic unifiée — Analyse, Presets &amp; Expertise (JSON brut)</strong></summary>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+                <button type="button" id="btn-copy-full-diag" style="background:#163822;color:#33ff66;border:1px solid #33ff66;border-radius:4px;padding:4px 12px;cursor:pointer;font-family:Consolas,monospace;font-size:.82rem">Copier le diagnostic complet (Analyse + Presets + Expertise)</button>
+                <span id="copy-full-diag-status" style="color:#33ff66;font-size:.82rem;font-family:Consolas,monospace"></span>
+            </div>
+            <pre id="pre-full-diag-json" style="background:#0b0f0c;color:#33ff66;border:1px solid #1f3b28;border-radius:6px;padding:12px;margin-top:8px;max-height:460px;overflow:auto;font-family:Consolas,Monaco,monospace;font-size:.8rem;line-height:1.45">{{ full_diag_bundle|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_UNICODE')) }}</pre>
+        </details>
+    </div>
+    <script>
+    (function(){
+        document.addEventListener('click',function(e){
+            if(!e.target || e.target.id!=='btn-copy-full-diag') return;
+            var pre=document.getElementById('pre-full-diag-json');
+            var st=document.getElementById('copy-full-diag-status');
+            if(!pre) return;
+            var txt=pre.textContent||'';
+            function showOk(){ if(st){ st.textContent='Copié dans le presse-papiers !'; setTimeout(function(){ st.textContent=''; }, 2500); } }
+            if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(txt).then(showOk); }
+            else {
+                var ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+                document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); showOk(); } finally { document.body.removeChild(ta); }
+            }
+        });
+    })();
+    </script>
 {% endblock %}
