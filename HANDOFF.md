@@ -57,3 +57,8 @@ Exécuter et documenter la reprise réelle avec workers actifs pour les 4 types 
 - **Eligibilite & Assistant direct :** passage a une liste blanche stricte (ailed, error, borted, stalled), validation de la matrice (source, kind) et prise en charge explicite de source=assistant + profile.direct_research.
 - **Autorisation RBAC /jobs :** activation de SecurityBundle dans pps/orchestrator, protection ccess_control sur ^/jobs et attribut #[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')] sur JobsPageController::retry() et delete().
 - **Isolation des tests & recette E2E :** redirection de when@test vers ar/orchestrator_test.sqlite (0 residu sur data/orchestrator.sqlite), 7/7 tests PHPUnit (70 assertions) et preuve horodatee dans docs/RECETTE_ISSUE_2_E2E.md.
+
+## Cloture definitive Issue #2 — v5.1.0.O0a5 (2026-11-15)
+- Alignement complet de JobRetryCoordinator sur QueueConsumeCommand (source=lab pour profile/stems/chords, source=assistant pour profile.review et fichiers hex32 profile.direct_research).
+- Validation stricte de concordance kind, scientific_run_id et song_id, schema reel scientific_runs (inished_at = NULL), reconciliation idempotente au demarrage de QueueConsumeCommand et bypass IP local (127.0.0.1/::1) sans popup.
+- PHPUnit 7/7 tests, 57 assertions (OK), linters YAML/Container [OK], 0 residu en base prod.

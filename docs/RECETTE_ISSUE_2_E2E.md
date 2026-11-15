@@ -1,25 +1,22 @@
-# Preuve de Recette Bout en Bout - Issue #2
+# Recette & Validation Technique — Issue #2 (v5.1.0.O0a5)
 
-- **Date :** 2026-11-15 09:29:04 UTC
-- **Isolation :** `var/orchestrator_test.sqlite` (0 residu en base prod)
+- **Date :** 2026-11-15
+- **Branche :** master (jalon 5.1.0.O0a5 / pps/orchestrator 4.3a33)
+- **Isolation :** ar/orchestrator_test.sqlite et ar/benchmark_test.sqlite (0 residu sur data/orchestrator.sqlite et pps/ezs_lab/data/benchmark.sqlite).
 
-## Journal brut
+## 1. Tests unitaires & d'integration automatises (php bin/phpunit --testdox)
+- **Resultat :** OK (7 tests, 57 assertions).
+- **Couverture :**
+  * JobRetrySecurityTest::testRemoteAccessControlAndLocalBypass : rejet HTTP 401/403 pour IP distante (10.99.0.5), acces local transparent sans popup (127.0.0.1 / ::1).
+  * JobRetrySecurityTest::testDirectResearchHexFileAndKindRunSongIntegrity : rejet des incoherences kind (incoherence_kind_metier), scientific_run_id (incoherence_scientific_run_id) et song_id (incoherence_song_id) ; rearmement atomique des fichiers hex32 untime/state/profile-direct/{job_id}.result.json.
+  * JobRetrySecurityTest::testSagaRollbackIdempotentReconciliationAndConsumeCommand : verrouillage exclusif LockFactory (errou_relance_actif), rollback compensatoire SQLite (echec_rearmement_central), reconciliation idempotente apres interruption inter-bases (elance_reconciliee_idempotente) et execution de orchestrator:queue:consume --drain.
 
-```text
-[2026-11-15T09:29:03(Z)] [1. PROFILE (LAB)] Crash worker simule sur central_job=#52
-[2026-11-15T09:29:03(Z)] [1. PROFILE (LAB)] Relance coordonnee OK -> status=waiting, analysis_jobs#911=queued
-[2026-11-15T09:29:03(Z)] [1. PROFILE (LAB)] Reprise worker terminee -> central_job=#52=ended (attempts=2), scientific_run#901 conserve.
-[2026-11-15T09:29:03(Z)] [2a. Assistant review] Crash worker simule sur central_job=#53
-[2026-11-15T09:29:03(Z)] [2a. Assistant review] Relance coordonnee OK -> status=waiting, analysis_jobs#912=queued
-[2026-11-15T09:29:03(Z)] [2a. Assistant review] Reprise worker terminee -> central_job=#53=ended (attempts=2), scientific_run#901 conserve.
-[2026-11-15T09:29:03(Z)] [2b. Assistant direct (profile.direct_research)] Crash worker simule sur central_job=#54
-[2026-11-15T09:29:03(Z)] [2b. Assistant direct (profile.direct_research)] Relance coordonnee OK -> status=waiting, analysis_jobs#913=queued
-[2026-11-15T09:29:03(Z)] [2b. Assistant direct (profile.direct_research)] Reprise worker terminee -> central_job=#54=ended (attempts=2), scientific_run#901 conserve.
-[2026-11-15T09:29:03(Z)] [3. STEMS] Crash worker simule sur central_job=#55
-[2026-11-15T09:29:03(Z)] [3. STEMS] Relance coordonnee OK -> status=waiting, analysis_jobs#914=queued
-[2026-11-15T09:29:03(Z)] [3. STEMS] Artefact partiel purge et remplace.
-[2026-11-15T09:29:04(Z)] [3. STEMS] Reprise worker terminee -> central_job=#55=ended (attempts=2), scientific_run#901 conserve.
-[2026-11-15T09:29:04(Z)] [4. CHORDS] Crash worker simule sur central_job=#56
-[2026-11-15T09:29:04(Z)] [4. CHORDS] Relance coordonnee OK -> status=waiting, analysis_jobs#915=queued
-[2026-11-15T09:29:04(Z)] [4. CHORDS] Reprise worker terminee -> central_job=#56=ended (attempts=2), scientific_run#901 conserve.
-```
+## 2. Recette operationnelle reelle sur Windows (orchestrator:queue:consume --drain --env=test -vv)
+- **Reconciliation au demarrage :** [Reconcile] 1 job(s) divergents reconcilies. -> execution reelle de profile_direct_job.py --run <hex32> jusqu'a [Job #88] ended (OK) (ttempt=2).
+- **Enveloppes validees :** alignement strict sur QueueConsumeCommand::dispatchToActor() (source='lab' pour profile, stems, chords ; source='assistant' pour profile.review, profile.direct_research).
+- **Schema reel scientific_runs :** mise a jour des colonnes reelles state = 'queued', finished_at = NULL (et autorisation d'un run frere deja queued).
+
+## 3. Verification d'integrite production
+- php bin/console lint:yaml config/ apps/orchestrator/config/ apps/ezs_lab/config/ : [OK].
+- php bin/console lint:container --env=dev et --env=test : [OK].
+- Bases de production data/orchestrator.sqlite et pps/ezs_lab/data/benchmark.sqlite : intactes.

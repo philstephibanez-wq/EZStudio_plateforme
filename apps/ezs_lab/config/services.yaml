@@ -27,3 +27,7 @@ services:
             $pythonExecutable: 'H:\Python\pythoncore-3.14-64\python.exe'
             $dependencyRoot: '%kernel.project_dir%/var/runtime/deps'
             $keepUploads: true
+
+when@test:
+    parameters:
+        app.database_path: '%kernel.project_dir%/var/benchmark_test.sqlite'

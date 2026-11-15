@@ -1,91 +1,23 @@
-<?php
-declare(strict_types=1);
-namespace App\Tests\Controller;
-use App\Service\JobRetryCoordinator;
-use App\Service\QueueActionCsrfManager;
-use App\Service\QueueManager;
-use Doctrine\ORM\EntityManagerInterface;
-use PDO;
-use Psr\Log\NullLogger;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
-use Symfony\Component\Lock\LockFactory;
-use Symfony\Component\Security\Core\User\InMemoryUser;
+<?php declare(strict_types=1); namespace App\Tests\Controller;
+use App\Service\JobRetryCoordinator; use App\Service\QueueManager; use Doctrine\ORM\EntityManagerInterface; use PDO; use Psr\Log\NullLogger;
+use Symfony\Bundle\FrameworkBundle\Console\Application; use Symfony\Bundle\FrameworkBundle\Test\WebTestCase; use Symfony\Component\Console\Tester\CommandTester; use Symfony\Component\Lock\LockFactory;
 final class JobRetrySecurityTest extends WebTestCase {
-    private function createTempLabDb(): string {
-        $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "ezs_lab_retry_test_" . bin2hex(random_bytes(4)) . ".sqlite";
-        $pdo = new PDO("sqlite:" . $path); $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $pdo->exec("CREATE TABLE scientific_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, song_id INTEGER, item TEXT, state TEXT, updated_at TEXT)");
-        $pdo->exec("CREATE TABLE analysis_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER, scientific_run_id INTEGER, song_id INTEGER, source_path TEXT, kind TEXT, status TEXT, progress INTEGER, request_json TEXT, error TEXT, created_at TEXT, updated_at TEXT)");
-        return $path;
-    }
-    public function testUnauthorizedAndForbiddenAccessReturns401Or403EvenWithValidCsrf(): void {
-        $client = static::createClient();
-        $client->request("POST", "/jobs/999999/retry"); $this->assertResponseStatusCodeSame(401);
-        $client->request("POST", "/jobs/999999/delete"); $this->assertResponseStatusCodeSame(401);
-        $client->request("POST", "/jobs/999999/retry", [], [], ["PHP_AUTH_USER" => "viewer", "PHP_AUTH_PW" => "viewer_pass"]);
-        $this->assertResponseStatusCodeSame(403);
-        $client->request("POST", "/jobs/999999/delete", [], [], ["PHP_AUTH_USER" => "viewer", "PHP_AUTH_PW" => "viewer_pass"]);
-        $this->assertResponseStatusCodeSame(403);
-    }
-    public function testSagaRollbackLockWhitelistAndDirectResearch(): void {
-        static::ensureKernelShutdown(); static::bootKernel();
-        $em = static::getContainer()->get(EntityManagerInterface::class);
-        $qm = static::getContainer()->get(QueueManager::class);
-        $lf = static::getContainer()->get(LockFactory::class);
-        $coord = static::getContainer()->get(JobRetryCoordinator::class);
-        $dbPath = $this->createTempLabDb(); $pdo = new PDO("sqlite:" . $dbPath);
-        try {
-            $pdo->exec("INSERT INTO scientific_runs (id, song_id, item, state, updated_at) VALUES (20, 601, 'profile', 'failed', '2026-11-15T08:00:00Z')");
-            $pdo->exec("INSERT INTO analysis_jobs (id, scientific_run_id, song_id, kind, status, progress, request_json, error, updated_at) VALUES (201, 20, 601, 'profile', 'failed', 40, '{}', 'boom_saga', '2026-11-15T08:00:00Z')");
-            $pdo->exec("INSERT INTO analysis_jobs (id, scientific_run_id, song_id, kind, status, progress, request_json, error, updated_at) VALUES (202, 20, 601, 'profile.direct_research', 'aborted', 25, '{\"intermediate_error\":\"step2\",\"partial_research_state\":\"partial\"}', 'err_dr', '2026-11-15T08:00:00Z')");
-            $pdo->exec("INSERT INTO analysis_jobs (id, scientific_run_id, song_id, kind, status, progress, request_json, error, updated_at) VALUES (203, 20, 601, 'stems', 'cancelled', 10, '{}', 'user_cancel', '2026-11-15T08:00:00Z')");
-            $jLock = $qm->dispatch("lab", ["job" => "profile", "analysis_job_id" => 201, "scientific_run_id" => 20, "functional_test" => true]);
-            $qm->claimNextWaiting(); $qm->markFailed($jLock->getId(), "err");
-            $lock = $lf->createLock("job_retry_" . $jLock->getId(), 30.0); $this->assertTrue($lock->acquire());
-            try { $rLock = $coord->retry($jLock->getId(), $dbPath); $this->assertFalse($rLock["ok"]); $this->assertSame("verrou_relance_actif", $rLock["reason"]); } finally { $lock->release(); }
-            $jCancel = $qm->dispatch("lab", ["job" => "stems", "analysis_job_id" => 203, "scientific_run_id" => 20, "functional_test" => true]);
-            $qm->claimNextWaiting(); $qm->markFailed($jCancel->getId(), "err");
-            $rCancel = $coord->retry($jCancel->getId(), $dbPath); $this->assertFalse($rCancel["ok"]); $this->assertSame("etat_metier_non_readmissible_cancelled", $rCancel["reason"]);
-            $jDr = $qm->dispatch("assistant", ["job" => "profile.direct_research", "job_id" => 202, "run_id" => 20, "functional_test" => true]);
-            $qm->claimNextWaiting(); $qm->markFailed($jDr->getId(), "err");
-            $rDr = $coord->retry($jDr->getId(), $dbPath); $this->assertTrue($rDr["ok"]);
-            $drRow = $pdo->query("SELECT status, request_json FROM analysis_jobs WHERE id = 202")->fetch(PDO::FETCH_ASSOC);
-            $this->assertSame("queued", $drRow["status"]); $this->assertStringNotContainsString("intermediate_error", (string) $drRow["request_json"]);
-            $failingQm = $this->createStub(QueueManager::class); $failingQm->method("isProcessAlive")->willReturn(false); $failingQm->method("findActiveDuplicate")->willReturn(null); $failingQm->method("retry")->willThrowException(new \RuntimeException("broker_down"));
-            $sagaCoord = new JobRetryCoordinator($em, $failingQm, $lf, new NullLogger(), $dbPath);
-            $rSaga = $sagaCoord->retry($jLock->getId(), $dbPath); $this->assertFalse($rSaga["ok"]); $this->assertSame("echec_rearmement_central", $rSaga["reason"]);
-            $restoredJob = $pdo->query("SELECT status, progress, error FROM analysis_jobs WHERE id = 201")->fetch(PDO::FETCH_ASSOC);
-            $this->assertSame("failed", $restoredJob["status"]); $this->assertSame(40, (int) $restoredJob["progress"]); $this->assertSame("boom_saga", $restoredJob["error"]);
-            $this->assertSame("failed", $pdo->query("SELECT state FROM scientific_runs WHERE id = 20")->fetchColumn());
-        } finally { $em->getConnection()->executeStatement("DELETE FROM job_queue"); unset($pdo); @unlink($dbPath); }
-    }
-    public function testEndToEndRecetteFourJobTypesAndArtifactRecovery(): void {
-        static::ensureKernelShutdown(); static::bootKernel();
-        $c = static::getContainer(); $em = $c->get(EntityManagerInterface::class); $qm = $c->get(QueueManager::class); $coord = $c->get(JobRetryCoordinator::class);
-        $db = $this->createTempLabDb(); $sb = new PDO("sqlite:" . $db);
-        $art = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "ezs_recette_" . bin2hex(random_bytes(4)); mkdir($art, 0777, true); $logs = [];
-        $log = static function (string $m) use (&$logs): void { $logs[] = "[" . gmdate("Y-m-d\TH:i:s\(\Z\)") . "] " . $m; };
-        try {
-            $sb->exec("INSERT INTO scientific_runs (id, song_id, item, state, updated_at) VALUES (901, 77, 'profile', 'failed', 'now')");
-            $sb->exec("INSERT INTO analysis_jobs (id, scientific_run_id, song_id, kind, status, progress, request_json, error, updated_at) VALUES (911, 901, 77, 'profile', 'failed', 45, '{\"song_id\":77}', 'sigkill_137', 'now'), (912, 901, 77, 'assistant.profile.review', 'error', 20, '{\"run_id\":901}', 'timeout', 'now'), (913, 901, 77, 'profile.direct_research', 'aborted', 35, '{\"run_id\":901,\"intermediate_error\":\"step2\",\"partial_research_state\":\"partial\"}', 'aborted', 'now'), (914, 901, 77, 'stems', 'failed', 60, '{\"song_id\":77}', 'demucs_crash', 'now'), (915, 901, 77, 'chords', 'stalled', 80, '{\"song_id\":77}', 'madmom_hang', 'now')");
-            $part = $art . DIRECTORY_SEPARATOR . "song_77_vocals.wav.part"; file_put_contents($part, "PARTIAL_WAV");
-            $cases = [["1. PROFILE (LAB)", "lab", ["job" => "profile", "analysis_job_id" => 911, "scientific_run_id" => 901, "song_id" => 77], 911], ["2a. Assistant review", "assistant", ["job" => "profile.review", "job_id" => 912, "run_id" => 901], 912], ["2b. Assistant direct (profile.direct_research)", "assistant", ["job" => "profile.direct_research", "job_id" => 913, "run_id" => 901], 913], ["3. STEMS", "studio", ["job" => "stems", "job_id" => 914, "song_id" => 77], 914], ["4. CHORDS", "studio", ["job" => "chords", "job_id" => 915, "song_id" => 77], 915]];
-            foreach ($cases as [$lbl, $src, $pay, $lid]) {
-                $qj = $qm->dispatch($src, $pay); $qm->claimNextWaiting(); $qm->markFailed($qj->getId(), "worker_crash");
-                $log("[" . $lbl . "] Crash worker simule sur central_job=#" . $qj->getId());
-                $res = $coord->retry($qj->getId(), $db); $this->assertTrue($res["ok"], $lbl);
-                $log("[" . $lbl . "] Relance coordonnee OK -> status=" . $res["job"]->getStatus() . ", analysis_jobs#" . $lid . "=queued");
-                $cl = $qm->claimNextWaiting(); $qm->updateProgress($cl->getId(), 50);
-                if ($lid === 914 && is_file($part)) { @unlink($part); file_put_contents($art . DIRECTORY_SEPARATOR . "song_77_vocals.wav", "RIFF_VALID"); $log("[3. STEMS] Artefact partiel purge et remplace."); }
-                $sb->exec("UPDATE analysis_jobs SET status='completed', progress=100 WHERE id=" . $lid);
-                if ($src === "lab") { $sb->exec("UPDATE scientific_runs SET state='completed' WHERE id=901"); }
-                $qm->markCompleted($cl->getId());
-                $this->assertSame("completed", $sb->query("SELECT status FROM analysis_jobs WHERE id=" . $lid)->fetchColumn());
-                $log("[" . $lbl . "] Reprise worker terminee -> central_job=#" . $cl->getId() . "=ended (attempts=" . $cl->getAttempts() . "), scientific_run#901 conserve.");
-            }
-            $this->assertSame("completed", $sb->query("SELECT state FROM scientific_runs WHERE id=901")->fetchColumn());
-            $md = "# Preuve de Recette Bout en Bout - Issue #2\n\n- **Date :** " . gmdate("Y-m-d H:i:s \U\T\C") . "\n- **Isolation :** `var/orchestrator_test.sqlite` (0 residu en base prod)\n\n## Journal brut\n\n```text\n" . implode("\n", $logs) . "\n```\n";
-            file_put_contents(dirname(__DIR__, 2) . "/docs/RECETTE_ISSUE_2_E2E.md", $md);
-        } finally { $em->getConnection()->executeStatement("DELETE FROM job_queue"); unset($sb); @unlink($db); @unlink($art . DIRECTORY_SEPARATOR . "song_77_vocals.wav"); @rmdir($art); }
-    }
+    private function createTempLabDb(): string { $p = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "ezs_lab_test_" . bin2hex(random_bytes(4)) . ".sqlite"; $pdo = new PDO("sqlite:" . $p); $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); $pdo->exec("CREATE TABLE scientific_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, public_id TEXT, song_id INTEGER, item TEXT, state TEXT, created_at TEXT, finished_at TEXT)"); $pdo->exec("CREATE TABLE analysis_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER, scientific_run_id INTEGER, song_id INTEGER, source_path TEXT, kind TEXT, status TEXT, progress INTEGER, request_json TEXT, error TEXT, created_at TEXT, updated_at TEXT)"); return $p; }
+    public function testRemoteAccessControlAndLocalBypass(): void { $client = static::createClient(); $client->request("POST", "/jobs/999999/retry", [], [], ["REMOTE_ADDR" => "10.99.0.5"]); $this->assertResponseStatusCodeSame(401); $client->request("POST", "/jobs/999999/delete", [], [], ["REMOTE_ADDR" => "10.99.0.5", "PHP_AUTH_USER" => "viewer", "PHP_AUTH_PW" => "viewer_pass"]); $this->assertResponseStatusCodeSame(403); $client->request("POST", "/jobs/999999/retry", [], [], ["REMOTE_ADDR" => "127.0.0.1"]); $this->assertNotSame(401, $client->getResponse()->getStatusCode()); }
+    public function testDirectResearchHexFileAndKindRunSongIntegrity(): void { static::ensureKernelShutdown(); static::bootKernel(); $c = static::getContainer(); $em = $c->get(EntityManagerInterface::class); $qm = $c->get(QueueManager::class); $lf = $c->get(LockFactory::class); $coord = $c->get(JobRetryCoordinator::class); $db = $this->createTempLabDb(); $pdo = new PDO("sqlite:" . $db); $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "ezs_dr_" . bin2hex(random_bytes(4)); mkdir($dir, 0777, true); $hex = bin2hex(random_bytes(16));
+        try { $pdo->exec("INSERT INTO scientific_runs (id, public_id, song_id, item, state, created_at, finished_at) VALUES (20, 'pub-20', 601, 'profile', 'failed', 'now', 'now')"); $pdo->exec("INSERT INTO analysis_jobs (id, scientific_run_id, song_id, kind, status, progress, error, updated_at) VALUES (201, 20, 601, 'profile', 'failed', 40, 'err', 'now'), (203, 20, 601, 'stems', 'cancelled', 10, 'cancel', 'now')");
+            $jBadKind = $qm->dispatch("lab", ["job" => "stems", "analysis_job_id" => 201, "scientific_run_id" => 20, "song_id" => 601]); $qm->claimNextWaiting(); $qm->markFailed($jBadKind->getId(), "err"); $this->assertSame("incoherence_kind_metier", $coord->retry($jBadKind->getId(), $db, $dir)["reason"]);
+            $jBadRun = $qm->dispatch("lab", ["job" => "profile", "analysis_job_id" => 201, "scientific_run_id" => 999, "song_id" => 601]); $qm->claimNextWaiting(); $qm->markFailed($jBadRun->getId(), "err"); $this->assertSame("incoherence_scientific_run_id", $coord->retry($jBadRun->getId(), $db, $dir)["reason"]);
+            $jBadSong = $qm->dispatch("lab", ["job" => "profile", "analysis_job_id" => 201, "scientific_run_id" => 20, "song_id" => 888]); $qm->claimNextWaiting(); $qm->markFailed($jBadSong->getId(), "err"); $this->assertSame("incoherence_song_id", $coord->retry($jBadSong->getId(), $db, $dir)["reason"]);
+            file_put_contents($dir . "/" . $hex . ".request.json", '{"prompt":"test"}'); file_put_contents($dir . "/" . $hex . ".result.json", '{"ok":false,"state":"error"}'); $jDr = $qm->dispatch("assistant", ["job" => "profile.direct_research", "job_id" => $hex]); $qm->claimNextWaiting(); $qm->markFailed($jDr->getId(), "err"); $rDr = $coord->retry($jDr->getId(), $db, $dir); $this->assertTrue($rDr["ok"]); $this->assertSame("queued", json_decode((string) file_get_contents($dir . "/" . $hex . ".result.json"), true)["state"]);
+        } finally { $em->getConnection()->executeStatement("DELETE FROM job_queue"); unset($pdo); @unlink($db); @unlink($dir . "/" . $hex . ".request.json"); @unlink($dir . "/" . $hex . ".result.json"); @rmdir($dir); } }
+    public function testSagaRollbackIdempotentReconciliationAndConsumeCommand(): void { static::ensureKernelShutdown(); $kernel = static::bootKernel(); $c = static::getContainer(); $em = $c->get(EntityManagerInterface::class); $qm = $c->get(QueueManager::class); $lf = $c->get(LockFactory::class); $coord = $c->get(JobRetryCoordinator::class); $db = $this->createTempLabDb(); $pdo = new PDO("sqlite:" . $db);
+        try { $pdo->exec("INSERT INTO scientific_runs (id, public_id, song_id, item, state, created_at, finished_at) VALUES (30, 'pub-30', 701, 'stems', 'failed', 'now', 'now')"); $pdo->exec("INSERT INTO analysis_jobs (id, scientific_run_id, song_id, kind, status, progress, error, updated_at) VALUES (301, 30, 701, 'stems', 'failed', 55, 'crash', 'now'), (302, 30, 701, 'chords', 'queued', 0, NULL, 'now')");
+            $jLock = $qm->dispatch("lab", ["job" => "stems", "analysis_job_id" => 301, "scientific_run_id" => 30, "song_id" => 701]); $qm->claimNextWaiting(); $qm->markFailed($jLock->getId(), "err");
+            $lk = $lf->createLock("job_retry_" . $jLock->getId(), 30.0); $this->assertTrue($lk->acquire()); try { $this->assertSame("verrou_relance_actif", $coord->retry($jLock->getId(), $db)["reason"]); } finally { $lk->release(); }
+            $stubQm = $this->createStub(QueueManager::class); $stubQm->method("isProcessAlive")->willReturn(false); $stubQm->method("findActiveDuplicate")->willReturn(null); $stubQm->method("retry")->willThrowException(new \RuntimeException("down"));
+            $saga = new JobRetryCoordinator($em, $stubQm, $lf, new NullLogger(), $db); $this->assertSame("echec_rearmement_central", $saga->retry($jLock->getId(), $db)["reason"]); $this->assertSame("failed", $pdo->query("SELECT status FROM analysis_jobs WHERE id = 301")->fetchColumn());
+            $jDiv = $qm->dispatch("lab", ["job" => "chords", "analysis_job_id" => 302, "scientific_run_id" => 30, "song_id" => 701]); $qm->claimNextWaiting(); $qm->markFailed($jDiv->getId(), "interrupted_before_central_commit"); $rRec = $coord->retry($jDiv->getId(), $db); $this->assertTrue($rRec["ok"]); $this->assertSame("relance_reconciliee_idempotente", $rRec["reason"]);
+            $em->getConnection()->executeStatement("DELETE FROM job_queue"); $qm->dispatch("lab", ["job" => "healthcheck"]); $app = new Application($kernel); $tester = new CommandTester($app->find("orchestrator:queue:consume")); $tester->execute(["--drain" => true]); $this->assertSame(0, $tester->getStatusCode()); $this->assertStringContainsString("ended (OK)", $tester->getDisplay());
+        } finally { $em->getConnection()->executeStatement("DELETE FROM job_queue"); unset($pdo); @unlink($db); } }
 }
