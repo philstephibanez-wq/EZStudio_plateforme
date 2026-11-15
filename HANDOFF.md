@@ -1,76 +1,86 @@
-# HANDOFF TECHNIQUE — Clôture Issue #2 (`EZStudio_plateforme`)
+# HANDOFF — Généralisation de l'Expertise Multi-Items (`PROFILE`, `STEMS`, `CHORDS`, `LYRICS`)
 
-**Contexte :** Suite de l'audit du 15/11/2026 sur le commit `2ca3cdb28ed0` (`[P1][Queue] Relance coordonnée et CSRF implémentés — sécurisation et recette de bout en bout à terminer`).  
-**Objectif :** Lever les 5 points bloquants restants pour valider les critères de clôture et fermer l'issue #2.
-
----
-
-## 1. Chantiers d'implémentation attendus
-
-### A. Cohérence inter-bases & Concurrence (`src/Service/JobRetryCoordinator.php`)
-* **Verrou applicatif :** Injecter `LockFactory` et poser un verrou exclusif `job_retry_{id}` dès l'entrée dans la méthode de relance pour bloquer les requêtes concurrentes (double-clic simultané).
-* **Rollback compensatoire (Pattern Saga) :**
-  1. Capturer un snapshot complet des lignes locales avant mutation (`analysis_jobs` et `scientific_runs` si applicable : statut, timestamps, erreurs).
-  2. Commiter le passage à `queued` dans SQLite (pour libérer le verrou fichier).
-  3. Exécuter `QueueManager::retry()` dans un bloc `try/catch`.
-  4. En cas d'exception ou de retour `false`, restaurer l'état exact du snapshot SQLite via une transaction compensatoire et journaliser l'incident.
-
-### B. Granularité des états & Cas `profile.direct_research` (`src/Service/JobRetryCoordinator.php`)
-* **Liste blanche stricte :** Remplacer l'exclusion (`completed/cancelled/running/cancelling`) dans `rearmLocalActorState()` par une liste positive explicite d'états relançables (ex. `['failed', 'error', 'aborted', 'stalled']`). Rejeter tout autre état.
-* **Validation `(source, kind)` :** Vérifier systématiquement la cohérence entre le `kind` du job central, le type d'acteur et la présence d'un `scientific_run_id` valide pour LAB.
-* **Support `source=assistant` + `profile.direct_research` :** Implémenter la logique de réarmement métier dédiée à ce couple (nettoyage/réinitialisation des étapes intermédiaires avant repassage en `queued`).
-
-### C. Autorisation métier & Sécurité d'accès (`security.yaml` & `JobsPageController.php`)
-* **Configuration Symfony :** Activer des règles `access_control` dans `config/packages/security.yaml` protégeant les routes `/jobs` (exiger `IS_AUTHENTICATED_FULLY` ou un rôle dédié `ROLE_ORCHESTRATOR_OPERATOR`). Si l'authentification est déléguée à un reverse proxy, implémenter l'Authenticator correspondant et documenter l'architecture réseau/proxy.
-* **Contrôleur :** Ajouter `#[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')]` sur `JobsPageController::retry()` et `delete()` (en complément du jeton CSRF existant).
+- **Date :** 2026-11-15
+- **Dépôt :** `EZStudio_plateforme` (`master`)
+- **Socle acquis :**
+  - Clôture des Issues #1 et #2 (unicité des dispatches REST `STEMS`/`CHORDS`, réconciliation idempotente, relance coordonnée avec contrôle d'intégrité `kind`/`scientific_run_id`/`song_id` et préservation des moteurs/presets déclaratifs).
+  - Mutualisation des design tokens CSS (`shared/assets/css/ezs-tokens.css`, `public/shared/css/ezs-tokens.css`) et macros Twig (`shared/templates/macros/ezs_ui.html.twig`) sur `shared`, `orchestrator`, `ezs_lab` et `ezs_assistant`.
+  - Colonne & filtre `Item` (`Profile`, `Stems`, `Chords`, `Lyrics`) actifs sur `/jobs`.
 
 ---
 
-## 2. Tests, Isolation & Preuves de recette attendues
+## 1. Principes directeurs & Gouvernance
 
-### A. Isolation des bases de test
-* Vérifier et garantir que la base `orchestrator` utilisée par PHPUnit est strictement isolée de l'environnement de production (variables d'environnement `.env.test`, chemins SQLite temporaires dédiés).
-
-### B. Enrichissement des tests d'intégration (`tests/Controller/JobRetrySecurityTest.php`)
-* Tester l'échec simulé de `QueueManager::retry()` et vérifier le rollback effectif de la base SQLite vers son état initial.
-* Tester le refus HTTP **401/403** sur `/retry` et `/delete` pour un utilisateur non authentifié ou sans rôle (même avec un jeton CSRF valide).
-* Tester la concurrence (verrou actif sur relance simultanée) et le rejet d'états hors liste blanche.
-* Couvrir le réarmement spécifique du couple `source=assistant` + `profile.direct_research`.
-
-### C. Recette de bout en bout (Conditions réelles)
-Exécuter et documenter la reprise réelle avec workers actifs pour les 4 types :
-1. `PROFILE` (LAB)
-2. `Assistant review` et `Assistant direct` (`profile.direct_research`)
-3. `STEMS`
-4. `CHORDS`
-* *Points à vérifier :* conservation de l'historique, gestion des artefacts scientifiques partiels, reprise après crash simulé d'un worker.
+1. **Séparation stricte Analyse vs Expertise :**
+   - **LAB (`source = 'lab'`) :** produit et persiste les faits scientifiques calculés (`profile`, `stems`, `chords`, `lyrics`). Autorité unique de vérité sur la donnée musicale et la base `benchmark.sqlite`.
+   - **Assistant (`source = 'assistant'`) :** exécute la contre-expertise externe (`profile.review`, `stems.review`, `chords.review`, `lyrics.review`) et publie des révisions et assertions proposées. Ne modifie jamais directement `benchmark.sqlite`.
+   - **Orchestrator :** pilote uniquement le cycle de vie (`waiting` -> `progressing` -> `ended`) via l'API REST `/api/queue/*` et le consommateur unique (`1 job actif maximum` pour protéger le GPU).
+2. **Moteurs déclaratifs & presets propres à chaque étape :**
+   - Chaque étape (`analyse` côté LAB et `expertise` côté Assistant) déclare explicitement son moteur (`engine` / `engine_profile`) et son `preset` dans `request_json` et dans l'enveloppe `job_queue.payload`.
+   - Aucune étape ne réutilise implicitement le moteur ou le preset d'une autre étape ; `JobRetryCoordinator` vérifie et préserve ces paramètres lors de toute relance.
+3. **Convention canonique des enveloppes Orchestrator :**
+   - **Analyse (`source = 'lab'`) :** `job` parmi `profile`, `stems`, `chords`, `lyrics`.
+   - **Expertise (`source = 'assistant'`) :** `job` parmi `profile.review`, `stems.review`, `chords.review`, `lyrics.review` (plus `profile.direct_research` pour la recherche directe).
+   - **Types SQLite LAB (`analysis_jobs.kind`) :** `profile`, `stems` / `stems_scientific`, `chords_scientific` / `chords`, `lyrics_scientific` / `lyrics`, et `assistant.<item>.review`.
 
 ---
 
-## 3. Livrables pour clôture de l'issue #2
-- [ ] Commit(s) contenant les correctifs de code, la configuration sécurité et la documentation proxy/accès.
-- [ ] Sortie brute complète des commandes `phpunit` et `lint` (sans manipulation résiduelle en base de prod).
-- [ ] Logs / preuves d'exécution de la recette bout en bout sur les 4 types de jobs.
+## 2. Contrat universel d'expertise (`ezstudio.item-review.v1`)
 
-## Cloture Issue #2 — v5.1.0.O0a4 (2026-11-15)
-- **Coherence inter-bases & concurrence :** ajout d'un verrou exclusif LockFactory (job_retry_{id}) et d'un pattern Saga avec snapshot et rollback compensatoire SQLite dans src/Service/JobRetryCoordinator.php.
-- **Eligibilite & Assistant direct :** passage a une liste blanche stricte (ailed, error, borted, stalled), validation de la matrice (source, kind) et prise en charge explicite de source=assistant + profile.direct_research.
-- **Autorisation RBAC /jobs :** activation de SecurityBundle dans pps/orchestrator, protection ccess_control sur ^/jobs et attribut #[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')] sur JobsPageController::retry() et delete().
-- **Isolation des tests & recette E2E :** redirection de when@test vers ar/orchestrator_test.sqlite (0 residu sur data/orchestrator.sqlite), 7/7 tests PHPUnit (70 assertions) et preuve horodatee dans docs/RECETTE_ISSUE_2_E2E.md.
+Chaque contre-expertise (`profile`, `stems`, `chords`, `lyrics`) repose sur un contrat JSON commun :
+- **En-tête :** `schema_version`, `item` (`profile|stems|chords|lyrics`), `song_id`, `scientific_run_id`, `review_job_id`, `engine`, `engine_profile`, `preset`.
+- **Entrées (LAB -> Assistant) :** `facts` (artefacts et métriques produits par l'analyse), `claims` (hypothèses/assertions à vérifier), `context` (métadonnées morceau & historique).
+- **Sorties (Assistant -> LAB) :** `proposed_verdict` (`accepted|adjusted|rejected|needs_human_review`), `final_assertions` (valeurs retenues + confiance + justification), `revision` (horodatage, modèle, durée, empreinte).
 
-## Cloture definitive Issue #2 — v5.1.0.O0a5 (2026-11-15)
-- Alignement complet de JobRetryCoordinator sur QueueConsumeCommand (source=lab pour profile/stems/chords, source=assistant pour profile.review et fichiers hex32 profile.direct_research).
-- Validation stricte de concordance kind, scientific_run_id et song_id, schema reel scientific_runs (inished_at = NULL), reconciliation idempotente au demarrage de QueueConsumeCommand et bypass IP local (127.0.0.1/::1) sans popup.
-- PHPUnit 7/7 tests, 57 assertions (OK), linters YAML/Container [OK], 0 residu en base prod.
+---
 
-## Correctif compatibilite CHORDS (chords_scientific) & workflow 4 items — v5.1.0.O0a6 (2026-11-15)
-- Alignement de JobRetryCoordinator::rearmLocalActorState() sur Database::queueScientificChordsJob() (nalysis_jobs.kind = 'chords_scientific') et couverture des 4 items analyse/expertise (profile, stems, chords, lyrics).
-- Validation PHPUnit (7/7 tests, 61 assertions) avec relance reelle de jobs chords_scientific et lyrics_scientific.
+## 3. Plan d'exécution complet — Étape par Étape
 
-## Mutualisation des design tokens (Items, Phases, Etats, Onglets) — v5.1.0.O0a8 (2026-11-15)
-- Creation de shared/assets/css/ezs-tokens.css (public/shared/css/ezs-tokens.css) et shared/templates/macros/ezs_ui.html.twig partages sur toute la plateforme (shared, orchestrator, ezs_lab, ezs_assistant).
-- Harmonisation du style des onglets d'Orchestrator sur celui d'EZS_Lab avec contraste doux ardoise/teinte sur theme sombre.
+### Étape 1 — Schéma SQLite générique & Migration rétrocompatible (`apps/ezs_lab`)
+- **Objectif :** Généraliser le stockage des expertises sans casser `PROFILE`.
+- **Actions :**
+  1. Créer les tables génériques dans `apps/ezs_lab/src/Service/Database.php` :
+     - `item_reviews` (`id`, `item`, `song_id`, `scientific_run_id`, `status`, `engine`, `engine_profile`, `preset`, `created_at`, `updated_at`)
+     - `item_review_revisions` (`id`, `review_id`, `revision_no`, `verdict`, `payload_json`, `created_at`)
+     - `item_final_assertions` (`id`, `review_id`, `item`, `scientific_run_id`, `assertions_json`, `updated_at`)
+     - `item_review_dispatches` (`id`, `review_id`, `analysis_job_id`, `orchestrator_queue_id`, `dispatched_at`)
+  2. Migrer les données existantes des tables historiques `profile_*` vers `item_*` avec `item = 'profile'` (migration idempotente au démarrage).
+  3. Ajouter la création des jobs d'expertise génériques dans `analysis_jobs` avec `kind = 'assistant.<item>.review'` et conservation des paramètres déclaratifs (`engine`, `engine_profile`, `preset`) dans `request_json`.
+- **Validation :** Tests PHPUnit d'intégrité SQLite sur base temporaire + vérification rétrocompatibilité `PROFILE`.
 
-## Cloture Issue #1 (Unicite queue_id & recette MockHttpClient STEMS/CHORDS) — v5.1.0.O0a9 (2026-11-15)
-- Suppression des cles queue_id en double dans StemsExecutionService::queue() et ChordsExecutionService::queue().
-- Ajout de 	ests/Service/LabSingleDispatchTest.php (MockHttpClient prouvant 1 seul POST /api/queue/dispatch par appel) et docs/RECETTE_ISSUE_1_DISPATCH.md. PHPUnit 8/8 tests, 69 assertions (OK).
+### Étape 2 — Service générique & API interne LAB (`apps/ezs_lab`)
+- **Objectif :** Exposer un contrat REST uniforme pour les 4 items.
+- **Actions :**
+  1. Créer `ItemExternalReviewService` et `ItemAiRequestService` paramétrés par `$item` (`profile`, `stems`, `chords`, `lyrics`), chaque item résolvant son moteur déclaratif et son preset configurés.
+  2. Exposer les routes internes sous `/api/internal/reviews/{item}/...` (`queue`, `latest`, `run/{id}`, `run/{id}/final-assertions`, `submit`) avec validation stricte `{item}` dans `<profile|stems|chords|lyrics>`.
+  3. Conserver les routes existantes `/api/internal/profile/reviews/...` comme délégation directe vers `item = 'profile'`.
+- **Validation :** `php bin/console debug:router` (`APP_ID=ezs_lab`), `lint:container` et tests fonctionnels des endpoints REST.
+
+### Étape 3 — Généralisation du Worker Assistant (`apps/ezs_assistant`)
+- **Objectif :** Permettre au worker Python d'exécuter les expertises des 4 items avec leurs moteurs/presets dédiés.
+- **Actions :**
+  1. Étendre `apps/ezs_assistant/runtime/profile_ai_requests_worker.py` (ou créer un point d'entrée unifié `item_reviews_worker.py` rétrocompatible) avec l'option `--item <profile|stems|chords|lyrics>` (défaut `profile`).
+  2. Charger la configuration déclarative du moteur et du preset correspondant au couple `(expertise, item)` avant d'interroger le backend IA/LLM.
+  3. Publier la révision et les `final_assertions` sur `/api/internal/reviews/{item}` et reporter la progression (`0..100 %`) et l'état final (`complete` / `fail`) auprès d'Orchestrator.
+- **Validation :** Exécution `--once --item <item>` en dry-run/test sur les 4 items.
+
+### Étape 4 — Routage dans le Consommateur Orchestrator (`apps/orchestrator`)
+- **Objectif :** Exécuter `stems.review`, `chords.review` et `lyrics.review` via `QueueConsumeCommand`.
+- **Actions :**
+  1. Mettre à jour `apps/orchestrator/src/Command/QueueConsumeCommand.php` (`dispatchToActor` pour `source === 'assistant'`) afin de router `profile.review`, `stems.review`, `chords.review` et `lyrics.review` vers le worker Assistant avec `--item=<item>`, `--job-id=<job_id>`, `--run-id=<run_id>`, ainsi que les variables déclaratives `EZS_ENGINE` / `EZS_PRESET` si fournies dans le payload.
+  2. Vérifier que `JobRetryCoordinator` accepte et réarme bien les 8 couples (`lab:<item>` et `assistant:<item>.review`) tout en préservant `engine`, `engine_profile` et `preset`.
+- **Validation :** `php bin/phpunit --testdox` (incluant un test de routage `QueueConsumeCommand` sur les 4 items d'expertise).
+
+### Étape 5 — Intégration UI dans `EZS_Lab`, `EZS_Assistant` et `Orchestrator`
+- **Objectif :** Offrir le déclenchement, le suivi et la lecture des contre-expertises sur les 4 onglets du Lab.
+- **Actions :**
+  1. **EZS_Lab :** Ajouter le composant d'expertise (`Demander une expertise` + consultation du verdict et des `final_assertions`) sur les vues `Stems`, `Chords` et `Lyrics` (sur le modèle de `workbench/profile_ai_button.html.twig`), en utilisant les design tokens `ezs-tokens.css` (`.ezs-badge--<item>`, `.ezs-badge--expertise`).
+  2. **EZS_Assistant :** Ajouter le filtre et les badges d'item (`Profile`, `Stems`, `Chords`, `Lyrics`) dans `apps/ezs_assistant/templates/dashboard/index.html.twig` et `backoffice/main.html.twig` en s'appuyant sur `@shared/macros/ezs_ui.html.twig`.
+  3. **Orchestrator :** Vérifier l'affichage temps réel sur `/jobs` (colonnes `Type = Expertise`, `Item = Profile|Stems|Chords|Lyrics`, `État`, `Progression`).
+- **Validation :** `lint:twig` sur `orchestrator`, `ezs_lab` et `ezs_assistant`, puis vérification visuelle navigateur (`Ctrl+F5`).
+
+### Étape 6 — Recette E2E & Clôture
+- **Actions :**
+  1. Exécuter `php bin/phpunit --testdox` complet sur bases isolées (`var/orchestrator_test.sqlite`, `var/benchmark_test.sqlite`) avec zéro résidu en production.
+  2. Vérifier `lint:yaml`, `lint:container`, `lint:twig` sur l'ensemble du monorepo.
+  3. Incrémenter les fichiers `VERSION` des noyaux impactés (`apps/ezs_lab/VERSION`, `apps/ezs_assistant/VERSION`, `apps/orchestrator/VERSION`), mettre à jour `HANDOFF.md` et commiter après validation utilisateur.
