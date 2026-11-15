@@ -62,3 +62,7 @@ Exécuter et documenter la reprise réelle avec workers actifs pour les 4 types 
 - Alignement complet de JobRetryCoordinator sur QueueConsumeCommand (source=lab pour profile/stems/chords, source=assistant pour profile.review et fichiers hex32 profile.direct_research).
 - Validation stricte de concordance kind, scientific_run_id et song_id, schema reel scientific_runs (inished_at = NULL), reconciliation idempotente au demarrage de QueueConsumeCommand et bypass IP local (127.0.0.1/::1) sans popup.
 - PHPUnit 7/7 tests, 57 assertions (OK), linters YAML/Container [OK], 0 residu en base prod.
+
+## Correctif compatibilite CHORDS (chords_scientific) & workflow 4 items — v5.1.0.O0a6 (2026-11-15)
+- Alignement de JobRetryCoordinator::rearmLocalActorState() sur Database::queueScientificChordsJob() (nalysis_jobs.kind = 'chords_scientific') et couverture des 4 items analyse/expertise (profile, stems, chords, lyrics).
+- Validation PHPUnit (7/7 tests, 61 assertions) avec relance reelle de jobs chords_scientific et lyrics_scientific.
