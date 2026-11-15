@@ -1,0 +1,37 @@
+{% macro item_badge(item) %}
+    {% set key = (item|default(''))|lower %}
+    {% if key in ['profile', 'stems', 'chords', 'lyrics'] %}
+        <span class="ezs-badge ezs-badge--{{ key }}">{{ item }}</span>
+    {% elseif item %}
+        <span class="ezs-badge ezs-badge--state-waiting">{{ item }}</span>
+    {% else %}
+        <span class="text-body-secondary">—</span>
+    {% endif %}
+{% endmacro %}
+{% macro phase_badge(category) %}
+    {% set key = (category|default(''))|lower %}
+    {% if key == 'analyse' %}
+        <span class="ezs-badge ezs-badge--analyse">Analyse</span>
+    {% elseif key == 'expertise' %}
+        <span class="ezs-badge ezs-badge--expertise">Expertise</span>
+    {% elseif category %}
+        <span class="ezs-badge ezs-badge--state-waiting">{{ category }}</span>
+    {% else %}
+        <span class="text-body-secondary">—</span>
+    {% endif %}
+{% endmacro %}
+{% macro state_badge(state, has_error) %}
+    {% if state == 'ended' and not has_error %}
+        <span class="ezs-badge ezs-badge--state-ok">Terminé (OK)</span>
+    {% elseif state == 'ended' and has_error %}
+        <span class="ezs-badge ezs-badge--state-ko">Terminé (KO)</span>
+    {% elseif state == 'progressing' %}
+        <span class="ezs-badge ezs-badge--state-progressing">En progression</span>
+    {% elseif state == 'cancelling' %}
+        <span class="ezs-badge ezs-badge--state-cancelling">Annulation en cours</span>
+    {% elseif state == 'cancelled' %}
+        <span class="ezs-badge ezs-badge--state-cancelled">Annulé</span>
+    {% else %}
+        <span class="ezs-badge ezs-badge--state-waiting">Enregistré (en attente)</span>
+    {% endif %}
+{% endmacro %}

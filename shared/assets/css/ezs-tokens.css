@@ -1,0 +1,60 @@
+/* EZStudio Plateforme — Design Tokens Mutualisés (Items, Phases, États, Onglets) */
+:root {
+    --ezs-item-profile: #0ea5e9;
+    --ezs-item-profile-bg: rgba(14, 165, 233, 0.16);
+    --ezs-item-profile-fg: #38bdf8;
+    --ezs-item-stems: #3b82f6;
+    --ezs-item-stems-bg: rgba(59, 130, 246, 0.18);
+    --ezs-item-stems-fg: #60a5fa;
+    --ezs-item-chords: #f59e0b;
+    --ezs-item-chords-bg: rgba(245, 158, 11, 0.18);
+    --ezs-item-chords-fg: #fbbf24;
+    --ezs-item-lyrics: #a855f7;
+    --ezs-item-lyrics-bg: rgba(168, 85, 247, 0.18);
+    --ezs-item-lyrics-fg: #c084fc;
+    --ezs-phase-analyse: #10b981;
+    --ezs-phase-analyse-bg: rgba(16, 185, 129, 0.16);
+    --ezs-phase-analyse-fg: #34d399;
+    --ezs-phase-expertise: #ec4899;
+    --ezs-phase-expertise-bg: rgba(236, 72, 153, 0.16);
+    --ezs-phase-expertise-fg: #f472b6;
+    --ezs-state-waiting: #64748b;
+    --ezs-state-progressing: #2563eb;
+    --ezs-state-cancelling: #d97706;
+    --ezs-state-cancelled: #475569;
+    --ezs-state-ok: #16a34a;
+    --ezs-state-ko: #dc2626;
+}
+.ezs-badge { display: inline-flex; align-items: center; gap: 0.35em; padding: 0.22em 0.62em; border-radius: 999px; font-size: 0.76rem; font-weight: 600; line-height: 1.2; border: 1px solid transparent; white-space: nowrap; }
+.ezs-badge--profile { background: var(--ezs-item-profile-bg); color: var(--ezs-item-profile-fg); border-color: rgba(14, 165, 233, 0.45); }
+.ezs-badge--stems { background: var(--ezs-item-stems-bg); color: var(--ezs-item-stems-fg); border-color: rgba(59, 130, 246, 0.45); }
+.ezs-badge--chords { background: var(--ezs-item-chords-bg); color: var(--ezs-item-chords-fg); border-color: rgba(245, 158, 11, 0.45); }
+.ezs-badge--lyrics { background: var(--ezs-item-lyrics-bg); color: var(--ezs-item-lyrics-fg); border-color: rgba(168, 85, 247, 0.45); }
+.ezs-badge--analyse { background: var(--ezs-phase-analyse-bg); color: var(--ezs-phase-analyse-fg); border-color: rgba(16, 185, 129, 0.4); }
+.ezs-badge--expertise { background: var(--ezs-phase-expertise-bg); color: var(--ezs-phase-expertise-fg); border-color: rgba(236, 72, 153, 0.4); }
+.ezs-badge--state-waiting { background: rgba(100, 116, 139, 0.22); color: #cbd5e1; border-color: rgba(100, 116, 139, 0.45); }
+.ezs-badge--state-progressing { background: rgba(37, 99, 235, 0.24); color: #93c5fd; border-color: rgba(37, 99, 235, 0.55); }
+.ezs-badge--state-cancelling { background: rgba(217, 119, 6, 0.24); color: #fcd34d; border-color: rgba(217, 119, 6, 0.55); }
+.ezs-badge--state-cancelled { background: rgba(71, 85, 105, 0.24); color: #94a3b8; border-color: rgba(71, 85, 105, 0.45); }
+.ezs-badge--state-ok { background: rgba(22, 163, 74, 0.22); color: #86efac; border-color: rgba(22, 163, 74, 0.5); }
+.ezs-badge--state-ko { background: rgba(220, 38, 38, 0.24); color: #fca5a5; border-color: rgba(220, 38, 38, 0.55); }
+.main-nav a.ezs-tab--profile, .item-tabs a.ezs-tab--profile, .nav-tabs .nav-link.ezs-tab--profile { border-bottom: 3px solid var(--ezs-item-profile); }
+.main-nav a.ezs-tab--stems, .item-tabs a.ezs-tab--stems, .nav-tabs .nav-link.ezs-tab--stems { border-bottom: 3px solid var(--ezs-item-stems); }
+.main-nav a.ezs-tab--chords, .item-tabs a.ezs-tab--chords, .nav-tabs .nav-link.ezs-tab--chords { border-bottom: 3px solid var(--ezs-item-chords); }
+.main-nav a.ezs-tab--lyrics, .item-tabs a.ezs-tab--lyrics, .nav-tabs .nav-link.ezs-tab--lyrics { border-bottom: 3px solid var(--ezs-item-lyrics); }
+.main-nav a.ezs-tab--profile.active, .item-tabs a.ezs-tab--profile.active, .nav-tabs .nav-link.ezs-tab--profile.active { background: rgba(14, 165, 233, 0.24) !important; color: var(--ezs-item-profile-fg) !important; border-color: var(--ezs-item-profile) !important; font-weight: 700; }
+.main-nav a.ezs-tab--stems.active, .item-tabs a.ezs-tab--stems.active, .nav-tabs .nav-link.ezs-tab--stems.active { background: rgba(59, 130, 246, 0.26) !important; color: var(--ezs-item-stems-fg) !important; border-color: var(--ezs-item-stems) !important; font-weight: 700; }
+.main-nav a.ezs-tab--chords.active, .item-tabs a.ezs-tab--chords.active, .nav-tabs .nav-link.ezs-tab--chords.active { background: rgba(245, 158, 11, 0.24) !important; color: var(--ezs-item-chords-fg) !important; border-color: var(--ezs-item-chords) !important; font-weight: 700; }
+.main-nav a.ezs-tab--lyrics.active, .item-tabs a.ezs-tab--lyrics.active, .nav-tabs .nav-link.ezs-tab--lyrics.active { background: rgba(168, 85, 247, 0.26) !important; color: var(--ezs-item-lyrics-fg) !important; border-color: var(--ezs-item-lyrics) !important; font-weight: 700; }
+.item-card--profile { border-top-color: var(--ezs-item-profile) !important; }
+.item-card--stems { border-top-color: var(--ezs-item-stems) !important; }
+.item-card--chords { border-top-color: var(--ezs-item-chords) !important; }
+.item-card--lyrics { border-top-color: var(--ezs-item-lyrics) !important; }
+
+/* Harmonisation barre onglets Orchestrator / Plateforme sur le style EZS_Lab */
+.ezs-nav { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: #161a1f; border-bottom: 1px solid #2b3138; }
+.ezs-nav a, .ezs-nav span { display: inline-flex; align-items: center; padding: 7px 11px; border-radius: 4px; border: 1px solid #464c54; font-size: 0.9rem; line-height: 1.2; text-decoration: none !important; transition: background-color 0.15s ease; }
+.ezs-nav a { color: #e8eaed !important; background: transparent; }
+.ezs-nav a:hover { background: #30363d; color: #ffffff !important; }
+.ezs-nav a[aria-current="page"], .ezs-nav a.active, .main-nav a.active { background: #313944 !important; color: #f1f5f9 !important; border-color: #64748b !important; font-weight: 700; }
+.ezs-nav span { color: #8b949e; border-color: #30363d; opacity: 0.7; cursor: default; }

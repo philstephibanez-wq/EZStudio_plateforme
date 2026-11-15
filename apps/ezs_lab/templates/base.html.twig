@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}EZStudio_lab{% endblock %}</title>
+<link rel="stylesheet" href="/shared/css/ezs-tokens.css">
 <style>
 :root{
   --bg:#f5f6f8;--panel:#fff;--ink:#17191d;--muted:#68707c;--line:#d9dde3;
@@ -116,16 +117,16 @@ pre.log{background:#111820;color:#d9e0e7;padding:12px;overflow:auto;max-height:4
      class="{{ route_name == 'workbench_home' ? 'active' : '' }}"
      {% if route_name == 'workbench_home' %}aria-current="page"{% endif %}>Catalogue</a>
   <a href="{{ path('workbench_profile', current_song_id ? {song:current_song_id} : {}) }}"
-     class="{{ route_name == 'workbench_profile' ? 'active' : '' }}"
+     class="ezs-tab--profile {{ route_name == 'workbench_profile' ? 'active' : '' }}"
      {% if route_name == 'workbench_profile' %}aria-current="page"{% endif %}>Profile</a>
   <a href="{{ path('workbench_stems', current_song_id ? {song:current_song_id} : {}) }}"
-     class="{{ route_name == 'workbench_stems' ? 'active' : '' }}"
+     class="ezs-tab--stems {{ route_name == 'workbench_stems' ? 'active' : '' }}"
      {% if route_name == 'workbench_stems' %}aria-current="page"{% endif %}>Stems</a>
   <a href="{{ path('lab_chords_experiment', current_song_id ? {song:current_song_id} : {}) }}"
-     class="{{ route_name in ['lab_chords_experiment','bench_view'] ? 'active' : '' }}"
+     class="ezs-tab--chords {{ route_name in ['lab_chords_experiment','bench_view'] ? 'active' : '' }}"
      {% if route_name in ['lab_chords_experiment','bench_view'] %}aria-current="page"{% endif %}>Chords</a>
   <a href="{{ path('workbench_lyrics', current_song_id ? {song:current_song_id} : {}) }}"
-     class="{{ route_name == 'workbench_lyrics' ? 'active' : '' }}"
+     class="ezs-tab--lyrics {{ route_name == 'workbench_lyrics' ? 'active' : '' }}"
      {% if route_name == 'workbench_lyrics' %}aria-current="page"{% endif %}>Lyrics</a>
   <a href="{{ path('workbench_runs', current_song_id ? {song:current_song_id} : {}) }}"
      class="{{ route_name in ['workbench_runs','lab_run'] ? 'active' : '' }}"

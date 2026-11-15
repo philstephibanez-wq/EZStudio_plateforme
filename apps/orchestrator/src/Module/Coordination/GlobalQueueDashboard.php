@@ -14,8 +14,9 @@ final class GlobalQueueDashboard
         $stateFilter = in_array((string) ($filters['state'] ?? 'all'), ['all', 'active', 'waiting', 'progressing', 'cancelling', 'cancelled', 'ended_ok', 'ended_ko'], true) ? (string) $filters['state'] : 'all';
         $actorFilter = in_array((string) ($filters['actor'] ?? 'all'), ['all', 'lab', 'assistant'], true) ? (string) $filters['actor'] : 'all';
         $categoryFilter = in_array((string) ($filters['category'] ?? 'all'), ['all', 'Analyse', 'Expertise'], true) ? (string) $filters['category'] : 'all';
+        $itemFilter = in_array((string) ($filters['item'] ?? 'all'), ['all', 'Profile', 'Stems', 'Chords', 'Lyrics'], true) ? (string) $filters['item'] : 'all';
         $limit = in_array((int) ($filters['limit'] ?? 30), [20, 30, 50, 100], true) ? (int) $filters['limit'] : 30;
-        $activeFilters = ['state' => $stateFilter, 'actor' => $actorFilter, 'category' => $categoryFilter, 'limit' => $limit];
+        $activeFilters = ['state' => $stateFilter, 'actor' => $actorFilter, 'category' => $categoryFilter, 'item' => $itemFilter, 'limit' => $limit];
 
         if (!is_file($path)) {
             return ['available' => false, 'reason' => 'queue_database_missing', 'jobs' => [], 'filters' => $activeFilters];
@@ -65,10 +66,14 @@ final class GlobalQueueDashboard
 
                 $payload = json_decode((string) ($r['payload'] ?? '{}'), true);
                 if (!is_array($payload)) { $payload = []; }
+                $rawJob = strtolower(trim((string) ($payload['item'] ?? $payload['job'] ?? $payload['phase'] ?? $payload['type'] ?? '')));
+                $item = match (true) { str_starts_with($rawJob, 'profile') => 'Profile', str_starts_with($rawJob, 'stems') => 'Stems', str_starts_with($rawJob, 'chords') => 'Chords', str_starts_with($rawJob, 'lyrics') => 'Lyrics', default => '' };
                 $category = trim((string) ($payload['category'] ?? ''));
+                if ($category === '' && $rawJob !== '') { $category = (str_contains($rawJob, 'review') || str_contains($rawJob, 'direct_research') || $actor === 'assistant') ? 'Expertise' : 'Analyse'; }
                 $label = trim((string) ($payload['label'] ?? ''));
 
                 if ($categoryFilter !== 'all' && $category !== $categoryFilter) { continue; }
+                if ($itemFilter !== 'all' && $item !== $itemFilter) { continue; }
 
                 $progress = (int) ($r['progress'] ?? 0);
                 if ($state === 'ended' && !$hasError) { $progress = 100; }
@@ -79,6 +84,7 @@ final class GlobalQueueDashboard
                     'id' => (int) $r['id'],
                     'actor' => $actor,
                     'category' => $category !== '' ? $category : null,
+                    'item' => $item !== '' ? $item : null,
                     'label' => $label !== '' ? $label : null,
                     'state' => $state,
                     'progress' => max(0, min(100, $progress)),

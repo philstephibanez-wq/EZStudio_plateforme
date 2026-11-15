@@ -1,4 +1,5 @@
 {% extends 'layout/base.html.twig' %}
+{% import '@shared/macros/ezs_ui.html.twig' as ezs %}
 {% block title %}EZS Orchestrator — Ordonnanceur{% endblock %}
 {% block content %}
 <main class="container-fluid py-4 ezs-main">
@@ -76,18 +77,10 @@
                             <tr>
                                 <td>#{{ job.id }}</td>
                                 <td><span class="badge text-bg-dark border">{{ job.actor }}</span></td>
-                                <td>{{ job.category ?: '—' }}</td>
-                                <td>{% if job.item %}<span class="badge text-bg-secondary">{{ job.item }}</span>{% else %}<span class="text-body-secondary">—</span>{% endif %}</td>
+                                <td>{{ ezs.phase_badge(job.category) }}</td>
+                                <td>{{ ezs.item_badge(job.item) }}</td>
                                 <td>{{ job.label ?: '—' }}</td>
-                                <td>
-                                    {% if job.state == 'ended' and not job.has_error %}<span class="badge text-bg-success">Terminé (OK)</span>
-                                    {% elseif job.state == 'ended' and job.has_error %}<span class="badge text-bg-danger">Terminé (KO)</span>
-                                    {% elseif job.state == 'progressing' %}<span class="badge text-bg-primary">En progression</span>
-                                    {% elseif job.state == 'cancelling' %}<span class="badge text-bg-warning">Annulation en cours</span>
-                                    {% elseif job.state == 'cancelled' %}<span class="badge text-bg-secondary">Annulé</span>
-                                    {% if job.subject is defined and (workflow_can(job.subject, 'cancel') or workflow_can(job.subject, 'request_cancel')) %}<span class="badge text-bg-dark border ms-1" title="Annulable via FSM">annulable</span>{% endif %}
-                                    {% else %}<span class="badge text-bg-secondary">Enregistré (en attente)</span>{% endif %}
-                                </td>
+                                <td>{{ ezs.state_badge(job.state, job.has_error) }}</td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="progress flex-grow-1" style="height: 8px;">

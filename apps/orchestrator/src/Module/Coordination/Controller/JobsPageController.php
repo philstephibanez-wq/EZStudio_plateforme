@@ -29,6 +29,7 @@ final class JobsPageController
             'state' => (string) $request->query->get('state', 'all'),
             'actor' => (string) $request->query->get('actor', 'all'),
             'category' => (string) $request->query->get('category', 'all'),
+            'item' => (string) $request->query->get('item', 'all'),
             'limit' => (int) $request->query->get('limit', 30),
         ];
         $globalQueue = GlobalQueueDashboard::read(null, $filters);
@@ -102,6 +103,7 @@ final class JobsPageController
             'state' => (string) $request->query->get('state', ''),
             'actor' => (string) $request->query->get('actor', ''),
             'category' => (string) $request->query->get('category', ''),
+            'item' => (string) $request->query->get('item', ''),
             'limit' => (string) $request->query->get('limit', ''),
         ], static fn(string $v): bool => $v !== '' && $v !== 'all' && $v !== '30');
         return new RedirectResponse('/jobs' . ($query !== [] ? '?' . http_build_query($query) : ''));

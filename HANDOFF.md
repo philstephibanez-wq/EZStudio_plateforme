@@ -66,3 +66,7 @@ Exécuter et documenter la reprise réelle avec workers actifs pour les 4 types 
 ## Correctif compatibilite CHORDS (chords_scientific) & workflow 4 items — v5.1.0.O0a6 (2026-11-15)
 - Alignement de JobRetryCoordinator::rearmLocalActorState() sur Database::queueScientificChordsJob() (nalysis_jobs.kind = 'chords_scientific') et couverture des 4 items analyse/expertise (profile, stems, chords, lyrics).
 - Validation PHPUnit (7/7 tests, 61 assertions) avec relance reelle de jobs chords_scientific et lyrics_scientific.
+
+## Mutualisation des design tokens (Items, Phases, Etats, Onglets) — v5.1.0.O0a8 (2026-11-15)
+- Creation de shared/assets/css/ezs-tokens.css (public/shared/css/ezs-tokens.css) et shared/templates/macros/ezs_ui.html.twig partages sur toute la plateforme (shared, orchestrator, ezs_lab, ezs_assistant).
+- Harmonisation du style des onglets d'Orchestrator sur celui d'EZS_Lab avec contraste doux ardoise/teinte sur theme sombre.
