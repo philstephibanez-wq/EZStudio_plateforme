@@ -48,7 +48,7 @@ final class OrchestratorQueueClient
                 'source' => $source,
                 'payload' => $payload,
             ],
-            'timeout' => 5.0,
+            'timeout' => 15.0,
         ]);
 
         $statusCode = $response->getStatusCode();
@@ -92,7 +92,7 @@ final class OrchestratorQueueClient
 
         $this->httpClient->request('POST', $url, [
             'headers' => $this->defaultHeaders(false),
-            'timeout' => 5.0,
+            'timeout' => 15.0,
         ])->getStatusCode();
     }
 
@@ -103,7 +103,7 @@ final class OrchestratorQueueClient
         $this->httpClient->request('POST', $url, [
             'headers' => $this->defaultHeaders(true),
             'json' => ['error' => $errorMessage],
-            'timeout' => 5.0,
+            'timeout' => 15.0,
         ])->getStatusCode();
     }
 
@@ -113,7 +113,7 @@ final class OrchestratorQueueClient
 
         $this->httpClient->request('POST', $url, [
             'headers' => $this->defaultHeaders(false),
-            'timeout' => 5.0,
+            'timeout' => 15.0,
         ])->getStatusCode();
     }
 }
