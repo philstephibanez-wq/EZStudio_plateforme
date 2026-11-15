@@ -77,7 +77,6 @@ final class ChordsExecutionService
             'benchmark_run_id' => $benchmarkRunId,
             'job_id' => $jobId,
             'queue_id' => (int) ($dispatched['queue_id'] ?? 0),
-            'queue_id' => (int) ($dispatched['queue_id'] ?? 0),
         ];
     }
 

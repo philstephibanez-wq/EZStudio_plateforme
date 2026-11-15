@@ -70,3 +70,7 @@ Exécuter et documenter la reprise réelle avec workers actifs pour les 4 types 
 ## Mutualisation des design tokens (Items, Phases, Etats, Onglets) — v5.1.0.O0a8 (2026-11-15)
 - Creation de shared/assets/css/ezs-tokens.css (public/shared/css/ezs-tokens.css) et shared/templates/macros/ezs_ui.html.twig partages sur toute la plateforme (shared, orchestrator, ezs_lab, ezs_assistant).
 - Harmonisation du style des onglets d'Orchestrator sur celui d'EZS_Lab avec contraste doux ardoise/teinte sur theme sombre.
+
+## Cloture Issue #1 (Unicite queue_id & recette MockHttpClient STEMS/CHORDS) — v5.1.0.O0a9 (2026-11-15)
+- Suppression des cles queue_id en double dans StemsExecutionService::queue() et ChordsExecutionService::queue().
+- Ajout de 	ests/Service/LabSingleDispatchTest.php (MockHttpClient prouvant 1 seul POST /api/queue/dispatch par appel) et docs/RECETTE_ISSUE_1_DISPATCH.md. PHPUnit 8/8 tests, 69 assertions (OK).
