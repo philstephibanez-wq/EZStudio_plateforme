@@ -1,0 +1,35 @@
+security:
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+    providers:
+        users_in_memory:
+            memory:
+                users:
+                    operator:
+                        password: '%env(default::ORCHESTRATOR_OPERATOR_PASSWORD_HASH)%'
+                        roles: ['ROLE_ORCHESTRATOR_OPERATOR']
+    firewalls:
+        dev:
+            pattern: ^/(_profiler(/|$)|(_wdt|assets|build)/)
+            security: false
+        main:
+            lazy: true
+            provider: users_in_memory
+            http_basic:
+                realm: 'EZStudio Orchestrator'
+    access_control:
+        - { path: ^/jobs, roles: [IS_AUTHENTICATED_FULLY, ROLE_ORCHESTRATOR_OPERATOR] }
+when@test:
+    security:
+        password_hashers:
+            Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'plaintext'
+        providers:
+            users_in_memory:
+                memory:
+                    users:
+                        operator:
+                            password: 'operator_pass'
+                            roles: ['ROLE_ORCHESTRATOR_OPERATOR']
+                        viewer:
+                            password: 'viewer_pass'
+                            roles: ['ROLE_USER']
