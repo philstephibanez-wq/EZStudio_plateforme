@@ -17,7 +17,7 @@ def report_orchestrator_progress(percent: int) -> None:
     base_url = os.environ.get("ORCHESTRATOR_BASE_URL", "http://ezstudio.local").rstrip("/")
     url = f"{base_url}/api/queue/{job_id}/progress"
     body = json.dumps({"progress": max(0, min(100, int(percent)))}).encode("utf-8")
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "Accept": "application/json", "X-EZS-Queue-Token": os.environ.get("EZS_QUEUE_INTERNAL_TOKEN", "")}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=2.0):
             pass
@@ -101,7 +101,7 @@ def main():
             (ENGINE_VERSION, a.run_id),
         )
         db.commit()
-        log("INFO", "worker démarré")
+        log("INFO", "worker dÃ©marrÃ©")
 
         result = analyze(
             audio,
@@ -157,12 +157,12 @@ def main():
         db.commit()
         progress(100)
         write_progress_file(100, "completed")
-        log("INFO", "analyse terminée")
+        log("INFO", "analyse terminÃ©e")
 
         if a.keep_upload == "0":
             try:
                 audio.unlink(missing_ok=True)
-                log("INFO", "upload source supprimé après analyse")
+                log("INFO", "upload source supprimÃ© aprÃ¨s analyse")
             except Exception as e:
                 log("WARN", f"impossible de supprimer upload: {e}")
 

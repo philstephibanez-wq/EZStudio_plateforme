@@ -124,7 +124,7 @@ final class QueueDispatchController extends AbstractController
 
     private function wakeConsumer(): void
     {
-        if (($_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? '') === 'test') { return; }
+        if ($this->getParameter('kernel.environment') === 'test' || ($_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? '') === 'test') { return; }
         $platformRoot = str_replace('/', '\\', dirname(__DIR__, 5));
         $php = is_file('H:\\PHP\\php-8.5-x64\\php.exe') ? 'H:\\PHP\\php-8.5-x64\\php.exe' : 'php';
         $cmd = sprintf('cmd /c "cd /d %s && set APP_ID=orchestrator && start "" /B "%s" bin\\console orchestrator:queue:consume --drain"', $platformRoot, $php);

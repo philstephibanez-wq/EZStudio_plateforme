@@ -106,13 +106,13 @@ class QueueManager
         if ($job->isTerminal() || $job->getStatus() === JobQueue::STATUS_CANCELLING) { return $job; }
         if ($this->jobLifecycleStateMachine->can($job, 'cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'cancel');
-            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('AnnulÃ©');
             $this->entityManager->flush();
             return $job;
         }
         if ($this->jobLifecycleStateMachine->can($job, 'request_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'request_cancel');
-            $job->setHasError(false)->setErrorMessage('Annulation demandée');
+            $job->setHasError(false)->setErrorMessage('Annulation demandÃ©e');
             $this->entityManager->flush();
             return $job;
         }
@@ -127,7 +127,7 @@ class QueueManager
         if ($pid !== null && $pid > 0 && $this->isProcessAlive($pid)) { return $job; }
         if ($this->jobLifecycleStateMachine->can($job, 'confirm_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'confirm_cancel');
-            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('AnnulÃ©');
             $this->entityManager->flush();
         }
         return $job;
@@ -140,7 +140,7 @@ class QueueManager
         if ($job->isTerminal()) { return $job; }
         if ($job->getStatus() === JobQueue::STATUS_CANCELLING && $this->jobLifecycleStateMachine->can($job, 'confirm_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'confirm_cancel');
-            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('AnnulÃ©');
             $this->entityManager->flush();
             return $job;
         }
@@ -156,6 +156,29 @@ class QueueManager
     public function markCompletedIfActive(int $id): ?JobQueue { $this->entityManager->clear(); $job = $this->entityManager->find(JobQueue::class, $id); if (!$job instanceof JobQueue) { return null; } return $job->isTerminal() ? $job : $this->markEnded($id, false, null); }
     public function markCompleted(int $id): ?JobQueue { return $this->markEnded($id, false, null); }
     public function markFailed(int $id, ?string $errorMessage = null): ?JobQueue { return $this->markEnded($id, true, $errorMessage); }
+    public function retry(int $id): ?JobQueue
+    {
+        $conn = $this->entityManager->getConnection();
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+        $updated = $conn->executeStatement(
+            "UPDATE job_queue SET status = 'waiting', progress = 0, has_error = 0, error_message = NULL, worker_pid = NULL, updated_at = :now WHERE id = :id AND status = 'ended' AND has_error = 1",
+            ['now' => $now, 'id' => $id]
+        );
+        $this->entityManager->clear();
+        return $updated === 1 ? $this->entityManager->find(JobQueue::class, $id) : null;
+    }
+
+    public function delete(int $id): bool
+    {
+        $conn = $this->entityManager->getConnection();
+        $deleted = $conn->executeStatement(
+            "DELETE FROM job_queue WHERE id = :id AND status IN ('waiting', 'cancelled', 'ended')",
+            ['id' => $id]
+        );
+        $this->entityManager->clear();
+        return $deleted === 1;
+    }
+
     public function recoverInterruptedJobs(int $staleTimeoutSeconds = 0): int
     {
         $conn = $this->entityManager->getConnection();
@@ -173,7 +196,7 @@ class QueueManager
             $pid = isset($row['worker_pid']) && $row['worker_pid'] !== null ? (int) $row['worker_pid'] : null;
             if ($pid !== null && $pid > 0 && $this->isProcessAlive($pid)) { continue; }
             if ($status === JobQueue::STATUS_CANCELLING) {
-                $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'cancelled', worker_pid = NULL, has_error = 0, error_message = 'Annulé', updated_at = :now WHERE id = :id AND status = 'cancelling'", ['now' => $now, 'id' => $id]);
+                $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'cancelled', worker_pid = NULL, has_error = 0, error_message = 'AnnulÃ©', updated_at = :now WHERE id = :id AND status = 'cancelling'", ['now' => $now, 'id' => $id]);
                 continue;
             }
             $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'waiting', progress = 0, worker_pid = NULL, updated_at = :now WHERE id = :id AND status = 'progressing'", ['now' => $now, 'id' => $id]);

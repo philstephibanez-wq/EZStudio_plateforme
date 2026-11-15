@@ -60,7 +60,7 @@
                 <div class="table-responsive">
                     <table class="table table-dark table-sm align-middle mb-0">
                         <thead><tr>
-                            <th>Job</th><th>Acteur</th><th>Type</th><th>Chanson</th><th>État</th><th style="min-width: 170px;">Progression</th><th>Tentatives</th>{% if has_any_error %}<th>Erreur</th>{% endif %}<th>Dernier événement</th>
+                            <th>Job</th><th>Acteur</th><th>Type</th><th>Chanson</th><th>État</th><th style="min-width: 170px;">Progression</th><th>Tentatives</th>{% if has_any_error %}<th>Erreur</th>{% endif %}<th>Dernier événement</th><th class="text-end">Actions</th>
                         </tr></thead>
                         <tbody>
                         {% for job in global_queue.jobs %}
@@ -87,8 +87,8 @@
                                     </div>
                                 </td>
                                 <td>{{ job.attempts }}</td>
-                                {% if has_any_error %}<td class="small text-danger">{{ job.error_message ?: '—' }}</td>{% endif %}
-                                <td>{% if job.updated_at is not empty %}{{ job.updated_at|date('d/m/Y H:i:s', 'Europe/Paris') }}{% else %}—{% endif %}</td>
+                                {% if has_any_error %}<td class="small">{% if job.error_message %}<span class="text-danger">{{ job.error_message }}</span>{% else %}<span class="text-body-secondary">—</span>{% endif %}</td>{% endif %}
+                                <td>{% if job.updated_at is not empty %}{{ job.updated_at|date('d/m/Y H:i:s', 'Europe/Paris') }}{% else %}—{% endif %}</td><td class="text-end text-nowrap">{% if job.state == 'ended' and job.has_error %}<form method="post" action="/jobs/{{ job.id }}/retry" class="d-inline me-1"><button type="submit" class="btn btn-outline-warning btn-sm py-0 px-2">Relancer</button></form>{% endif %}{% if job.state in ['waiting', 'cancelled', 'ended'] %}<button type="button" class="btn btn-link text-secondary link-light p-0 ms-1 align-middle" data-bs-toggle="modal" data-bs-target="#deleteJobModal" title="Supprimer ce job" aria-label="Supprimer" data-job-id="{{ job.id }}"><svg xmlns="http://w3.org" width="15" height="15" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5M8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5m3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0"/></svg></button>{% else %}—{% endif %}</td>
                             </tr>
                         {% else %}
                             <tr><td colspan="{{ has_any_error ? 9 : 8 }}">Aucun job correspondant aux filtres.</td></tr>
@@ -103,6 +103,28 @@
             <p class="text-body-secondary mt-2 mb-0">Lecture seule : seul l’Ordonnanceur et les acteurs via REST modifient les états.</p>
         </div>
     </section>
+<div class="modal fade" id="deleteJobModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header border-secondary py-2">
+        <h6 class="modal-title">Supprimer l'entrée</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body py-3">Supprimer définitivement le job <strong id="deleteJobLabel">#</strong> de la file ?</div>
+      <div class="modal-footer border-secondary py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Annuler</button>
+        <form method="post" id="deleteJobForm" action=""><button type="submit" class="btn btn-danger btn-sm">Supprimer</button></form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('deleteJobModal')?.addEventListener('show.bs.modal', function (e) {
+  const id = e.relatedTarget?.getAttribute('data-job-id') || '';
+  document.getElementById('deleteJobLabel').textContent = '#' + id;
+  document.getElementById('deleteJobForm').action = '/jobs/' + id + '/delete';
+});
+</script>
 </main>
 <script>
 (function () {

@@ -20,7 +20,7 @@ def report_orchestrator_progress(percent: int) -> None:
     base_url = os.environ.get("ORCHESTRATOR_BASE_URL", "http://ezstudio.local").rstrip("/")
     url = f"{base_url}/api/queue/{job_id}/progress"
     body = json.dumps({"progress": max(0, min(100, int(percent)))}).encode("utf-8")
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "Accept": "application/json", "X-EZS-Queue-Token": os.environ.get("EZS_QUEUE_INTERNAL_TOKEN", "")}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=2.0):
             pass

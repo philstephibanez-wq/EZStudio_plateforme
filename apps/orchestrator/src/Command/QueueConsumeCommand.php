@@ -121,6 +121,7 @@ error>[Job #%d] ended (KO): %s
 
         $php = is_file('H:/PHP/php-8.5-x64/php.exe') ? 'H:/PHP/php-8.5-x64/php.exe' : 'php';
         $python = is_file('H:/Python/pythoncore-3.14-64/python.exe') ? 'H:/Python/pythoncore-3.14-64/python.exe' : 'python';
+        $internalToken = (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '');
         $baseUrl = (string) ($_ENV['ORCHESTRATOR_BASE_URL'] ?? $_SERVER['ORCHESTRATOR_BASE_URL'] ?? 'http://orchestrator.ezstudio.local:8000');
 
         if ($source === 'assistant') {
@@ -131,7 +132,7 @@ error>[Job #%d] ended (KO): %s
                     throw new \RuntimeException('invalid_assistant_review_parameters');
                 }
                 $script = $platformRoot . '/apps/ezs_assistant/runtime/profile_ai_requests_worker.py';
-                $this->runSubprocess([$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken], 1800, $output);
+                $this->runSubprocess($id, [$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 1800, $output);
                 return;
             }
             if ($type === 'profile.direct_research') {
@@ -140,7 +141,7 @@ error>[Job #%d] ended (KO): %s
                     throw new \RuntimeException('invalid_assistant_job_id');
                 }
                 $script = $platformRoot . '/apps/ezs_assistant/runtime/profile_direct_job.py';
-                $this->runSubprocess([$python, $script, '--run', $jobId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken], 600, $output);
+                $this->runSubprocess($id, [$python, $script, '--run', $jobId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 600, $output);
                 return;
             }
         }
@@ -150,7 +151,7 @@ error>[Job #%d] ended (KO): %s
                 $analysisJobId = (int) ($payload['analysis_job_id'] ?? $payload['job_id'] ?? 0);
                 $cmd = [$php, $platformRoot . '/bin/console', 'lab:profile:once', '--apply', '--orchestrator-job-id=' . $id];
                 if ($analysisJobId > 0) { $cmd[] = '--job-id=' . $analysisJobId; }
-                $this->runSubprocess($cmd, $platformRoot, ['APP_ID' => 'ezs_lab', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken], 1800, $output);
+                $this->runSubprocess($id, $cmd, $platformRoot, ['APP_ID' => 'ezs_lab', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 1800, $output);
                 return;
             }
             if (in_array($type, ['stems', 'chords'], true)) {
@@ -164,7 +165,7 @@ error>[Job #%d] ended (KO): %s
                 $cmd = [$python, $labRoot . '/python/worker.py', '--db', $labRoot . '/data/benchmark.sqlite', '--run-id', (string) $runId, '--audio', $audio, '--signature', $signature, '--deps', $platformRoot . '/var/runtime/deps', '--keep-upload', '1'];
                 $selectionRequest = trim((string) ($payload['selection_request'] ?? ''));
                 if ($type === 'chords' && $selectionRequest !== '') { $cmd[] = '--selection-request'; $cmd[] = $selectionRequest; }
-                $this->runSubprocess($cmd, $labRoot . '/python', ['EZSTUDIO_DEP_ROOT' => $platformRoot . '/var/runtime/deps', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken], 3600, $output);
+                $this->runSubprocess($id, $cmd, $labRoot . '/python', ['EZSTUDIO_DEP_ROOT' => $platformRoot . '/var/runtime/deps', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 3600, $output);
                 return;
             }
         }
@@ -187,11 +188,11 @@ error>[Job #%d] ended (KO): %s
 string> $command @param array
 <
 string,string> $env */
-    private function runSubprocess(array $command, string $cwd, array $env, int $timeout, OutputInterface $output): void
+    private function runSubprocess(int $queueJobId, array $command, string $cwd, array $env, int $timeout, OutputInterface $output): void
     {
         $process = new Process($command, $cwd, $env);
         $process->setTimeout($timeout);
-        $process->run(static function (string $type, string $buffer) use ($output): void { $output->write($buffer); });
+        $process->start(); $pid = $process->getPid(); if (is_int($pid) && $pid > 0) { $this->queueManager->attachWorkerPid($queueJobId, $pid); } $process->wait(static function (string $type, string $buffer) use ($output): void { $output->write($buffer); });
         if (!$process->isSuccessful()) { throw new \RuntimeException(sprintf('subprocess_exit_%d', $process->getExitCode() ?? -1)); }
     }
 }
