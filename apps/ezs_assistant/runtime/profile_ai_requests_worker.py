@@ -37,6 +37,52 @@ from profile_recording_disambiguation import duration_from_catalog
 from profile_web_investigator import research_each_assertion
 from profile_web_local_review import review_web_items
 
+STEP_PCT = {
+    'identity_resolver': 10,
+    'recording_duration': 20,
+    'public_source_research': 35,
+    'review_payload_builder': 45,
+    'independent_verifier': 55,
+    'assertion_web_investigator': 70,
+    'local_ai_document_review': 85,
+    'documentary_verdict_merger': 92,
+    'documentary_payload_enricher': 95,
+    'ai_draft_payload_enricher': 98,
+}
+
+_CURRENT_STEPS = []
+
+def _report_step(job_id, step):
+    _CURRENT_STEPS.append({
+        'engine': step.get('engine'),
+        'status': step.get('status'),
+        'duration_ms': step.get('duration_ms'),
+    })
+    try:
+        api(PATH + '/' + str(job_id) + '/checkpoints', {'event_key': 'engine.' + step['engine'], 'phase': 'engine.' + step['engine'], 'outcome': 'ok' if step['status']=='OK' else step['status'].lower(), 'detail': step})
+    except Exception:
+        pass
+    pct = STEP_PCT.get(step.get('engine'))
+    if pct is not None:
+        try:
+            import sqlite3 as _sq
+            _db = Path(__file__).resolve().parents[2] / 'ezs_lab' / 'data' / 'benchmark.sqlite'
+            with _sq.connect(str(_db), timeout=5.0) as _con:
+                _con.execute("UPDATE analysis_jobs SET progress = ?, updated_at = ? WHERE id = ? AND status = 'running'", (int(pct), datetime.now(timezone.utc).isoformat(), int(job_id)))
+        except Exception:
+            pass
+        orch_id = os.environ.get('ORCHESTRATOR_JOB_ID', '').strip()
+        if orch_id.isdigit() and int(orch_id) > 0:
+            orch_base = os.environ.get('ORCHESTRATOR_BASE_URL', 'http://ezstudio.local').rstrip('/')
+            orch_url = f"{orch_base}/api/queue/{orch_id}/progress"
+            body = json.dumps({'progress': max(0, min(100, int(pct)))}).encode('utf-8')
+            req = urllib.request.Request(orch_url, data=body, headers={'Content-Type': 'application/json', 'Accept': 'application/json', 'X-EZS-Queue-Token': os.environ.get('EZS_QUEUE_INTERNAL_TOKEN', '')}, method='POST')
+            try:
+                with urllib.request.urlopen(req, timeout=2.0):
+                    pass
+            except Exception:
+                pass
+
 WORKER_START_UTC = datetime.now(timezone.utc).isoformat()
 WORKER_START_PID = os.getpid()
 def _startup_code_provenance():
@@ -143,6 +189,7 @@ def assert_running(run_id, job_id):
 
 
 def process(run_id, client, check_cancel=None):
+    _CURRENT_STEPS.clear()
     check_cancel = check_cancel or (lambda: None)
     check_cancel()
     row = api('/internal/analysis/desktop/profile/reviews/run/' + str(run_id))['item']
@@ -199,7 +246,8 @@ def process(run_id, client, check_cancel=None):
         'web_citations': sum(len(i.get('citation_urls') or []) for i in investigation.get('items') or [])
     })
     check_cancel()
-    local_web_review = call_engine("local_ai_document_review", review_web_items, investigation, ident)
+    inv_ident = {**ident, **(investigation.get('identity') or {})}
+    local_web_review = call_engine("local_ai_document_review", review_web_items, investigation, inv_ident)
     verification = call_engine("documentary_verdict_merger", attach_documentary_findings, verification, investigation, local_web_review)
     snap('profile.documentary_comparison', verification)
     record_items('local_ai_document_review', local_web_review.get('items') or [])
@@ -224,6 +272,7 @@ def process(run_id, client, check_cancel=None):
     payload = call_engine("documentary_payload_enricher", enrich_review_payload_with_documentary, payload, row, research)
     payload = call_engine("ai_draft_payload_enricher", enrich_review_payload_with_ai, payload, ai)
     payload.setdefault('comparison', {})['final_verification'] = verification
+    payload['comparison']['engine_steps'] = list(_CURRENT_STEPS)
     payload.setdefault('consensus', {})['final_verification_summary'] = {
         'bon': sum(x['verdict']=='bon' for x in verification['assertions']),
         'faux': sum(x['verdict']=='faux' for x in verification['assertions']),
@@ -240,6 +289,13 @@ def process(run_id, client, check_cancel=None):
         'assertion_count': len(verification['assertions']),
     })
     # A completed inference is an advisory DRAFT, never independent validation.
+    all_urls = []
+    for a in verification.get('assertions') or []:
+        for s in a.get('sources') or []:
+            if isinstance(s, dict) and s.get('url') and s['url'] not in all_urls:
+                all_urls.append(s['url'])
+    if all_urls:
+        payload['sources'] = [{'url': u, 'title': u, 'provider': 'documentary_evidence'} for u in all_urls]
     payload['status'] = 'draft'
     payload['reviewer'] = 'assistant-lab-ui-qwen'
     digest = hashlib.sha256(json.dumps(
@@ -311,7 +367,7 @@ def once(client, target_job_id=None, target_run_id=None):
             try:
                 emit('job.claimed', {'run_id': rid, 'claim': True})
                 snap('worker.startup_provenance', STARTUP_PROVENANCE)
-                with execution_scope(rid, job_id, trace, on_step=lambda step: api(PATH + '/' + str(job_id) + '/checkpoints', {'event_key': 'engine.' + step['engine'], 'phase': 'engine.' + step['engine'], 'outcome': 'ok' if step['status']=='OK' else step['status'].lower(), 'detail': step})):
+                with execution_scope(rid, job_id, trace, on_step=lambda step: _report_step(job_id, step)):
                     outcome = process(rid, client, check_cancel=lambda: assert_running(rid, job_id))
                 assert_running(rid, job_id)
                 message = 'Révision IA #' + str(outcome['revision']) + ' enregistrée'

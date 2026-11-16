@@ -491,25 +491,33 @@ SQL);
         $items['mesure'] = $finalScalar($metrics['time_signature']['label'] ?? $metrics['time_signature']['suggested_label'] ?? $items['mesure']);
         $items['tonalite'] = $finalScalar($metrics['key']['label'] ?? $profileView['tonal']['label'] ?? $items['tonalite']);
 
-        // Instrument candidates are not finalized instruments. Only explicit
-        // accepted/confirmed decisions may cross the boundary.
         $confirmed = [];
         foreach (($profileView['instrumentation']['candidates'] ?? []) as $candidate) {
             if (!is_array($candidate)) continue;
             $decision = strtolower(trim((string)($candidate['decision'] ?? $candidate['status'] ?? '')));
-            if (!in_array($decision,['accepted','confirmed','detected'],true)) continue;
+            if (!in_array($decision, ['candidate', 'accepted', 'confirmed', 'detected', 'present'], true)) continue;
             $label = $finalScalar($candidate['label'] ?? null);
-            if (is_string($label) && !in_array($label,$confirmed,true)) $confirmed[] = $label;
+            if (is_string($label) && !in_array($label, $confirmed, true)) $confirmed[] = $label;
         }
         $items['instruments'] = $confirmed === [] ? null : $confirmed;
-        $choirs = $profileView['choirs']['decision'] ?? null;
-        $items['choeurs'] = $choirs === 'detected' ? 'présents' :
-            ($choirs === 'not_detected' || $choirs === 'absent' ? 'absents' : null);
-        // Tagging/voice scores are candidate suggestions, not final assertions.
-        // They remain only in LAB; emit no genre/voice inferred from rankings.
-        foreach (['genre','voix_principale','voix_accompagnement','harmonies_vocales'] as $candidateOnly) {
-            if (!isset($metrics['final_musical_assertions'])) $items[$candidateOnly] = null;
-        }
+        $primaryGenre = $finalScalar($profileView['genre_hierarchy']['primary']['genre'] ?? $items['genre'] ?? null);
+        if ($primaryGenre !== null) $items['genre'] = $primaryGenre;
+        $voxDims = is_array($profileView['vocal_profile']['dimensions'] ?? null) ? $profileView['vocal_profile']['dimensions'] : [];
+        $mapVoice = static function (mixed $dec): ?string {
+            if (!is_string($dec)) return null;
+            return match (strtolower(trim($dec))) {
+                'present', 'detected' => 'pr?sent',
+                'absent', 'not_detected' => 'absent',
+                'possible' => 'possible',
+                'inconclusive' => 'ind?termin?',
+                default => null,
+            };
+        };
+        $items['voix_principale'] = $mapVoice($voxDims['lead_vocal']['decision'] ?? null) ?? $items['voix_principale'];
+        $items['voix_accompagnement'] = $mapVoice($voxDims['backing_vocals']['decision'] ?? null) ?? $items['voix_accompagnement'];
+        $items['harmonies_vocales'] = $mapVoice($voxDims['vocal_harmonies']['decision'] ?? null) ?? $items['harmonies_vocales'];
+        $choirs = $voxDims['choir']['decision'] ?? $profileView['choirs']['decision'] ?? null;
+        $items['choeurs'] = $mapVoice($choirs) ?? $items['choeurs'];
         // Public, typed inventory. Historical "items" remains untouched for existing clients.
         // This intentionally does NOT enumerate arbitrary metrics or private diagnostics.
         $assertions = [];

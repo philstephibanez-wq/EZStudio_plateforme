@@ -156,7 +156,16 @@ final class ProfileAiRequestController extends AbstractController
             if ($request->isMethod('GET')) {
                 return $this->json(['schema'=>'ezstudio.assistant-checkpoint-history.v1','job_id'=>$id,'events'=>$service->history($id)]);
             }
-            return $this->json(['ok'=>true,'event'=>$service->save($id,$request->toArray())],201);
+            $payload = $request->toArray();
+            $event = $service->save($id, $payload);
+            if (isset($payload['progress']) && is_numeric($payload['progress'])) {
+                $pct = max(1, min(99, (int) $payload['progress']));
+                try {
+                    $db = new \PDO('sqlite:' . dirname(__DIR__, 2) . '/data/benchmark.sqlite');
+                    $db->prepare("UPDATE analysis_jobs SET progress = ?, updated_at = ? WHERE id = ? AND status = 'running'")->execute([$pct, gmdate('c'), $id]);
+                } catch (\Throwable) {}
+            }
+            return $this->json(['ok'=>true,'event'=>$event],201);
         } catch (\InvalidArgumentException $e) {return $this->json(['error'=>$e->getMessage()],422);}
         catch (\Throwable $e) {return $this->json(['error'=>$e->getMessage()],409);}
     }

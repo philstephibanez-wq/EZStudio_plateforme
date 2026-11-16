@@ -8,7 +8,29 @@ from difflib import SequenceMatcher
 from profile_final_verifier import final_assertions
 from profile_public_web import search, fetch_document
 from profile_live_evidence import evaluate_live_documents
-from profile_musicbrainz_structured import discover_recordings
+
+from declarative_review import load_review_preset
+from profile_musicbrainz_structured import discover_recordings, fetch_certified_recording_details, fetch_wikipedia_song_context
+
+def _load_doc_research_cfg():
+    try:
+        preset = load_review_preset("profile")[0]
+        return preset.get("documentary_research") or {}
+    except Exception:
+        return {}
+
+def _is_blocked_page(text, cfg):
+    low = str(text or "").casefold()
+    if len(low.strip()) < 120:
+        return True
+    sigs = cfg.get("blocked_page_signatures") or [
+        "verifying your browser",
+        "just a moment...",
+        "javascript is required to access this page",
+        "please enable javascript",
+    ]
+    return any(str(s).casefold() in low for s in sigs)
+
 
 def _tokens(value):
     value=unicodedata.normalize("NFKD",str(value).casefold())
@@ -46,15 +68,16 @@ def _source_priority(hit):
     return (3,"general_web_candidate")
 
 
-TERMS={"duration":"track duration length minutes seconds","tempo":"BPM tempo","meter":"time signature meter","key":"musical key tonality","genre":"genre style","lead_vocal":"lead vocals singer","backing_vocals":"backing vocals","choir":"choir choral vocals","vocal_harmonies":"vocal harmonies"}
+TERMS={"duration":"track duration length minutes seconds","duree":"track duration length minutes seconds","tempo":"BPM tempo","meter":"time signature meter","mesure":"time signature meter","key":"musical key tonality","tonalite":"musical key tonality","genre":"genre style","lead_vocal":"lead vocals singer","voix_principale":"lead vocals singer","backing_vocals":"backing vocals","voix_accompagnement":"backing vocals","choir":"choir choral vocals","choeurs":"choir choral vocals","vocal_harmonies":"vocal harmonies","harmonies_vocales":"vocal harmonies"}
 
 def research_each_assertion(row, identity, *, source_research=None, **unused):
     assertions=final_assertions(row)
     present={a["key"] for a in assertions}
+    fr_map = {"backing_vocals":"voix_accompagnement","vocal_harmonies":"harmonies_vocales","choir":"choeurs","lead_vocal":"voix_principale"}
     for key,label in (("backing_vocals","Voix d’accompagnement"),
                       ("vocal_harmonies","Harmonies vocales"),("choir","Chœurs"),
                       ("lead_vocal","Voix principale")):
-        if key not in present:
+        if key not in present and fr_map[key] not in present:
             assertions.append({"key":key,"label":label,"value":"non déterminé",
                                "no_lab_proposition":True})
     return research_assertions(assertions, identity, source_research=source_research)
@@ -85,10 +108,43 @@ def research_assertions(assertions, identity, *, source_research=None):
         match=re.fullmatch(r"(.+?)\s*[-–—]\s+([^–—]+)",title)
         if match and match.group(1).strip() and match.group(2).strip():
             title,artist=match.group(1).strip(),match.group(2).strip()
-    structured=discover_recordings(title,artist)
+    structured=discover_recordings(title,artist,duration_ms=identity.get('catalog_duration_ms'))
+    priority_docs = []
+    album_for_wiki = ""
+    if isinstance(structured, dict) and structured.get('verified') and isinstance(structured.get('certified_recording'), dict):
+        cert_rec = structured['certified_recording']
+        rels = cert_rec.get('releases') or []
+        if rels and isinstance(rels[0], dict):
+            album_for_wiki = str(rels[0].get('title') or '').strip()
+        det = fetch_certified_recording_details(cert_rec.get('mbid'))
+        structured['certified_details'] = det
+        if isinstance(det, dict) and det.get('status') == 'completed':
+            mb_summary = f"MusicBrainz Certified Recording: {det.get('title')} by {artist}. Duration: {det.get('duration_ms')} ms. Album: {album_for_wiki}. Genres: {', '.join(det.get('genres') or [])}. Tags: {', '.join(det.get('tags') or [])}. Relations: {det.get('relations')}"
+            priority_docs.append({
+                "url": det.get("url"),
+                "title": f"MusicBrainz: {title} - {artist}",
+                "snippet": mb_summary[:400],
+                "discovery_priority": 0,
+                "source_scope": "musicbrainz_certified_recording",
+                "recording_identity_verified": True,
+                "status": "read",
+                "text": mb_summary[:8000],
+            })
+    if title and artist:
+        for wdoc in fetch_wikipedia_song_context(title, artist, album=album_for_wiki):
+            priority_docs.append({
+                "url": wdoc["url"],
+                "title": f"Wikipedia: {wdoc['title']}",
+                "snippet": wdoc["text"][:300],
+                "discovery_priority": 1,
+                "source_scope": "wikipedia_encyclopedia",
+                "recording_identity_verified": bool((structured or {}).get('verified')),
+                "status": "read",
+                "text": wdoc["text"][:8000],
+            })
     items=[]
     document_cache={}
-    effective_identity={"title":title,"artist":artist}
+    effective_identity={"title":title,"artist":artist,"recording_identity_verified":bool((structured or {}).get("verified")),"certified_recording":(structured or {}).get("certified_recording")}
     ocr_audit={"status":"not_available" if not source_research else "recorded", "scans":ocr_sources}
     # Search broadly once, then reuse relevant sources for every item.
     base_hits=[]
@@ -110,15 +166,33 @@ def research_assertions(assertions, identity, *, source_research=None):
     for assertion in assertions:
         _profile_assertion_start = _profile_clock()
         key=assertion["key"]
-        item={"key":key,"value":assertion["value"],"status":"not_searched","citation_urls":[],
-              "documents":[],"eligible_for_verdict":False}
+        item={"key":key,"value":assertion["value"],"status":"read" if priority_docs else "not_searched","citation_urls":[d["url"] for d in priority_docs],
+              "documents":list(priority_docs),"eligible_for_verdict":bool(priority_docs)}
         if not title:
             item["status"]="identity_unavailable"
             items.append(item)
             record_item("assertion_web_investigator", item, _profile_assertion_start)
             continue
-        topic=TERMS.get(key,"instruments credits personnel" if key.startswith("instrument:") else key)
-        query=artist+' '+title+' song music '+topic if artist else title+' song music '+topic
+        cfg = _load_doc_research_cfg()
+        templates = cfg.get("dimension_query_templates") or {}
+        dim_key = "instruments" if key.startswith(("instruments:", "instrument:")) else key
+        tpl = templates.get(dim_key)
+        album_hint = ""
+        cert = (structured or {}).get("certified_recording") if isinstance(structured, dict) else None
+        if isinstance(cert, dict) and cert.get("releases"):
+            first_rel = cert["releases"][0] if isinstance(cert["releases"], list) and cert["releases"] and isinstance(cert["releases"][0], dict) else {}
+            album_hint = str(first_rel.get("title") or "").strip()
+        if tpl:
+            query = tpl.format(
+                artist=artist,
+                title=title,
+                album=album_hint,
+                value=str(assertion.get("value") or "")
+            )
+            query = " ".join(query.split())
+        else:
+            topic = TERMS.get(key, f"{assertion.get('value', '')} instruments credits personnel" if key.startswith(("instruments:", "instrument:")) else key)
+            query = artist + ' ' + title + ' song music ' + topic if artist else title + ' song music ' + topic
         item["query"]=query
         try:
             try:
@@ -153,8 +227,12 @@ def research_assertions(assertions, identity, *, source_research=None):
                     doc["status"]=source.get("status")
                     if source.get("reason"): doc["reason"]=source["reason"]
                     if source.get("status")=="read":
-                        doc["url"]=source.get("url") or url
-                        doc["text"]=str(source.get("text") or "")[:8000]  # Source text only: search snippets cannot become evidence.
+                        txt = str(source.get("text") or "")
+                        if _is_blocked_page(txt, _load_doc_research_cfg()):
+                            doc["status"] = "blocked_js_challenge"
+                        else:
+                            doc["url"]=source.get("url") or url
+                            doc["text"]=txt[:8000]  # Source text only: search snippets cannot become evidence.
                 except Exception as exc:
                     doc["status"]="read_error"
                     doc["error_type"]=type(exc).__name__
@@ -176,6 +254,17 @@ def research_assertions(assertions, identity, *, source_research=None):
         record_item("assertion_web_investigator", item, _profile_assertion_start)
     failed=sum(item.get("status")=="error" for item in items)
     degraded=sum(bool(item.get("search_error_count")) for item in items)
+    shared = {d["url"]: d for it in items for d in (it.get("documents") or []) if d.get("status") == "read" and d.get("url")}
+    if shared:
+        for it in items:
+            seen = {d.get("url") for d in (it.get("documents") or []) if d.get("status") == "read"}
+            for u, sd in shared.items():
+                if u not in seen:
+                    it.setdefault("documents", []).append(dict(sd))
+                    it.setdefault("citation_urls", []).append(u)
+            it["status"] = "documents_read"
+            it["eligible_for_verdict"] = True
+            it["evidence_review"] = evaluate_live_documents({"key": it["key"], "value": it["value"]}, effective_identity, it["documents"])
     return {"status":"error" if failed==len(items) and items else "partial" if (failed or degraded) else "completed" if items else "no_assertions",
             "reason":"web_search_failed_for_all_items" if failed==len(items) and items else
                      "web_search_partially_unavailable" if degraded else None,

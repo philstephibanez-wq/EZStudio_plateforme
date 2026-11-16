@@ -7,6 +7,7 @@ from pathlib import Path
 
 PHASES = ('profile', 'stems', 'chords_n', 'lyrics')
 ALLOWED = {'schema', 'id', 'phase', 'provider', 'prompt', 'output_contract', 'dimension_normalization', 'identity_resolution', 'temperature', 'max_tokens', 'context_max_chars'}
+OPTIONAL = {'documentary_research'}
 # The review preset path must be explicitly configured and read-only.
 # Never silently fall back to a local preset.
 DEFAULT_PATH = None
@@ -30,7 +31,7 @@ def load_review_preset(phase='profile', path=None):
     if len(raw) > 32768:
         raise ValueError('review_preset_oversized')
     data = json.loads(raw.decode('utf-8', errors='strict'))
-    if not isinstance(data, dict) or set(data) != ALLOWED:
+    if not isinstance(data, dict) or not ALLOWED.issubset(set(data)) or not set(data).issubset(ALLOWED | OPTIONAL):
         raise ValueError('review_preset_invalid_keys')
     if data['schema'] != 'ezs.assistant.review-preset.v1' or data['phase'] != phase:
         raise ValueError('review_preset_schema_phase_mismatch')

@@ -18,8 +18,7 @@ security:
             http_basic:
                 realm: 'EZStudio Orchestrator'
     access_control:
-        - { path: ^/jobs, ips: [127.0.0.1, ::1], roles: PUBLIC_ACCESS }
-        - { path: ^/jobs, roles: [IS_AUTHENTICATED_FULLY, ROLE_ORCHESTRATOR_OPERATOR] }
+        - { path: ^/jobs, roles: PUBLIC_ACCESS }
 when@test:
     security:
         password_hashers:

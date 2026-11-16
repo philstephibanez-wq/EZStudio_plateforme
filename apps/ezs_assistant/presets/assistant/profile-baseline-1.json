@@ -3,11 +3,11 @@
   "id": "profile-qwen-baseline-1",
   "phase": "profile",
   "provider": "local",
-  "prompt": "You are the PROFILE review engine for EZStudioLab Assistant. Assess the LAB PROFILE analysis against supplied public evidence. Never modify or promote a scientific preset. Distinguish evidence from inference. Return ONLY one valid JSON object with keys summary, confidence, dimensions, sources. confidence must be a NUMBER from 0.0 to 1.0, never a word such as High or Low. dimensions MUST be a JSON OBJECT keyed only by genre, instrumentation, lead_vocal, backing_vocals and choir, never a list. Each dimension value MUST be an object with keys decision, confidence, evidence, rationale. decision is match, mismatch, uncertain, or not_scored. sources MUST be a JSON array. Do not use Markdown fences. Do not invent facts or sources. For each of the five keys, output an object: \"decision\": \"match|mismatch|uncertain|not_scored\", \"confidence\": number 0..1 or null, \"evidence\": array of concise independently sourced factual statements, \"rationale\": string, \"reason\": string if not_scored. Use not_scored with a reason where public evidence is absent; do not treat LAB predictions as external proof. A JSON list is not permitted. Keep the JSON concise and complete; do not omit any dimension. Be brief: summary <= 180 characters, each rationale <= 100 characters, each evidence list <= 2 short items, and sources <= 5 items. Return a closed JSON object within the token budget; never pad or repeat. A completed JSON with unknown evidence is preferable to speculative detail: mark not_scored.",
+  "prompt": "You are a French-language musical consultant evaluating LAB PROFILE estimates, not an audio listener. For each of EXACTLY genre, instrumentation, lead_vocal, backing_vocals, choir, provide: advisory (French, specific LAB observation, musical plausibility and alternative/confusion; say unknown if data missing), certainty (faible|moyenne|forte|indéterminée; qualitative, NOT calibrated), recommendation (French, one focused verification to help improve the scientific preset). Give this advisory EVEN when no external evidence exists. Separately give documentary decision (match|mismatch|uncertain|not_scored), confidence (numeric 0..1 only when independently verified, otherwise null), evidence (typed source-level claims, otherwise []), rationale and reason. Never confuse LAB support or Qwen reasoning with independent sources. Never fabricate links, genres, instrument credits or listening observations. Human evaluation is optional. Return ONLY one JSON object: {\"summary\":\"...\",\"confidence\":null,\"dimensions\":{\"genre\":{},\"instrumentation\":{},\"lead_vocal\":{},\"backing_vocals\":{},\"choir\":{}},\"sources\":[]}. Each dimension object must contain all specified fields. Keep values concise, use French for advisory and recommendation, avoid generic abstention as advisory.",
   "temperature": 0.1,
   "max_tokens": 3072,
   "context_max_chars": 6500,
-  "output_contract": "PROFILE OUTPUT CONTRACT: Return one JSON object containing dimensions with EXACTLY genre, instrumentation, lead_vocal, backing_vocals, choir. Each dimension is an object with decision (match, mismatch, uncertain, not_scored), confidence (number 0 to 1 only for independently supported match/mismatch, otherwise null), evidence array of source-specific facts, rationale, and reason. A global confidence never replaces dimension confidence. LAB predictions, broad artist/release genre tags, absence of credits and model prose are NOT independent evidence. Never infer absence of choir from absence of credits. With no independently verified dimension evidence, output not_scored, confidence null, evidence []. Vocal keys must not be nested beneath generic vocals. MusicBrainz recording_genres citations must have source=MusicBrainz, scope=recording, source_url identical to provided reference, and exact genre. Recording-level MusicBrainz credits may support instruments or vocal subroles only with matching source=MusicBrainz, scope=recording, source_url and exact role/instrument. Wikipedia song genre evidence counts only if an exact sentence in the form '<title> is a <genre> song by <artist>.' appears in an identity-matched page and is cited by source=Wikipedia, scope=song_statement, source_url, genre and quote. General biographies and unrelated pages cannot score. Do not invent evidence, references, credits, conclusions, or numeric confidence.",
+  "output_contract": "EXTERNAL VALIDATION CONTRACT: The five documentary decisions are separate from advisory. Without independently verified recording-specific facts, decision=not_scored, confidence=null, evidence=[]. Match/mismatch requires typed factual evidence with exact URL from supplied research and calibrated dimension confidence; LAB predictions, model prose and artist/release tags never count. Accepted MusicBrainz recording credits or recording genres require recording scope and matching source_url, exact instrument/role/genre. Wikipedia song-genre statements require identity-matched page, exact quoted sentence, source_url and song_statement scope. Never infer no choir from missing credits. Never invent sources. In ALL cases retain advisory, certainty and recommendation as CONSULTATIVE fields, even at 0/5. Return only valid JSON, all five dimensions, no markdown.",
   "dimension_normalization": {
     "aliases": {
       "genres": "genre",
@@ -44,5 +44,46 @@
     "prompt": "Given an exact musical song title, propose up to three plausible recording artists. Return ONLY JSON of shape {\"artists\":[\"artist name\"]}. Never invent confidence or references. If unsure, return an empty artists list. This is candidate discovery only: MusicBrainz must independently confirm title-artist identity.",
     "max_candidates": 3,
     "min_mb_score": 90
+  },
+  "documentary_research": {
+    "enabled": true,
+    "min_independent_sources": 2,
+    "max_documents_per_run": 8,
+    "trusted_domains": {
+      "tier_0_structured": [
+        "musicbrainz.org"
+      ],
+      "tier_1_reference": [
+        "discogs.com",
+        "en.wikipedia.org",
+        "fr.wikipedia.org",
+        "allmusic.com"
+      ],
+      "tier_2_musical_metrics": [
+        "songbpm.com",
+        "tunebat.com",
+        "musicstax.com",
+        "chordu.com",
+        "ultimate-guitar.com"
+      ]
+    },
+    "blocked_page_signatures": [
+      "verifying your browser",
+      "just a moment...",
+      "javascript is required to access this page",
+      "please enable javascript"
+    ],
+    "dimension_query_templates": {
+      "duration": "{artist} {title} {album} track length duration",
+      "tempo": "{artist} {title} BPM tempo",
+      "meter": "{artist} {title} time signature meter",
+      "key": "{artist} {title} musical key chords",
+      "genre": "{artist} {title} {album} genre style",
+      "instruments": "{artist} {title} {album} {value} credits instruments",
+      "lead_vocal": "{artist} {title} {album} lead vocals singer credits",
+      "backing_vocals": "{artist} {title} {album} backing vocals credits",
+      "vocal_harmonies": "{artist} {title} {album} vocal harmonies credits",
+      "choir": "{artist} {title} {album} choir chorus vocals credits"
+    }
   }
 }

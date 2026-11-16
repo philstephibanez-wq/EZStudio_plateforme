@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from profile_musical_facts import evaluate_reference
 
 DECISIONS = {"bon", "faux", "non_trouve"}
-UNKNOWN = {"", "possible", "inconclusive", "unknown", "unavailable", "undetermined", "not_scored", "non déterminé"}
+UNKNOWN = {"", "inconclusive", "unknown", "unavailable", "undetermined", "not_scored", "non déterminé"}
 INSTRUMENT_ALIASES = {
     "guitar": "guitar", "electric guitar": "electric guitar",
     "acoustic guitar": "acoustic guitar", "bass guitar": "bass guitar",
@@ -47,8 +47,7 @@ def final_assertions(row):
             if not _valid(item["value"]):
                 raise ValueError("invalid_public_assertion_value")
             dimension = str(item["dimension"])
-            if dimension == "instruments" and key.startswith("instruments:"):
-                key = "instrument:" + key.split(":",1)[1]
+            pass  # Conserver instruments:0 canonique
             result.append({"key":key, "label":dimension, "value":_clean(item["value"])})
         return result
     view = (row.get("diagnostics") or {}).get("profile_view") or {}
@@ -71,7 +70,7 @@ def final_assertions(row):
     put("genre","Genre musical",((view.get("genre_hierarchy") or {}).get("primary") or {}).get("genre"))
     for i, item in enumerate((view.get("instrumentation") or {}).get("candidates") or []):
         if isinstance(item, dict) and _valid(item.get("label")):
-            put("instrument:"+str(i),"Instrument",item["label"])
+            put("instruments:"+str(i),"Instrument",item["label"])
     for key,label in (("lead_vocal","Voix principale"),("backing_vocals","Voix d'accompagnement"),
                       ("vocal_harmonies","Harmonies vocales"),("choir","Chœurs")):
         decision = (vox.get(key) or {}).get("decision")
@@ -124,7 +123,7 @@ def _evidence_for_assertion(item, source):
         return None
     value = _clean(item["value"]).casefold()
     key = item["key"]
-    if key.startswith("instrument:"):
+    if key.startswith(("instruments:", "instrument:")):
         credits = source.get("recording_credits") or []
         for credit in credits:
             if not isinstance(credit, dict) or credit.get("scope") != "recording":
@@ -137,7 +136,7 @@ def _evidence_for_assertion(item, source):
         tags = {_clean(t).casefold() for t in source.get("recording_genres") or []}
         if value in tags:
             return ("MusicBrainz — genre de l'enregistrement", "recording_genre")
-    if key in {"lead_vocal", "backing_vocals"} and value == "présent":
+    if key in {"lead_vocal", "backing_vocals", "voix_principale", "voix_accompagnement"} and value in {"présent", "present"}:
         roles = {_vocal_role(c) for c in source.get("recording_credits") or []
                  if isinstance(c, dict)}
         target = "lead" if key == "lead_vocal" else "backing"
@@ -221,11 +220,11 @@ def _documentary_type_ok(key, value):
         return False
     if key == "tempo":
         return bool(re.fullmatch(r"\d{1,3}(?:[.,]\d+)?\s*(?:bpm)?", v, re.I))
-    if key == "duration":
-        return bool(re.fullmatch(r"\d{1,3}:\d{2}(?::\d{2})?", v))
-    if key == "meter":
+    if key in ("duration", "duree"):
+        return bool(re.fullmatch(r"\d{1,3}:\d{2}(?::\d{2})?", v) or re.fullmatch(r"\d{1,4}(?:[.,]\d+)?\s*(?:s|sec|secondes?)?", v, re.I))
+    if key in ("meter", "mesure"):
         return bool(re.fullmatch(r"\d{1,2}\s*/\s*\d{1,2}", v))
-    if key.startswith("instrument:") or key in ("lead_vocal", "backing_vocals", "vocal_harmonies", "choir", "genre", "key"):
+    if key.startswith(("instruments:", "instrument:")) or key in ("lead_vocal", "voix_principale", "backing_vocals", "voix_accompagnement", "vocal_harmonies", "harmonies_vocales", "choir", "choeurs", "genre", "key", "tonalite"):
         return not bool(re.search(r"\b\d+(?:[.,]\d+)?\s*bpm\b", v, re.I) or re.fullmatch(r"\d+(?:[.,]\d+)?", v))
     return True
 
@@ -235,12 +234,15 @@ def _compare_documentary(key, lab, reference):
     if not _documentary_type_ok(key, reference):
         return "indeterminate"
     a, b = str(lab or "").strip().casefold(), str(reference).strip().casefold()
-    if key == "duration":
+    if key in ("duration", "duree"):
         try:
             def seconds(v):
+                v = v.replace("secondes", "").replace("seconde", "").replace("sec", "").replace("s", "").strip()
+                if ":" not in v:
+                    return float(v.replace(",", "."))
                 p = [int(x) for x in v.split(":")]
                 return 60*p[0]+p[1] if len(p)==2 else 3600*p[0]+60*p[1]+p[2]
-            return "concordant" if abs(seconds(a)-seconds(b)) <= 2 else "discordant"
+            return "concordant" if abs(seconds(a)-seconds(b)) <= 3 else "discordant"
         except (ValueError, IndexError):
             return "indeterminate"
     if key == "tempo":
@@ -256,11 +258,12 @@ def _compare_documentary(key, lab, reference):
             return "discordant"
         except ValueError:
             return "indeterminate"
-    if key == "meter":
+    if key in ("meter", "mesure"):
         return "concordant" if a.replace(" ","")==b.replace(" ","") else "discordant"
     if key == "genre":
-        return "concordant" if a==b else "indeterminate"
-    if key.startswith("instrument:"):
+        if not b: return "indeterminate"
+        return "concordant" if (a == b or a in b or b in a) else "discordant"
+    if key.startswith(("instruments:", "instrument:")):
         return "concordant" if _instrument_matches(a,b) else "indeterminate"
     if key in ("lead_vocal","backing_vocals","vocal_harmonies","choir"):
         aliases={"present":"présent","detected":"présent","yes":"présent","no":"absent"}
@@ -304,18 +307,54 @@ def attach_documentary_findings(verification, investigation, local_review):
         if proposed not in ("bon", "faux"):
             proposed = None
         incompatible = value is not None and not _documentary_type_ok(key, value)
-        if incompatible:
-            value, proposed, urls = None, None, []
-        comparison = _compare_documentary(key, assertion.get("value"), value)
+        comparison = "indeterminate" if incompatible else _compare_documentary(key, assertion.get("value"), value)
+        id_confirmed = bool((investigation.get("identity") or {}).get("recording_identity_verified")) or bool(urls)
+        reason_txt = review.get("reason") or candidate.get("explanation") or ("Valeur documentaire incompatible avec le type de cet item" if incompatible else "Aucune valeur documentaire exploitable")
+        final_verdict = None
+        if value is not None and urls and id_confirmed and not incompatible:
+            if proposed == "bon" or comparison == "concordant":
+                final_verdict = "bon"
+            elif proposed == "faux" or comparison == "discordant":
+                final_verdict = "faux"
+        # Calcul explicite de l'ecart pour chaque item des qu'une valeur externe existe
+        gap_note = ""
+        if value is not None:
+            try:
+                if key in ("duration", "duree"):
+                    def _sec(v):
+                        s0 = str(v).lower().replace("secondes","").replace("seconde","").replace("sec","").replace("s","").strip()
+                        if ":" not in s0: return float(s0.replace(",","."))
+                        p0 = [int(x) for x in s0.split(":")]
+                        return 60*p0[0]+p0[1] if len(p0)==2 else 3600*p0[0]+60*p0[1]+p0[2]
+                    diff_s = round(abs(_sec(assertion.get("value")) - _sec(value)), 1)
+                    gap_note = f" (écart : {diff_s} s)"
+                elif key == "tempo":
+                    x0 = float(str(assertion.get("value")).lower().replace("bpm","").strip().replace(",","."))
+                    y0 = float(str(value).lower().replace("bpm","").strip().replace(",","."))
+                    gap_note = f" (écart : {round(abs(x0 - y0), 2)} BPM)"
+                elif comparison == "concordant":
+                    gap_note = " (concordant)"
+                elif comparison == "discordant":
+                    gap_note = " (écart / divergence)"
+            except Exception:
+                gap_note = ""
+        if final_verdict in ("bon", "faux"):
+            assertion["verdict"] = final_verdict
+        if value is not None:
+            assertion["reference_value"] = (str(value).strip() + gap_note)[:160]
+        if urls:
+            assertion["citations"] = urls[:12]
+            assertion["sources"] = [{"title": u, "url": u, "evidence_type": "documentary_web_evidence"} for u in urls[:12]]
+        if reason_txt:
+            assertion["reason"] = reason_txt
         assertion["documentary_observation"] = {
-            "status": "provisional" if value else "not_found",
+            "status": "verified" if final_verdict in ("bon", "faux") else ("provisional" if value else "not_found"),
             "reference_value": str(value)[:160] if value is not None else None,
             "comparison": comparison,
             "citations": urls[:12],
-            "recording_identity_confirmed": False,
+            "recording_identity_confirmed": id_confirmed,
             "scientific_validation": False,
-            "reason": ("Valeur documentaire incompatible avec le type de cet item" if incompatible else None) or review.get("reason") or candidate.get("explanation") or
-                      "Aucune valeur documentaire exploitable",
+            "reason": reason_txt,
         }
     merged["web_investigation"] = investigation
     merged["local_web_review"] = local_review

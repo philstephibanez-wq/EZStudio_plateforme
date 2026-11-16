@@ -62,7 +62,6 @@ final class JobsPageController
         ]);
     }
 
-    #[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')]
     #[Route('/jobs/{id}/retry', name: 'ezs_v2_jobs_retry', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function retry(int $id, Request $request, JobRetryCoordinator $coordinator, QueueActionCsrfManager $csrf): Response
     {
@@ -85,7 +84,6 @@ final class JobsPageController
         return $this->redirectBack($request);
     }
 
-    #[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')]
     #[Route('/jobs/{id}/delete', name: 'ezs_v2_jobs_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function delete(int $id, Request $request, QueueManager $queueManager, QueueActionCsrfManager $csrf): Response
     {

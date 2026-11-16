@@ -70,7 +70,9 @@ switch ($Action.ToLower()) {
         Write-Host "[EZS] Arret de la plateforme..." -ForegroundColor Yellow
         Get-FrankenProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
         Get-OrchestratorQueueProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match "EZStudio_plateforme" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
         Start-Sleep -Seconds 1
+        Remove-Item -Path "$PlatformRoot\apps\ezs_lab\var\cache\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Host "[EZS] Plateforme arretee." -ForegroundColor Green
     }
     "restart" {
