@@ -9,15 +9,16 @@ from profile_final_verifier import final_assertions
 from profile_public_web import search, fetch_document
 from profile_live_evidence import evaluate_live_documents
 
+from pathlib import Path
 from declarative_review import load_review_preset
 from profile_musicbrainz_structured import discover_recordings, fetch_certified_recording_details, fetch_wikipedia_song_context
 
 def _load_doc_research_cfg():
     try:
-        preset = load_review_preset("profile")[0]
+        preset = load_review_preset("profile", path=__import__("os").getenv("EZSTUDIOLAB_REVIEW_PRESET_PATH") or str(Path(__file__).resolve().parents[2] / "ezs_lab" / "presets" / "assistant" / "profile-baseline-1.json"))[0]
         return preset.get("documentary_research") or {}
-    except Exception:
-        return {}
+    except Exception as exc:
+        raise RuntimeError(f'review_preset_load_failed:{exc}') from exc
 
 def _is_blocked_page(text, cfg):
     low = str(text or "").casefold()

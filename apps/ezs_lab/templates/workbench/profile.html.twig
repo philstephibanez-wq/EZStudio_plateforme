@@ -168,7 +168,7 @@
       {'keys':['key','tonalite'], 'label':'Tonalité', 'lab': sum.key ?? '—'},
       {'keys':['genre'], 'label':'Genre', 'lab': sum.genre ?? '—'}
     ] %}
-    {% for idx in 0..3 %}
+    {% set inst_list = sum.instruments|default([]) %}{% if inst_list is empty %}{% for a in (revs|first.comparison.final_verification.assertions ?? []) %}{% if a.key starts with "instruments:" or a.key starts with "instrument:" %}{% set inst_list = inst_list|merge([a.value ?? a.lab_value ?? ""]) %}{% endif %}{% endfor %}{% endif %}{% for inst in inst_list %}{% set idx = loop.index0 %}
       {% set inst_obj = sum.instruments[idx] ?? null %}
       {% set inst_name = inst_obj.name ?? inst_obj ?? null %}
       {% set base_rows = base_rows|merge([{'keys':['instruments:' ~ idx, 'instrument:' ~ idx], 'label':'Instrument ' ~ (idx + 1), 'lab': inst_name ?? '—'}]) %}
@@ -203,7 +203,7 @@
               {% set disp_ref = (row_def.label == 'Durée' and raw_ref matches '/^[0-9.]+$/') ? ((raw_ref / 60)|round(0,'floor') ~ ':' ~ '%02d'|format((raw_ref % 60)|round(0,'floor'))) : (raw_ref ?: '—') %}
               <tr>
                 <td><strong>{{ row_def.label }}</strong></td>
-                <td>{{ row_def.lab }}</td>
+                <td>{{ (found.lab_value ?? found.value ?? row_def.lab)|replace({'pr?sent':'présent','ind?termin?':'indéterminé'}) }}</td>
                 <td><span class="badge {{ badge_cls }} v-badge-tip" tabindex="0">{{ badge_lbl }}<span class="v-badge-pop"><strong>{{ v_desc }}</strong><br><span style="color:#94a3b8">{{ v_detail }}</span></span></span></td>
                 <td>{{ disp_ref }}</td>
                 <td class="ana-cell" style="font-size:11px" title="{{ v_detail }}">{% for src in (found.sources ?? []) %}{% if src.url is defined and src.url %}<a href="{{ src.url }}" target="_blank" rel="noopener noreferrer" title="{{ src.url }}">[{{ loop.index }}]</a> {% endif %}{% endfor %}<span class="meta" style="font-size:10.5px">{{ v_detail }}</span></td>

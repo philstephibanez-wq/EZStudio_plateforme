@@ -28,11 +28,11 @@ def evaluate_reference(item, source):
         return None
     proposed = str(item["value"]).strip()
     if key == "tempo":
-        a = re.fullmatch(r"(\d+(?:\.\d+)?)\s*BPM", proposed, re.I)
-        b = re.fullmatch(r"(\d+(?:\.\d+)?)\s*BPM", reference, re.I)
+        a = re.fullmatch(r"(\d+(?:[.,]\d+)?)(?:\s*BPM)?", proposed, re.I)
+        b = re.fullmatch(r"(\d+(?:[.,]\d+)?)(?:\s*BPM)?", reference, re.I)
         if not a or not b:
             return None
-        a,b = float(a.group(1)),float(b.group(1))
+        a,b = float(a.group(1).replace(",",".")),float(b.group(1).replace(",","."))
         if not 20 <= b <= 350:
             return None
         # Ratios are not silently folded; if tempo ambiguous, abstain.

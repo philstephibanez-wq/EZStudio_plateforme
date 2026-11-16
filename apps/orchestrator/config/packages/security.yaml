@@ -18,7 +18,6 @@ security:
             http_basic:
                 realm: 'EZStudio Orchestrator'
     access_control:
-        - { path: ^/jobs, roles: PUBLIC_ACCESS }
 when@test:
     security:
         password_hashers:

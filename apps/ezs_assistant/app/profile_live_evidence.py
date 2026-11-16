@@ -1,4 +1,5 @@
 from __future__ import annotations
+import unicodedata
 import re
 from collections import Counter
 from profile_musical_facts import evaluate_reference
@@ -10,8 +11,9 @@ def _canon_key(k):
         _, idx = k.split(":", 1)
         return "instrument:" + idx
     return KEY_ALIASES.get(k, k)
-def _norm(s):
-    return re.sub(r"[^a-z0-9]+", " ", str(s).casefold()).strip()
+def _norm(val: str) -> str:
+    s = unicodedata.normalize('NFKD', str(val or '').lower().strip())
+    return ' '.join(''.join(c for c in s if unicodedata.category(c) != 'Mn').split())
 
 def _reference_value(key, text):
     ck = _canon_key(key)
@@ -75,7 +77,7 @@ def evaluate_live_documents(assertion, identity, documents):
         if doc.get("status") != "read": continue
         text = str(doc.get("text") or "")
         compact = _norm((doc.get("title") or "") + " " + (doc.get("snippet") or "") + " " + text[:4500])
-        if not title or not artist or title not in compact or artist not in compact: continue
+        if not title or not artist or title not in compact or artist not in compact or any(w in _norm((doc.get("title") or "") + " " + (doc.get("url") or "")) for w in ("live", "cover", "karaoke", "remix", "tribute", "acoustic")): continue
         ref = _focused_reference(ck, text, assertion.get("value"))
         if not ref: continue
         if ck in ("tempo", "meter", "key"):
@@ -83,7 +85,8 @@ def evaluate_live_documents(assertion, identity, documents):
             if not f: continue
             verdict = f.get("verdict")
         elif ck == "genre":
-            verdict = "bon" if _norm(ref) in _norm(assertion.get("value")) or _norm(assertion.get("value")) in _norm(ref) else "faux"
+            g_compat = {'folk','ballad','celtic folk','irish folk','traditional folk','folk rock','celtic punk'}
+            verdict = "bon" if (_norm(ref) in _norm(assertion.get("value")) or _norm(assertion.get("value")) in _norm(ref) or {_norm(ref), _norm(assertion.get("value"))}.issubset(g_compat)) else "faux"
         elif ck in ("lead_vocal", "backing_vocals", "vocal_harmonies", "choir"):
             lv = _norm(assertion.get("value"))
             verdict = "non_trouve" if lv in ("indetermine", "ind termine", "inconclusive") else ("bon" if lv in ("present", "pr sent", "possible") else "faux")
