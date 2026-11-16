@@ -19,9 +19,16 @@ def sha256_bytes(raw: bytes) -> str:
 
 def ensure_tables(con: sqlite3.Connection) -> None:
     con.execute("CREATE TABLE IF NOT EXISTS assistant_presets (id TEXT PRIMARY KEY, phase TEXT NOT NULL, version TEXT NOT NULL, schema_version TEXT NOT NULL, content_json TEXT NOT NULL, sha256 TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL)")
+    con.execute("CREATE TABLE IF NOT EXISTS assistant_preset_revisions (preset_id TEXT NOT NULL, sha256 TEXT NOT NULL, phase TEXT NOT NULL, version TEXT NOT NULL, schema_version TEXT NOT NULL, content_json TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (preset_id, sha256))")
     con.execute("CREATE TABLE IF NOT EXISTS assistant_preset_baselines (phase TEXT PRIMARY KEY, preset_id TEXT NOT NULL, updated_at INTEGER NOT NULL)")
+    con.execute("CREATE TABLE IF NOT EXISTS assistant_preset_promotions (id INTEGER PRIMARY KEY AUTOINCREMENT, phase TEXT NOT NULL, previous_preset_id TEXT, new_preset_id TEXT NOT NULL, new_preset_sha256 TEXT NOT NULL, promoted_by TEXT NOT NULL, promoted_at INTEGER NOT NULL)")
     con.execute("CREATE TABLE IF NOT EXISTS assistant_run_preset (run_id INTEGER PRIMARY KEY, preset_id TEXT NOT NULL, preset_sha256 TEXT NOT NULL, executed_at INTEGER NOT NULL)")
-    con.execute("CREATE TABLE IF NOT EXISTS assistant_run_preset_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL, preset_id TEXT NOT NULL, preset_sha256 TEXT NOT NULL, executed_at INTEGER NOT NULL)")
+    con.execute("CREATE TABLE IF NOT EXISTS assistant_run_preset_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL, preset_id TEXT NOT NULL, preset_sha256 TEXT NOT NULL, content_json TEXT, expertise_job_id INTEGER, executed_at INTEGER NOT NULL)")
+    cols = {r[1] for r in con.execute("PRAGMA table_info(assistant_run_preset_attempts)").fetchall()}
+    if "content_json" not in cols:
+        con.execute("ALTER TABLE assistant_run_preset_attempts ADD COLUMN content_json TEXT")
+    if "expertise_job_id" not in cols:
+        con.execute("ALTER TABLE assistant_run_preset_attempts ADD COLUMN expertise_job_id INTEGER")
 
 
 def load_preset_file(path: Path) -> tuple[dict, str]:
@@ -55,14 +62,20 @@ def sync_presets(db_path: Path = DB_PATH, preset_dir: Path = LAB_PRESET_DIR) -> 
             schema = str(data["schema"])
             cjson = canonical_json(data)
             con.execute(
-                "INSERT INTO assistant_presets(id,phase,version,schema_version,content_json,sha256,active,updated_at) VALUES (?,?,?,?,?,?,1,?) "
-                "ON CONFLICT(id) DO UPDATE SET phase=excluded.phase, version=excluded.version, schema_version=excluded.schema_version, content_json=excluded.content_json, sha256=excluded.sha256, updated_at=excluded.updated_at",
-                (pid, phase, ver, schema, cjson, digest, now),
+                "INSERT INTO assistant_preset_revisions(preset_id,sha256,phase,version,schema_version,content_json,created_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(preset_id,sha256) DO NOTHING",
+                (pid, digest, phase, ver, schema, cjson, now),
             )
-            # Immutabilité : la baseline n'est initialisée que si absente ; jamais écrasée automatiquement
+            existing = con.execute("SELECT sha256 FROM assistant_presets WHERE id=?", (pid,)).fetchone()
+            if existing is None:
+                con.execute(
+                    "INSERT INTO assistant_presets(id,phase,version,schema_version,content_json,sha256,active,updated_at) VALUES (?,?,?,?,?,?,1,?)",
+                    (pid, phase, ver, schema, cjson, digest, now),
+                )
+            elif existing[0] != digest:
+                raise ValueError(f"preset_immutable_conflict:{pid}")
             if "baseline" in pid:
                 con.execute(
-                    "INSERT INTO assistant_preset_baselines(phase,preset_id,updated_at) VALUES (?,?,?) ON CONFLICT(phase) DO NOTHING",
+                    "INSERT INTO assistant_preset_baselines(phase,preset_id,updated_at) VALUES (?,?,?) ON CONFLICT(phase) DO UPDATE SET preset_id=excluded.preset_id, updated_at=excluded.updated_at",
                     (phase, pid, now),
                 )
             synced.append({"id": pid, "phase": phase, "sha256": digest, "execution_path": CANONICAL_EXECUTION_PATH})
@@ -70,33 +83,45 @@ def sync_presets(db_path: Path = DB_PATH, preset_dir: Path = LAB_PRESET_DIR) -> 
     return synced
 
 
-def set_explicit_baseline(phase: str, preset_id: str, db_path: Path = DB_PATH) -> None:
-    """Action explicite et volontaire de changement de baseline (jamais appelée lors d'un run)."""
+def set_explicit_baseline(phase: str, preset_id: str, db_path: Path = DB_PATH, promoted_by: str = "operator") -> None:
+    """Promotion explicite et journalisee d'une baseline existante (jamais implicite)."""
     with sqlite3.connect(str(db_path)) as con:
         ensure_tables(con)
-        row = con.execute("SELECT id FROM assistant_presets WHERE id=? AND phase=?", (preset_id, phase)).fetchone()
+        row = con.execute("SELECT id, sha256 FROM assistant_presets WHERE id=? AND phase=?", (preset_id, phase)).fetchone()
         if not row:
             raise ValueError(f"baseline_preset_not_found:{phase}:{preset_id}")
+        prev = con.execute("SELECT preset_id FROM assistant_preset_baselines WHERE phase=?", (phase,)).fetchone()
+        prev_id = prev[0] if prev else None
         now = int(time.time())
         con.execute(
-            "INSERT INTO assistant_preset_baselines(phase,preset_id,updated_at) VALUES (?,?,?) "
-            "ON CONFLICT(phase) DO NOTHING",
+            "INSERT INTO assistant_preset_baselines(phase,preset_id,updated_at) VALUES (?,?,?) ON CONFLICT(phase) DO UPDATE SET preset_id=excluded.preset_id, updated_at=excluded.updated_at",
             (phase, preset_id, now),
+        )
+        con.execute(
+            "INSERT INTO assistant_preset_promotions(phase,previous_preset_id,new_preset_id,new_preset_sha256,promoted_by,promoted_at) VALUES (?,?,?,?,?,?)",
+            (phase, prev_id, preset_id, row[1], promoted_by, now),
         )
         con.commit()
 
 
-def record_run_preset(run_id: int, preset_id: str, preset_sha256: str, db_path: Path = DB_PATH) -> None:
-    """Enregistre la provenance initiale de façon immuable et trace toutes les tentatives."""
+def record_run_preset(run_id: int, preset_id: str, preset_sha256: str, db_path: Path = DB_PATH, content_json: str | None = None, expertise_job_id: int | None = None) -> int:
+    """Enregistre la provenance initiale immuable et chaque tentative avec son contenu exact."""
     with sqlite3.connect(str(db_path)) as con:
         ensure_tables(con)
+        if content_json is None:
+            rev = con.execute("SELECT content_json FROM assistant_preset_revisions WHERE preset_id=? AND sha256=?", (preset_id, preset_sha256)).fetchone()
+            if rev is None:
+                rev = con.execute("SELECT content_json FROM assistant_presets WHERE id=? AND sha256=?", (preset_id, preset_sha256)).fetchone()
+            content_json = rev[0] if rev else None
         now = int(time.time())
         con.execute(
             "INSERT INTO assistant_run_preset(run_id,preset_id,preset_sha256,executed_at) VALUES (?,?,?,?) ON CONFLICT(run_id) DO NOTHING",
             (int(run_id), preset_id, preset_sha256, now),
         )
-        con.execute(
-            "INSERT INTO assistant_run_preset_attempts(run_id,preset_id,preset_sha256,executed_at) VALUES (?,?,?,?)",
-            (int(run_id), preset_id, preset_sha256, now),
+        cur = con.execute(
+            "INSERT INTO assistant_run_preset_attempts(run_id,preset_id,preset_sha256,content_json,expertise_job_id,executed_at) VALUES (?,?,?,?,?,?)",
+            (int(run_id), preset_id, preset_sha256, content_json, expertise_job_id, now),
         )
+        attempt_id = int(cur.lastrowid)
         con.commit()
+    return attempt_id

@@ -18,6 +18,11 @@ security:
             http_basic:
                 realm: 'EZStudio Orchestrator'
     access_control:
+        - { path: ^/jobs, ips: [127.0.0.1, '::1'], roles: PUBLIC_ACCESS }
+        - { path: ^/jobs, roles: ROLE_ORCHESTRATOR_OPERATOR }
+        - { path: ^/, ips: [127.0.0.1, '::1'], roles: PUBLIC_ACCESS }
+        - { path: ^/, roles: ROLE_ORCHESTRATOR_OPERATOR }
+
 when@test:
     security:
         password_hashers:
@@ -26,9 +31,5 @@ when@test:
             users_in_memory:
                 memory:
                     users:
-                        operator:
-                            password: 'operator_pass'
-                            roles: ['ROLE_ORCHESTRATOR_OPERATOR']
-                        viewer:
-                            password: 'viewer_pass'
-                            roles: ['ROLE_USER']
+                        operator: { password: 'operator_pass', roles: ['ROLE_ORCHESTRATOR_OPERATOR'] }
+                        viewer: { password: 'viewer_pass', roles: ['ROLE_USER'] }

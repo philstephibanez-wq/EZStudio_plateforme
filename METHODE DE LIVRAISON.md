@@ -30,4 +30,4 @@ Avant tout commit ou clôture d'issue, exécuter systématiquement dans cet ordr
 5. **Redémarrage & Recette réelle** :
    `.\bin\ezs.ps1 restart` (purge le cache Symfony/Twig et arrête les workers Python résiduels), puis relancer le job cible et comparer les verdicts avec la révision de référence.
 
-Et toujour UTF sans BOM
+Et toujour UTF 8 sans BOM

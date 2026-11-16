@@ -61,6 +61,7 @@ def _focused_reference(key, text, proposed):
                 if first and len(first) <= 40: return first
         return None
     if ck.startswith("instrument:"):
+        if any(w in _norm(text[:3000]) for w in ('tablature', 'guitar tab', 'harmonica tab', 'chord diagram', 'tuning:', 'capo:', 'made famous by')): return None
         raw = str(proposed).strip()
         for v in ([raw, "guitar"] if raw.lower() == "acoustic guitar" else [raw]):
             if v and re.search(r"\b" + re.escape(v) + r"\b", text, re.I): return v
@@ -77,7 +78,7 @@ def evaluate_live_documents(assertion, identity, documents):
         if doc.get("status") != "read": continue
         text = str(doc.get("text") or "")
         compact = _norm((doc.get("title") or "") + " " + (doc.get("snippet") or "") + " " + text[:4500])
-        if not title or not artist or title not in compact or artist not in compact or any(w in _norm((doc.get("title") or "") + " " + (doc.get("url") or "")) for w in ("live", "cover", "karaoke", "remix", "tribute", "acoustic")): continue
+        if not title or not artist or title not in compact or artist not in compact or any(w in _norm((doc.get("title") or "") + " " + (doc.get("url") or "")) for w in ("live", "cover", "karaoke", "remix", "tribute", "acoustic", "ultimate-guitar", "chordu", "chordify", "songsterr", "tablature", "guitar tab", "harmonica tab", "made famous by")): continue
         ref = _focused_reference(ck, text, assertion.get("value"))
         if not ref: continue
         if ck in ("tempo", "meter", "key"):
