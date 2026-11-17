@@ -75,7 +75,7 @@ def sync_presets(db_path: Path = DB_PATH, preset_dir: Path = LAB_PRESET_DIR) -> 
                 raise ValueError(f"preset_immutable_conflict:{pid}")
             if "baseline" in pid:
                 con.execute(
-                    "INSERT INTO assistant_preset_baselines(phase,preset_id,updated_at) VALUES (?,?,?) ON CONFLICT(phase) DO UPDATE SET preset_id=excluded.preset_id, updated_at=excluded.updated_at",
+                    "INSERT INTO assistant_preset_baselines(phase,preset_id,updated_at) VALUES (?,?,?) ON CONFLICT(phase) DO NOTHING",
                     (phase, pid, now),
                 )
             synced.append({"id": pid, "phase": phase, "sha256": digest, "execution_path": CANONICAL_EXECUTION_PATH})

@@ -90,7 +90,7 @@ def evaluate_live_documents(assertion, identity, documents):
             verdict = "bon" if (_norm(ref) in _norm(assertion.get("value")) or _norm(assertion.get("value")) in _norm(ref) or {_norm(ref), _norm(assertion.get("value"))}.issubset(g_compat)) else "faux"
         elif ck in ("lead_vocal", "backing_vocals", "vocal_harmonies", "choir"):
             lv = _norm(assertion.get("value"))
-            verdict = "non_trouve" if lv in ("indetermine", "ind termine", "inconclusive") else ("bon" if lv in ("present", "pr sent", "possible") else "faux")
+            verdict = "non_trouve" if lv in ("indetermine", "inconclusive") else ("bon" if lv in ("present", "possible") else "faux")
         else:
             verdict = "bon"
         accepted.append({"url": doc.get("url"), "reference_value": ref, "verdict": verdict, "attribution": "title_artist_page"})

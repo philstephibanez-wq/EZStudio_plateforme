@@ -1,3 +1,4 @@
+CANONICAL_EXECUTION_PATH = "v1"
 """LAB-triggered PROFILE documentary review on MAIN, using the existing LAB FIFO."""
 from __future__ import annotations
 import argparse

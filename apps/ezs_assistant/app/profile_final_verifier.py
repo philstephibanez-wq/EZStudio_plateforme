@@ -214,6 +214,14 @@ def verify_final_values(row, identity, research):
             "scientific_preset_mutation_allowed":False}
 
 
+def _parse_sec(val):
+    s = str(val or "").strip().lower()
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})(?::(\d{2}))?", s)
+    if m:
+        return int(m.group(1))*3600 + int(m.group(2))*60 + int(m.group(3)) if m.group(3) else int(m.group(1))*60 + int(m.group(2))
+    m2 = re.search(r"([0-9]+(?:[.,][0-9]+)?)", s)
+    return float(m2.group(1).replace(",", ".")) if m2 else None
+
 def _documentary_type_ok(key, value):
     """Avoid incompatible units/values being marked as documentary agreement."""
     import re
@@ -286,6 +294,7 @@ def attach_documentary_findings(verification, investigation, local_review):
                   if isinstance(item, dict) and item.get("key")}
     ai_by_key = {str(item["key"]): item for item in (local_review.get("items") or [])
                  if isinstance(item, dict) and item.get("key")}
+    is_excerpt = False
     for assertion in merged.get("assertions") or []:
         key = str(assertion.get("key") or "")
         if not key or assertion.get("verdict") in ("bon", "faux"):
@@ -309,7 +318,7 @@ def attach_documentary_findings(verification, investigation, local_review):
         if proposed not in ("bon", "faux"):
             proposed = None
         incompatible = value is not None and not _documentary_type_ok(key, value)
-        comparison = "indeterminate" if incompatible else ("concordant" if str(assertion.get("value") or "").strip().lower() == str(value or "").strip().lower() else _compare_documentary(key, assertion.get("value"), value))
+        comparison = "indeterminate" if incompatible else _compare_documentary(key, assertion.get("value"), value)
         id_confirmed = bool((investigation.get("identity") or {}).get("recording_identity_verified")) or bool(urls)
         reason_txt = review.get("reason") or candidate.get("explanation") or ("Valeur documentaire incompatible avec le type de cet item" if incompatible else "Aucune valeur documentaire exploitable")
         final_verdict = None
@@ -343,21 +352,39 @@ def attach_documentary_findings(verification, investigation, local_review):
         if str(assertion.get("value") or "").strip().lower() in ("inconclusive", "indéterminé", "indetermine", "ind?termin?"):
             assertion["verdict"] = "non_trouve"
             continue
-        if key in ("lead_vocal", "voix_principale") and value is not None and "sent" in str(assertion.get("value") or "").lower() and "sent" in str(value).lower():
-            final_verdict = "bon"; comparison = "concordant"
+        if key in ("lead_vocal", "voix_principale", "backing_vocals", "voix_accompagnement", "vocal_harmonies", "harmonies_vocales", "choir", "choeurs") and value is not None:
+            lv_s, ev_s = str(assertion.get("value") or "").lower(), str(value).lower()
+            if ("sent" in lv_s and "sent" in ev_s) or ("absent" in lv_s and "absent" in ev_s):
+                final_verdict = "bon"; comparison = "concordant"
+            elif ("sent" in lv_s and "absent" in ev_s) or ("absent" in lv_s and "sent" in ev_s):
+                final_verdict = "faux"; comparison = "discordant"
         if key == "tempo" and value is not None and final_verdict == "faux":
             mr = _load_metric_rules(); tol = float(mr.get("tempo_octave_tolerance_bpm") or 0.0)
             m1 = re.search(r"([0-9]+(?:[.,][0-9]+)?)", str(assertion.get("value") or "")); m2 = re.search(r"([0-9]+(?:[.,][0-9]+)?)", str(value))
             if tol > 0 and m1 and m2:
                 lb, eb = float(m1.group(1).replace(",",".")), float(m2.group(1).replace(",","."))
                 if abs(2.0 * lb - eb) <= tol or abs(lb - 2.0 * eb) <= tol / 2.0:
-                    final_verdict = "bon"; comparison = "concordant"; reason_txt = f"Concordance octave rythmique 2x/0.5x (LAB {lb} vs EXT {eb} BPM)."
+                    final_verdict = "non_trouve"; comparison = "related_metric"; reason_txt = f"Hypothèse métrique double/mi-temps 2x/0.5x (LAB {lb} vs EXT {eb} BPM — non équivalent strict)."
         if key in ("meter", "mesure") and value is not None and final_verdict == "faux":
             mr = _load_metric_rules(); lv = str(assertion.get("value") or "").strip().lower(); ev = str(value).strip().lower()
-            if ev in [str(x).lower() for x in ((mr.get("ternary_web_aliases") or {}).get(lv) or [])]:
-                final_verdict = "bon"; comparison = "concordant"; reason_txt = "Parenté métrique ternaire (6/8 confirmé / indexé 3/4 sur les bases web)."
-        if final_verdict in ("bon", "faux"):
-            assertion["verdict"] = final_verdict
+            if lv != ev and ev in [str(x).lower() for x in ((mr.get("ternary_web_aliases") or {}).get(lv) or [])]:
+                final_verdict = "non_trouve"; comparison = "related_metric"; reason_txt = f"Parenté métrique ternaire ({lv} vs {ev} — non équivalent strict)."
+        if key in ("duration", "duree") and value is not None:
+            _ls, _es = _parse_sec(assertion.get("value")), _parse_sec(value)
+            if _ls is not None and _es and _es > 0 and (_ls / _es) < 0.45:
+                is_excerpt = True
+        if is_excerpt and (key in ("duration", "duree", "choir", "choeurs", "backing_vocals", "voix_accompagnement", "vocal_harmonies", "harmonies_vocales") or key.startswith("instrument")):
+            final_verdict = "non_trouve"; comparison = "excerpt_uncomparable"; reason_txt = "Extrait audio ou version partielle (< 45 s ou < 45 % de la durée studio) : comparaison globale non applicable."
+        if comparison == "discordant" and final_verdict == "bon":
+            final_verdict = "faux"
+        elif comparison == "concordant" and final_verdict == "faux":
+            final_verdict = "bon"
+        elif comparison in ("indeterminate", "related_metric", "excerpt_uncomparable", "unverified", "not_scored") or not comparison:
+            final_verdict = "non_trouve"
+        has_valid_url = any(isinstance(s, str) and s.startswith("https://") for s in (urls or []))
+        if final_verdict in ("bon", "faux") and (not has_valid_url or not bool((investigation or {}).get("available", True))):
+            final_verdict = "non_trouve"; comparison = "unverified"; reason_txt = "Traçabilité documentaire insuffisante (URL source ou validation externe absente)."
+        assertion["verdict"] = final_verdict if final_verdict in ("bon", "faux") else "non_trouve"
         if value is not None:
             assertion["reference_value"] = (str(value).strip() + gap_note)[:160]
         if urls:

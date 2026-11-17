@@ -196,7 +196,7 @@
               {% set disp_ref = (row_def.label == 'Durée' and raw_ref matches '/^[0-9.]+$/') ? ((raw_ref / 60)|round(0,'floor') ~ ':' ~ '%02d'|format((raw_ref % 60)|round(0,'floor'))) : (raw_ref ?: '—') %}
               <tr>
                 <td><strong>{{ row_def.label }}</strong></td>
-                <td>{{ (found.lab_value ?? found.value ?? row_def.lab)|replace({'pr?sent':'présent','ind?termin?':'indéterminé'}) }}</td>
+                <td>{{ ((found.lab_value ?? null) ?: ((found.value ?? null) ?: row_def.lab))|replace({'pr?sent':'présent','ind?termin?':'indéterminé'}) }}</td>
                 <td><span class="badge {{ badge_cls }} v-badge-tip" tabindex="0">{{ badge_lbl }}<span class="v-badge-pop"><strong>{{ v_desc }}</strong><br><span style="color:#94a3b8">{{ v_detail }}</span></span></span></td>
                 <td>{{ disp_ref }}</td>
                 <td class="ana-cell" style="font-size:11px" title="{{ v_detail }}">{% for src in (found.sources ?? []) %}{% if src.url is defined and src.url %}<a href="{{ src.url }}" target="_blank" rel="noopener noreferrer" title="{{ src.url }}">[{{ loop.index }}]</a> {% endif %}{% endfor %}<span class="meta" style="font-size:10.5px">{{ v_detail }}</span></td>
