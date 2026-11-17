@@ -82,7 +82,7 @@ final class WorkbenchController extends AbstractController
     }
 
     #[Route('/profile/expertise-all', name: 'profile_expertise_all', methods: ['POST'])]
-    public function expertiseAllProfiles(Request $request, \EZSLab\Service\ProfileAiRequestService $aiQueue, WorkbenchCatalog $catalog): Response
+    public function expertiseAllProfiles(Request $request, \EZSLab\Service\ProfileAiRequestService $aiQueue, CatalogService $catalog): Response
     {
         $site = (string)$request->headers->get('Sec-Fetch-Site','');
         $origin = (string)$request->headers->get('Origin','');
@@ -94,7 +94,7 @@ final class WorkbenchController extends AbstractController
         }
         $queued = 0; $skippedActive = 0; $skippedMissing = 0;
         foreach ($catalog->songs() as $song) {
-            $runId = (int)($song['profile']['run_id'] ?? 0);
+            $runId = (int)($song['profile']['run_id'] ?? $song['latest_run_id'] ?? 0);
             if ($runId <= 0) { ++$skippedMissing; continue; }
             try { $aiQueue->enqueue($runId); ++$queued; }
             catch (\RuntimeException) { ++$skippedActive; }
