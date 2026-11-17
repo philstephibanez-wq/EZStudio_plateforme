@@ -22,12 +22,13 @@
       <span class="badge">1 · Chanson</span>
       {% if selected_song %}
         <div>
-          <h1 style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span id="inplace-title" contenteditable="true" spellcheck="false" title="Cliquer pour éditer le titre" style="outline:none;border-bottom:1px dashed var(--muted);padding:1px 4px;border-radius:3px">{{ selected_song.title }}</span>
-            <span>—</span>
-            <span id="inplace-artist" contenteditable="true" spellcheck="false" title="Cliquer pour éditer l'interprète" style="outline:none;border-bottom:1px dashed var(--muted);padding:1px 4px;border-radius:3px">{{ selected_song.artist }}</span>
-            <button type="button" id="song-edit-toggle" class="secondary icon-btn" title="Éditer sur place">✎</button>
-          </h1>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label for="inplace-title" style="display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#cbd5e1">Titre<input type="text" id="inplace-title" value="{{ selected_song.title }}" readonly aria-label="Titre" placeholder="Titre" style="font-size:15px;font-weight:700;width:clamp(220px,24vw,340px);padding:5px 9px;border-radius:5px;border:1px solid var(--line);background:rgba(255,255,255,0.03);color:inherit"></label>
+            <label for="inplace-artist" style="display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#cbd5e1">Interprète<input type="text" id="inplace-artist" value="{{ selected_song.artist }}" readonly aria-label="Interprète" placeholder="Interprète" style="font-size:15px;font-weight:700;width:clamp(220px,24vw,340px);padding:5px 9px;border-radius:5px;border:1px solid var(--line);background:rgba(255,255,255,0.03);color:inherit"></label>
+            <button type="button" id="song-edit-toggle" class="secondary icon-btn" title="Modifier le titre et l'interprète">✎</button>
+            <button type="button" id="song-edit-save" style="display:none;padding:5px 10px;font-size:12px">Valider</button>
+            <button type="button" id="song-edit-cancel" class="secondary" style="display:none;padding:5px 9px;font-size:12px">Annuler</button>
+          </div>
           {% if selected_song.source_filename is defined and selected_song.source_filename %}<div class="meta" style="font-size:11px;margin-top:2px">{{ selected_song.source_filename }}</div>{% endif %}
         </div>
         <span id="song-identity-message" class="meta" style="font-size:11px"></span>
@@ -57,22 +58,14 @@
     }
     const st=document.getElementById('copy-diag-status');if(st){st.style.display='inline';setTimeout(()=>{st.style.display='none';},2000);}
   });
-  const card=document.getElementById('part-1-song-card'), tEl=document.getElementById('inplace-title'), aEl=document.getElementById('inplace-artist'), pen=document.getElementById('song-edit-toggle'), msg=document.getElementById('song-identity-message');
+  const card=document.getElementById('part-1-song-card'), tEl=document.getElementById('inplace-title'), aEl=document.getElementById('inplace-artist'), pen=document.getElementById('song-edit-toggle'), btnSave=document.getElementById('song-edit-save'), btnCancel=document.getElementById('song-edit-cancel'), msg=document.getElementById('song-identity-message');
   if(tEl && aEl && card){
-    let origT=tEl.textContent.trim(), origA=aEl.textContent.trim();
-    const url=card.dataset.identityUrl||'';
-    [tEl,aEl].forEach(el=>{
-      el.addEventListener('focus',()=>{el.style.borderBottomColor='#4ea1ff';el.style.background='rgba(255,255,255,0.08)';});
-      el.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();el.blur();}else if(e.key==='Escape'){tEl.textContent=origT;aEl.textContent=origA;el.blur();}});
-      el.addEventListener('blur',async()=>{
-        el.style.borderBottomColor='var(--muted)';el.style.background='transparent';
-        const nt=tEl.textContent.trim(), na=aEl.textContent.trim();
-        if(!url||!nt||!na||(nt===origT&&na===origA))return;
-        msg.textContent='Enregistrement…';
-        try{const fd=new FormData();fd.append('title',nt);fd.append('artist',na);const r=await fetch(url,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Song-Identity':'save'},body:fd});if(!r.ok)throw new Error(r.status);origT=nt;origA=na;msg.textContent='Enregistré';setTimeout(()=>msg.textContent='',2000);}catch(_){tEl.textContent=origT;aEl.textContent=origA;msg.textContent='Erreur';}
-      });
-    });
-    pen?.addEventListener('click',()=>{tEl.focus();const sel=window.getSelection();const rng=document.createRange();rng.selectNodeContents(tEl);sel.removeAllRanges();sel.addRange(rng);});
+    let origT=tEl.value.trim(), origA=aEl.value.trim(); const url=card.dataset.identityUrl||'';
+    const setEdit=(on)=>{[tEl,aEl].forEach(el=>{el.readOnly=!on;el.style.borderColor=on?'#4ea1ff':'var(--line)';el.style.background=on?'rgba(255,255,255,0.09)':'rgba(255,255,255,0.03)';});if(pen)pen.style.display=on?'none':'inline-block';if(btnSave)btnSave.style.display=on?'inline-block':'none';if(btnCancel)btnCancel.style.display=on?'inline-block':'none';if(on){tEl.focus();tEl.select();}};
+    const cancelEdit=()=>{tEl.value=origT;aEl.value=origA;setEdit(false);};
+    const saveEdit=async()=>{const nt=tEl.value.trim(),na=aEl.value.trim();if(!url||!nt||!na){return;}if(nt===origT&&na===origA){setEdit(false);return;}msg.textContent='Enregistrement…';btnSave.disabled=true;try{const fd=new FormData();fd.append('title',nt);fd.append('artist',na);const r=await fetch(url,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Song-Identity':'save'},body:fd});if(!r.ok)throw new Error(r.status);origT=nt;origA=na;setEdit(false);msg.textContent='Enregistré';setTimeout(()=>msg.textContent='',2000);}catch(_){msg.textContent='Erreur';}finally{btnSave.disabled=false;}};
+    pen?.addEventListener('click',()=>setEdit(true)); btnCancel?.addEventListener('click',cancelEdit); btnSave?.addEventListener('click',saveEdit);
+    [tEl,aEl].forEach(el=>el.addEventListener('keydown',(e)=>{if(el.readOnly)return;if(e.key==='Enter'){e.preventDefault();saveEdit();}else if(e.key==='Escape'){e.preventDefault();cancelEdit();}}));
   }
   document.getElementById('profile-report-publication-enabled')?.addEventListener('change',async function(){
     const cb=this,st=document.getElementById('profile-report-publication-status'),w=cb.checked;cb.disabled=true;st.textContent='…';

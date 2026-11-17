@@ -8,6 +8,7 @@ from difflib import SequenceMatcher
 from profile_final_verifier import final_assertions
 from profile_public_web import search, fetch_document
 from profile_live_evidence import evaluate_live_documents
+from profile_universal_investigator import step1_build_pivot_queries, step3_select_source_sets, step4_extract_facts_via_gpu, step5_and_6_confront_and_judge
 
 from pathlib import Path
 from declarative_review import load_review_preset
@@ -266,6 +267,20 @@ def research_assertions(assertions, identity, *, source_research=None):
             it["status"] = "documents_read"
             it["eligible_for_verdict"] = True
             it["evidence_review"] = evaluate_live_documents({"key": it["key"], "value": it["value"]}, effective_identity, it["documents"])
+    for _pq in step1_build_pivot_queries(effective_identity):
+        for _hit in ((lambda r: r if isinstance(r, list) else (r or {}).get("results", []))(search(_pq, max_results=3))):
+            _u = str(_hit.get("url") or "").strip()
+            if _u and _u not in shared and len(shared) < 12:
+                _src = fetch_document(_u)
+                if _src.get("status") == "read" and not _is_blocked_page(str(_src.get("text") or ""), _load_doc_research_cfg()):
+                    shared[_u] = {"status": "read", "url": _src.get("url") or _u, "title": _hit.get("title") or "", "text": (str(_hit.get("snippet") or "") + "\n" + str(_src.get("text") or ""))[:8000]}
+    if shared:
+        _u_sets = step3_select_source_sets(list(shared.values()), effective_identity)
+        _u_facts = step4_extract_facts_via_gpu(effective_identity, _u_sets)
+        for it in items:
+            if (it.get("evidence_review") or {}).get("verdict") == "non_trouve":
+                _u_rev = step5_and_6_confront_and_judge({"key": it["key"], "value": it["value"]}, _u_facts, _u_sets)
+                if _u_rev: it["evidence_review"] = _u_rev
     return {"status":"error" if failed==len(items) and items else "partial" if (failed or degraded) else "completed" if items else "no_assertions",
             "reason":"web_search_failed_for_all_items" if failed==len(items) and items else
                      "web_search_partially_unavailable" if degraded else None,

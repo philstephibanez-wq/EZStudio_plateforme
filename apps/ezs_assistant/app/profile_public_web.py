@@ -41,7 +41,38 @@ def _url(value):
     except (TypeError,ValueError):
         return None
 
+def _load_local_env():
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    for fname in (".env.local", ".env"):
+        fpath = os.path.join(root, fname)
+        if not os.path.isfile(fpath): continue
+        for line in open(fpath, encoding="utf-8", errors="ignore"):
+            s = line.strip()
+            if not s or s.startswith("#") or "=" not in s: continue
+            k, v = s.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+def _google_cse_search(query, max_results=10):
+    _load_local_env()
+    key = os.getenv("GOOGLE_CSE_API_KEY", "").strip()
+    cx = os.getenv("GOOGLE_CSE_CX", "").strip()
+    if not key or not cx: return None
+    qs = urllib.parse.urlencode({"key": key, "cx": cx, "q": query, "num": min(10, max(1, int(max_results)))})
+    req = urllib.request.Request(urllib.parse.urlunsplit(("https", "www." + "googleapis.com", "/customsearch/v1", qs, "")), headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read(500_000).decode("utf-8"))
+        out = []
+        for it in data.get("items") or []:
+            u = _url(it.get("link"))
+            if u: out.append({"title": str(it.get("title") or ""), "url": u, "snippet": str(it.get("snippet") or "")})
+        return out
+    except Exception:
+        return None
+
 def search(query,max_results=10):
+    cse = _google_cse_search(query, max_results=max_results)
+    if cse: return cse
     """Native Python DDGS metasearch on Windows. No SearXNG daemon or API key.
 
     Fail closed with a technical error when all upstream engines are unavailable.
@@ -52,7 +83,7 @@ def search(query,max_results=10):
         raise RuntimeError("DDGS_NOT_INSTALLED: python -m pip install ddgs") from exc
     try:
         with DDGS(timeout=18) as engine:
-            hits=list(engine.text(query,max_results=max_results+8))
+            hits=list(engine.text(query,max_results=max_results+8,backend="auto"))
     except Exception as exc:
         if "no results found" in str(exc).casefold():
             return []

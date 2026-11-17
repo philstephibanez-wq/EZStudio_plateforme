@@ -9,9 +9,10 @@
   <a class="button" href="{{ path('workbench_import') }}">Importer une chanson</a>
 </div>
 
+{% if app.request.query.get('expertise_all_queued') is not null %}<div class="card"><strong>Tout expertiser</strong> — {{ app.request.query.get('expertise_all_queued') }} job(s) ajouté(s), {{ app.request.query.get('expertise_all_skipped_active')|default(0) }} déjà actif(s), {{ app.request.query.get('expertise_all_skipped_missing')|default(0) }} sans analyse disponible.</div>{% endif %}
 {% if app.request.query.get('profile_all_queued') is not null %}
 <div class="card">
-  <strong>PROFILE ALL</strong> —
+  <strong>Tout analyser</strong> —
   {{ app.request.query.get('profile_all_queued') }} job(s) ajouté(s),
   {{ app.request.query.get('profile_all_skipped_active')|default(0) }} déjà actif(s),
   {{ app.request.query.get('profile_all_skipped_source')|default(0) }} sans source disponible.
@@ -32,8 +33,9 @@
         class="catalog-profile-all-form"
         data-confirm="Lancer une nouvelle analyse PROFILE sur toutes les chansons du catalogue ? Les jobs PROFILE déjà actifs seront ignorés."
         style="display:inline">
-    <button type="submit" class="secondary">PROFILE ALL</button>
+    <button type="submit" class="secondary">Tout analyser</button>
   </form>
+  <form method="post" action="{{ path('profile_expertise_all') }}" class="catalog-profile-all-form" data-confirm="Lancer une expertise IA sur toutes les chansons analysées du catalogue ? Les expertises déjà actives seront ignorées." style="display:inline"><button type="submit" class="secondary">Tout expertiser</button></form>
   <a class="button secondary"
      href="{{ path('profile_export_all_zip') }}"
      title="Exporter tous les résultats PROFILE disponibles">ZIP ALL</a>

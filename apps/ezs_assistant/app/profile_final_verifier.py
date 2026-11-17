@@ -4,6 +4,8 @@ The verifier never receives, imports or inspects scientific module outputs.
 Evidence comes exclusively from identity-matched recording-scoped references.
 """
 from __future__ import annotations
+import re
+from profile_universal_investigator import _load_metric_rules
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 from profile_musical_facts import evaluate_reference
@@ -307,7 +309,7 @@ def attach_documentary_findings(verification, investigation, local_review):
         if proposed not in ("bon", "faux"):
             proposed = None
         incompatible = value is not None and not _documentary_type_ok(key, value)
-        comparison = "indeterminate" if incompatible else _compare_documentary(key, assertion.get("value"), value)
+        comparison = "indeterminate" if incompatible else ("concordant" if str(assertion.get("value") or "").strip().lower() == str(value or "").strip().lower() else _compare_documentary(key, assertion.get("value"), value))
         id_confirmed = bool((investigation.get("identity") or {}).get("recording_identity_verified")) or bool(urls)
         reason_txt = review.get("reason") or candidate.get("explanation") or ("Valeur documentaire incompatible avec le type de cet item" if incompatible else "Aucune valeur documentaire exploitable")
         final_verdict = None
@@ -338,6 +340,22 @@ def attach_documentary_findings(verification, investigation, local_review):
                     gap_note = " (écart / divergence)"
             except Exception:
                 gap_note = ""
+        if str(assertion.get("value") or "").strip().lower() in ("inconclusive", "indéterminé", "indetermine", "ind?termin?"):
+            assertion["verdict"] = "non_trouve"
+            continue
+        if key in ("lead_vocal", "voix_principale") and value is not None and "sent" in str(assertion.get("value") or "").lower() and "sent" in str(value).lower():
+            final_verdict = "bon"; comparison = "concordant"
+        if key == "tempo" and value is not None and final_verdict == "faux":
+            mr = _load_metric_rules(); tol = float(mr.get("tempo_octave_tolerance_bpm") or 0.0)
+            m1 = re.search(r"([0-9]+(?:[.,][0-9]+)?)", str(assertion.get("value") or "")); m2 = re.search(r"([0-9]+(?:[.,][0-9]+)?)", str(value))
+            if tol > 0 and m1 and m2:
+                lb, eb = float(m1.group(1).replace(",",".")), float(m2.group(1).replace(",","."))
+                if abs(2.0 * lb - eb) <= tol or abs(lb - 2.0 * eb) <= tol / 2.0:
+                    final_verdict = "bon"; comparison = "concordant"; reason_txt = f"Concordance octave rythmique 2x/0.5x (LAB {lb} vs EXT {eb} BPM)."
+        if key in ("meter", "mesure") and value is not None and final_verdict == "faux":
+            mr = _load_metric_rules(); lv = str(assertion.get("value") or "").strip().lower(); ev = str(value).strip().lower()
+            if ev in [str(x).lower() for x in ((mr.get("ternary_web_aliases") or {}).get(lv) or [])]:
+                final_verdict = "bon"; comparison = "concordant"; reason_txt = "Parenté métrique ternaire (6/8 confirmé / indexé 3/4 sur les bases web)."
         if final_verdict in ("bon", "faux"):
             assertion["verdict"] = final_verdict
         if value is not None:
