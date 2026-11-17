@@ -13,7 +13,6 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Twig\Environment;
 
 final class JobsPageController
@@ -63,9 +62,13 @@ final class JobsPageController
     }
 
     #[Route('/jobs/{id}/retry', name: 'ezs_v2_jobs_retry', methods: ['POST'], requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')]
     public function retry(int $id, Request $request, JobRetryCoordinator $coordinator, QueueActionCsrfManager $csrf): Response
     {
+        // Local workstation-only workflow; authenticated remote HTTP is not sufficient.
+        // Retain the POST route and the session-bound CSRF check below.
+        if (!in_array($request->getClientIp(), ['127.0.0.1', '::1'], true)) {
+            return new Response('Action locale uniquement.', 403);
+        }
         $provided = (string) $request->request->get('_token', '');
         if (!$csrf->isValid($request, 'retry_job_' . $id, $provided)) {
             return new Response('Jeton CSRF invalide ou manquant.', 403);
@@ -86,9 +89,13 @@ final class JobsPageController
     }
 
     #[Route('/jobs/{id}/delete', name: 'ezs_v2_jobs_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
-    #[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')]
     public function delete(int $id, Request $request, QueueManager $queueManager, QueueActionCsrfManager $csrf): Response
     {
+        // Local workstation-only workflow; authenticated remote HTTP is not sufficient.
+        // Retain the POST route and the session-bound CSRF check below.
+        if (!in_array($request->getClientIp(), ['127.0.0.1', '::1'], true)) {
+            return new Response('Action locale uniquement.', 403);
+        }
         $provided = (string) $request->request->get('_token', '');
         if (!$csrf->isValid($request, 'delete_job_' . $id, $provided)) {
             return new Response('Jeton CSRF invalide ou manquant.', 403);
