@@ -1,3 +1,4 @@
+from declarative_expertise_runner import canonical_json, sha256_bytes
 import json, sqlite3, sys, tempfile, unittest
 from pathlib import Path
 
@@ -64,13 +65,13 @@ class TestProfileP1Invariants(unittest.TestCase):
             db = root / 'lab.sqlite'
             sync_presets(db, pdir)
             set_explicit_baseline('profile', 'profile-cand-2', db, promoted_by='tester')
-            record_run_preset(101, 'profile-cand-2', 'deadbeef', content_json='{"id":"profile-cand-2","v":1}', db_path=db)
+            c1=canonical_json({"id":"profile-cand-2","v":1}); record_run_preset(101, 'profile-cand-2', sha256_bytes(c1.encode()), content_json=c1, db_path=db)
             sync_presets(db, pdir)
             con = sqlite3.connect(str(db))
             try:
                 base = con.execute('SELECT preset_id FROM assistant_preset_baselines WHERE phase=?', ('profile',)).fetchone()[0]
                 self.assertEqual(base, 'profile-cand-2')
-                record_run_preset(101, 'profile-qwen-baseline-1', 'cafebabe', content_json='{"id":"profile-qwen-baseline-1","v":2}', db_path=db)
+                c2=canonical_json({"id":"profile-qwen-baseline-1","v":2}); record_run_preset(101, 'profile-qwen-baseline-1', sha256_bytes(c2.encode()), content_json=c2, db_path=db)
                 base_after = con.execute('SELECT preset_id FROM assistant_preset_baselines WHERE phase=?', ('profile',)).fetchone()[0]
                 run_prov = con.execute('SELECT preset_id FROM assistant_run_preset WHERE run_id=?', (101,)).fetchone()[0]
                 self.assertEqual(base_after, 'profile-cand-2')
@@ -95,31 +96,11 @@ class TestProfileP1Invariants(unittest.TestCase):
 
 
     def test_url_alone_never_confirms_recording_identity(self):
-        from profile_final_verifier import attach_documentary_findings
-        assertions = [
-            {
-                "key": "tempo_bpm",
-                "label": "Tempo",
-                "lab_value": "123.047 BPM",
-                "verdict": "non_trouve",
-                "status": "provisional",
-            }
-        ]
-        investigation = {
-            "identity": {"recording_identity_verified": False},
-            "items": {
-                "tempo_bpm": {
-                    "observation_status": "found",
-                    "comparison": "concordant",
-                    "confidence": 0.95,
-                    "evidence_summary": "Tempo 123 BPM sur page generique",
-                    "citations": [{"url": "https://example.com", "title": "Song"}],
-                }
-            },
-        }
-        out = attach_documentary_findings({"assertions": assertions}, investigation, {"items": []})
-        self.assertEqual(out["assertions"][0]["verdict"], "non_trouve")
-        self.assertEqual(out["assertions"][0]["status"], "provisional")
+        ks=("tempo","lead_vocal","backing_vocals","vocal_harmonies","choir")
+        verif={"assertions":[{"key":k,"value":"present","verdict":"non_trouve"} for k in ks]}
+        inv={"identity":{"recording_identity_verified":False},"items":[{"key":k,"evidence_review":{"reference_value":"present","proposed_verdict":"bon","references":[{"url":"https://musicbrainz.org"}]}} for k in ks]}
+        out=v.attach_documentary_findings(verif,inv,{"items":[]})
+        for a in out["assertions"]: self.assertEqual(a["verdict"],"non_trouve")
 
     def test_unreconstructible_preset_attempt_rejected(self):
         import tempfile
@@ -145,6 +126,14 @@ class TestProfileP1Invariants(unittest.TestCase):
             with patch.dict(os.environ, {"EZSTUDIO_LAB_ROOT": td, "EZSTUDIOLAB_ASSISTANT_TOKEN": "", "EZSTUDIO_ANALYSIS_WORKER_TOKEN": ""}, clear=False):
                 self.assertEqual(mod._load_lab_token(), "secret_lab_automate_tok")
 
+
+    def test_p1_vocal_strict_and_p2_sha256_guard(self):
+        out=v.attach_documentary_findings({"assertions":[{"key":"lead_vocal","value":"not sent"},{"key":"choir","value":"present"}]},{"identity":{"recording_identity_verified":True},"items":[{"key":"lead_vocal","evidence_review":{"reference_value":"not sent","proposed_verdict":"bon","references":[{"url":"https://musicbrainz.org"}]}},{"key":"choir","evidence_review":{"reference_value":"absent","proposed_verdict":"faux","references":[{"url":"https://musicbrainz.org"}]}}]},{"items":[]})
+        by_k={a["key"]:a["verdict"] for a in out["assertions"]}
+        self.assertEqual(by_k["lead_vocal"],"non_trouve")
+        self.assertEqual(by_k["choir"],"faux")
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
+            with self.assertRaises(ValueError): record_run_preset(202,"p","badsha",content_json="{'a':1}",db_path=Path(td)/"s.db")
 
 if __name__ == "__main__":
     unittest.main()

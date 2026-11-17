@@ -17,7 +17,9 @@ from profile_musicbrainz_structured import discover_recordings, fetch_certified_
 def _load_doc_research_cfg():
     try:
         preset = load_review_preset("profile", path=__import__("os").getenv("EZSTUDIOLAB_REVIEW_PRESET_PATH") or str(Path(__file__).resolve().parents[2] / "ezs_lab" / "presets" / "assistant" / "profile-baseline-1.json"))[0]
-        return preset.get("documentary_research") or {}
+        cfg=preset.get("documentary_research") if isinstance(preset,dict) else None
+        if not isinstance(cfg,dict) or not isinstance(cfg.get("dimension_query_templates"),dict) or not cfg["dimension_query_templates"]: raise RuntimeError("review_preset_missing_documentary_research")
+        return cfg
     except Exception as exc:
         raise RuntimeError(f'review_preset_load_failed:{exc}') from exc
 

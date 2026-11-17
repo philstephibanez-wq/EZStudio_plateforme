@@ -352,12 +352,16 @@ def attach_documentary_findings(verification, investigation, local_review):
         if str(assertion.get("value") or "").strip().lower() in ("inconclusive", "indéterminé", "indetermine", "ind?termin?"):
             assertion["verdict"] = "non_trouve"
             continue
-        if key in ("lead_vocal", "voix_principale", "backing_vocals", "voix_accompagnement", "vocal_harmonies", "harmonies_vocales", "choir", "choeurs") and value is not None:
-            lv_s, ev_s = str(assertion.get("value") or "").lower(), str(value).lower()
-            if ("sent" in lv_s and "sent" in ev_s) or ("absent" in lv_s and "absent" in ev_s):
-                final_verdict = "bon"; comparison = "concordant"
-            elif ("sent" in lv_s and "absent" in ev_s) or ("absent" in lv_s and "sent" in ev_s):
-                final_verdict = "faux"; comparison = "discordant"
+        if key in ("lead_vocal","voix_principale","backing_vocals","voix_accompagnement","vocal_harmonies","harmonies_vocales","choir","choeurs") and value is not None:
+            def _vs(r):
+                x=_clean(r).casefold().replace(chr(233),"e")
+                return "present" if x in ("present","detected","yes","oui") else "absent" if x in ("absent","no","non") else "possible" if x in ("possible","maybe","probable") else "indeterminate"
+            ls,es=_vs(assertion.get("value")),_vs(value)
+            if ls in ("present","absent") and es in ("present","absent") and id_confirmed and urls and not incompatible:
+                final_verdict,comparison=("bon","concordant") if ls==es else ("faux","discordant")
+            else:
+                final_verdict,comparison="non_trouve","indeterminate"
+                reason_txt="Identite non certifiee." if not id_confirmed else "URL HTTPS requise." if not urls else "Etat vocal non determine."
         if key == "tempo" and value is not None and final_verdict == "faux":
             mr = _load_metric_rules(); tol = float(mr.get("tempo_octave_tolerance_bpm") or 0.0)
             m1 = re.search(r"([0-9]+(?:[.,][0-9]+)?)", str(assertion.get("value") or "")); m2 = re.search(r"([0-9]+(?:[.,][0-9]+)?)", str(value))
