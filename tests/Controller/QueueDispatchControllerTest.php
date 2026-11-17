@@ -105,4 +105,53 @@ class QueueDispatchControllerTest extends WebTestCase
             $this->restoreParkedRows($em);
         }
     }
+
+    public function testAssistantAutomateDispatchProgressAndSubprocessEnvContract(): void
+    {
+        $client = static::createClient();
+        $headers = $this->authServer();
+        $this->purgeTestRows();
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $this->parkExistingActiveRows($em);
+
+        try {
+            $client->request('POST', '/api/queue/dispatch', [], [], $headers, json_encode([
+                'source' => 'assistant',
+                'payload' => [
+                    'job' => 'profile.review',
+                    'category' => 'Expertise',
+                    'label' => 'Automate Regression Guard',
+                    'job_id' => 99331,
+                    'run_id' => 99291,
+                    'functional_test' => true,
+                ],
+            ]));
+            $this->assertResponseStatusCodeSame(201);
+            $res = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertEquals('waiting', $res['status'] ?? null);
+            $queueId = (int) ($res['queue_id'] ?? 0);
+            $this->assertGreaterThan(0, $queueId);
+
+            $client->request('POST', '/api/queue/claim', [], [], $headers);
+            $claim = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertEquals($queueId, $claim['job']['id'] ?? null);
+
+            $client->request('POST', '/api/queue/' . $queueId . '/progress', [], [], $headers, json_encode(['progress' => 55]));
+            $this->assertResponseIsSuccessful();
+            $prog = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertSame(55, (int) ($prog['progress'] ?? 0));
+
+            $client->request('POST', '/api/queue/' . $queueId . '/complete', [], [], $headers);
+            $this->assertResponseIsSuccessful();
+
+            $cmdFile = dirname(__DIR__, 2) . '/apps/orchestrator/src/Command/QueueConsumeCommand.php';
+            $cmdSource = (string) file_get_contents($cmdFile);
+            $this->assertStringContainsString("'EZSTUDIOLAB_ASSISTANT_BASE_URL'", $cmdSource);
+            $this->assertStringContainsString('lab.ezstudio.local:8000', $cmdSource);
+            $this->assertStringContainsString("'EZSTUDIOLAB_ASSISTANT_TOKEN'", $cmdSource);
+        } finally {
+            $this->purgeTestRows();
+            $this->restoreParkedRows($em);
+        }
+    }
 }

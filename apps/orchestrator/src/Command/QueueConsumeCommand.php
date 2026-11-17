@@ -138,7 +138,16 @@ error>[Job #%d] ended (KO): %s
                     throw new \RuntimeException('invalid_assistant_review_parameters');
                 }
                 $script = $platformRoot . '/apps/ezs_assistant/runtime/profile_ai_requests_worker.py';
-                $this->runSubprocess($id, [$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 1800, $output);
+                $labTok = (string) ($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_TOKEN'] ?? getenv('EZSTUDIOLAB_ASSISTANT_TOKEN') ?: '');
+                if ($labTok === '' && is_file($platformRoot . '/apps/ezs_lab/.env.local')) {
+                    foreach (file($platformRoot . '/apps/ezs_lab/.env.local', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $ln) {
+                        if (str_starts_with($ln, 'EZSTUDIO_ANALYSIS_WORKER_TOKEN=')) {
+                            $labTok = trim(substr($ln, 31), " \t\n\r\0\x0B\"'");
+                            break;
+                        }
+                    }
+                }
+                $this->runSubprocess($id, [$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZSTUDIOLAB_ASSISTANT_BASE_URL' => (string) ($_ENV['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? getenv('EZSTUDIOLAB_ASSISTANT_BASE_URL') ?: 'http://lab.ezstudio.local:8000'), 'EZSTUDIOLAB_ASSISTANT_TOKEN' => $labTok, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 1800, $output);
                 return;
             }
             if ($type === 'profile.direct_research') {

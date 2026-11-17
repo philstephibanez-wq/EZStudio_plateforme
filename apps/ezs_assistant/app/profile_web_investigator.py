@@ -286,6 +286,7 @@ def research_assertions(assertions, identity, *, source_research=None):
                      "web_search_partially_unavailable" if degraded else None,
             "technical_errors":sum(item.get("status")=="error" or bool(item.get("search_error_count")) for item in items),
             "unique_documents_fetched":len(document_cache),
+            "identity":effective_identity,
             "structured_recording_candidates":structured,
             "ocr_audit":ocr_audit,
             "searched":len(items),"items":items,

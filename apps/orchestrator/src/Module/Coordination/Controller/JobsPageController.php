@@ -63,6 +63,7 @@ final class JobsPageController
     }
 
     #[Route('/jobs/{id}/retry', name: 'ezs_v2_jobs_retry', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')]
     public function retry(int $id, Request $request, JobRetryCoordinator $coordinator, QueueActionCsrfManager $csrf): Response
     {
         $provided = (string) $request->request->get('_token', '');
@@ -85,6 +86,7 @@ final class JobsPageController
     }
 
     #[Route('/jobs/{id}/delete', name: 'ezs_v2_jobs_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_ORCHESTRATOR_OPERATOR')]
     public function delete(int $id, Request $request, QueueManager $queueManager, QueueActionCsrfManager $csrf): Response
     {
         $provided = (string) $request->request->get('_token', '');

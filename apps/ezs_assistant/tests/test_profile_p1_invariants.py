@@ -64,13 +64,13 @@ class TestProfileP1Invariants(unittest.TestCase):
             db = root / 'lab.sqlite'
             sync_presets(db, pdir)
             set_explicit_baseline('profile', 'profile-cand-2', db, promoted_by='tester')
-            record_run_preset(101, 'profile-cand-2', 'deadbeef', db_path=db)
+            record_run_preset(101, 'profile-cand-2', 'deadbeef', content_json='{"id":"profile-cand-2","v":1}', db_path=db)
             sync_presets(db, pdir)
             con = sqlite3.connect(str(db))
             try:
                 base = con.execute('SELECT preset_id FROM assistant_preset_baselines WHERE phase=?', ('profile',)).fetchone()[0]
                 self.assertEqual(base, 'profile-cand-2')
-                record_run_preset(101, 'profile-qwen-baseline-1', 'cafebabe', db_path=db)
+                record_run_preset(101, 'profile-qwen-baseline-1', 'cafebabe', content_json='{"id":"profile-qwen-baseline-1","v":2}', db_path=db)
                 base_after = con.execute('SELECT preset_id FROM assistant_preset_baselines WHERE phase=?', ('profile',)).fetchone()[0]
                 run_prov = con.execute('SELECT preset_id FROM assistant_run_preset WHERE run_id=?', (101,)).fetchone()[0]
                 self.assertEqual(base_after, 'profile-cand-2')
@@ -92,6 +92,59 @@ class TestProfileP1Invariants(unittest.TestCase):
                 wi._load_doc_research_cfg()
         finally:
             wi.load_review_preset = orig
+
+
+    def test_url_alone_never_confirms_recording_identity(self):
+        from profile_final_verifier import attach_documentary_findings
+        assertions = [
+            {
+                "key": "tempo_bpm",
+                "label": "Tempo",
+                "lab_value": "123.047 BPM",
+                "verdict": "non_trouve",
+                "status": "provisional",
+            }
+        ]
+        investigation = {
+            "identity": {"recording_identity_verified": False},
+            "items": {
+                "tempo_bpm": {
+                    "observation_status": "found",
+                    "comparison": "concordant",
+                    "confidence": 0.95,
+                    "evidence_summary": "Tempo 123 BPM sur page generique",
+                    "citations": [{"url": "https://example.com", "title": "Song"}],
+                }
+            },
+        }
+        out = attach_documentary_findings({"assertions": assertions}, investigation, {"items": []})
+        self.assertEqual(out["assertions"][0]["verdict"], "non_trouve")
+        self.assertEqual(out["assertions"][0]["status"], "provisional")
+
+    def test_unreconstructible_preset_attempt_rejected(self):
+        import tempfile
+        import gc
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
+            db = Path(td) / "unrec.sqlite"
+            with self.assertRaises(ValueError):
+                record_run_preset(999, "missing-preset", "000000", db_path=db)
+            gc.collect()
+
+    def test_worker_loads_lab_token_from_env_local_when_unset(self):
+        import importlib.util, os, tempfile
+        from unittest.mock import patch
+        spec = importlib.util.spec_from_file_location(
+            "profile_ai_requests_worker",
+            Path(__file__).resolve().parents[1] / "runtime" / "profile_ai_requests_worker.py",
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        with tempfile.TemporaryDirectory() as td:
+            env_file = Path(td) / ".env.local"
+            env_file.write_text('EZSTUDIO_ANALYSIS_WORKER_TOKEN="secret_lab_automate_tok"\n', encoding="utf-8")
+            with patch.dict(os.environ, {"EZSTUDIO_LAB_ROOT": td, "EZSTUDIOLAB_ASSISTANT_TOKEN": "", "EZSTUDIO_ANALYSIS_WORKER_TOKEN": ""}, clear=False):
+                self.assertEqual(mod._load_lab_token(), "secret_lab_automate_tok")
+
 
 if __name__ == "__main__":
     unittest.main()

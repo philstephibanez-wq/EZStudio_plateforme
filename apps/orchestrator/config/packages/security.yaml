@@ -18,7 +18,8 @@ security:
             http_basic:
                 realm: 'EZStudio Orchestrator'
     access_control:
-        - { path: ^/jobs, ips: [127.0.0.1, '::1'], roles: PUBLIC_ACCESS }
+        - { path: ^/api/queue, ips: [127.0.0.1, '::1'], roles: PUBLIC_ACCESS }
+        - { path: ^/jobs, ips: [127.0.0.1, '::1'], methods: [GET, HEAD], roles: PUBLIC_ACCESS }
         - { path: ^/jobs, roles: ROLE_ORCHESTRATOR_OPERATOR }
         - { path: ^/, ips: [127.0.0.1, '::1'], roles: PUBLIC_ACCESS }
         - { path: ^/, roles: ROLE_ORCHESTRATOR_OPERATOR }

@@ -113,6 +113,8 @@ def record_run_preset(run_id: int, preset_id: str, preset_sha256: str, db_path: 
             if rev is None:
                 rev = con.execute("SELECT content_json FROM assistant_presets WHERE id=? AND sha256=?", (preset_id, preset_sha256)).fetchone()
             content_json = rev[0] if rev else None
+        if not content_json:
+            raise ValueError(f"unreconstructible_preset_revision:{preset_id}:{preset_sha256}")
         now = int(time.time())
         con.execute(
             "INSERT INTO assistant_run_preset(run_id,preset_id,preset_sha256,executed_at) VALUES (?,?,?,?) ON CONFLICT(run_id) DO NOTHING",

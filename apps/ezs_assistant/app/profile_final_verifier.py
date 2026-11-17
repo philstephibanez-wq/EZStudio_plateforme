@@ -319,7 +319,7 @@ def attach_documentary_findings(verification, investigation, local_review):
             proposed = None
         incompatible = value is not None and not _documentary_type_ok(key, value)
         comparison = "indeterminate" if incompatible else _compare_documentary(key, assertion.get("value"), value)
-        id_confirmed = bool((investigation.get("identity") or {}).get("recording_identity_verified")) or bool(urls)
+        id_confirmed = bool((investigation.get("identity") or {}).get("recording_identity_verified"))
         reason_txt = review.get("reason") or candidate.get("explanation") or ("Valeur documentaire incompatible avec le type de cet item" if incompatible else "Aucune valeur documentaire exploitable")
         final_verdict = None
         if value is not None and urls and id_confirmed and not incompatible:

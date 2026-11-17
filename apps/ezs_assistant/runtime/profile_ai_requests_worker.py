@@ -1,6 +1,6 @@
+from __future__ import annotations
 CANONICAL_EXECUTION_PATH = "v1"
 """LAB-triggered PROFILE documentary review on MAIN, using the existing LAB FIFO."""
-from __future__ import annotations
 import argparse
 import hashlib
 import json
@@ -128,7 +128,7 @@ def _load_lab_token():
                 return token
     raise RuntimeError('lab_token_unavailable')
 
-TOKEN = os.environ.get('EZSTUDIOLAB_ASSISTANT_TOKEN', '').strip()
+TOKEN = _load_lab_token()
 PATH = '/internal/analysis/desktop/profile/ai-requests'
 
 def api(path, data=None):
