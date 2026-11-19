@@ -137,9 +137,10 @@
           <button type="button" id="profile-ai-run-button">Expertiser</button>
           <button type="button" class="secondary" id="profile-ai-cancel-button" disabled>Annuler</button>
         {% endif %}
-        {% set revs = profile_external_revisions is not empty ? profile_external_revisions : (song_external_revisions ?? []) %}
+        {% set revs = profile_external_revisions ?? [] %}
+        {% set history_revs = song_external_revisions ?? [] %}
         <select id="expertise-history-select" style="font-size:11px">
-          {% for rev in revs %}<option value="exp-rev-{{ rev.id }}">#{{ rev.id }} (run #{{ rev.run_id }}) · {{ rev.status }}</option>{% else %}<option>Aucune expertise</option>{% endfor %}
+          {% if history_revs is not empty and revs is empty %}<option value="" selected>Historique des expertises</option>{% endif %}{% for rev in history_revs %}<option value="exp-rev-{{ rev.id }}" data-run="{{ rev.run_id }}" {{ revs is not empty and selected_profile_run and rev.run_id == selected_profile_run.id and rev.id == (revs|first).id ? 'selected' : '' }}>#{{ rev.id }} (run #{{ rev.run_id }}) · {{ rev.status }}</option>{% else %}<option>Aucune expertise</option>{% endfor %}
         </select>
       </div>
     </div>
@@ -249,9 +250,31 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
 <script>
 (function(){
   document.getElementById('expertise-history-select')?.addEventListener('change',function(){
+    const choice=this.options[this.selectedIndex];
+    const sourceRun=Number(choice?.dataset.run||0);
+    const currentRun={{ selected_profile_run ? selected_profile_run.id : 0 }};
+    if(sourceRun>0 && sourceRun!==currentRun) {
+      const url=new URL(window.location.href);
+      url.searchParams.set('song', String({{ selected_song ? selected_song.id : 0 }}));
+      url.searchParams.set('run', String(sourceRun));
+      url.searchParams.set('expertise', this.value.replace('exp-rev-', ''));
+      window.location.assign(url.toString());
+      return;
+    }
     document.querySelectorAll('.exp-rev-panel').forEach(el=>el.style.display='none');
     const t=document.getElementById(this.value); if(t) t.style.display='';
   });
+  // Restore a historical expertise selection after changing its source run.
+  const requestedRevision=new URLSearchParams(window.location.search).get('expertise');
+  if(requestedRevision && /^\d+$/.test(requestedRevision)) {
+    const history=document.getElementById('expertise-history-select');
+    const value='exp-rev-'+requestedRevision;
+    if(history && Array.from(history.options).some(o=>o.value===value) && document.getElementById(value)) {
+      history.value=value;
+      document.querySelectorAll('.exp-rev-panel').forEach(el=>el.style.display='none');
+      document.getElementById(value).style.display='';
+    }
+  }
   const root=document.getElementById('profile-ai-request'), btn=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), state=document.getElementById('profile-ai-request-state'), prog=document.getElementById('profile-ai-progress');
   if(!root||!btn||!state||!prog) return;
   let activeJob=0, wasActive=false;

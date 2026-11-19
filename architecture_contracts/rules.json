@@ -1,0 +1,74 @@
+{
+  "schema": "ezs.architecture-contracts.r4",
+  "policy": "fail-closed",
+  "rules": [
+    {
+      "id": "EZS-GATE-001",
+      "description": "Aucun conflit dans l'index Git"
+    },
+    {
+      "id": "EZS-GATE-002",
+      "description": "Aucun fichier sensible ou binaire persistant suivi dans l'index"
+    },
+    {
+      "id": "EZS-GATE-003",
+      "description": "Aucune reference active a l'ancien PHP H:/PHP/php-8.5-x64"
+    },
+    {
+      "id": "EZS-GATE-004",
+      "description": "Aucun acces explicite par Orchestrator ou Assistant a la base privee LAB"
+    },
+    {
+      "id": "EZS-GATE-005",
+      "description": "Aucun acces explicite par LAB ou Assistant a la base privee Orchestrator"
+    },
+    {
+      "id": "EZS-GATE-006",
+      "description": "Le validateur et son registre doivent faire partie du snapshot audite"
+    },
+    {
+      "id": "EZS-GATE-007",
+      "description": "Le contenu local de validateur doit correspondre a la copie indexee en pre-commit"
+    },
+    {
+      "id": "EZS-GATE-008",
+      "description": "Aucune violation detectee dans l'etat complet du commit"
+    },
+    {
+      "id": "EZS-GATE-009",
+      "description": "Refuser symlinks, gitlinks et modes Git non inspectables dans le commit"
+    },
+    {
+      "id": "EZS-GATE-010",
+      "description": "Rejeter toute prétention de conformité sans implémentation exécutable des contrôles ARCH"
+    },
+    {
+      "id": "EZS-GATE-011",
+      "description": "Refuser le lancement local autonome profile:once depuis LocalProfileDrainCommand ; autorite de la queue globale Orchestrator requise"
+    },
+    {
+      "id": "EZS-GATE-012",
+      "description": "Detecter le lancement local de profile:once depuis toute Command LAB (hors drain R3)"
+    },
+    {
+      "id": "EZS-GATE-013",
+      "description": "Refuser le SQL direct Orchestrator sur analysis_jobs LAB via PDO"
+    },
+    {
+      "id": "EZS-GATE-014",
+      "description": "Detecter la prise de controle locale de analysis_jobs running par ProfileOnceCommand"
+    }
+  ],
+  "coverage": {
+    "EZS-ARCH-001": "partial-explicit-db-paths-and-orchestrator-direct-sql",
+    "EZS-ARCH-002": "not-implemented",
+    "EZS-ARCH-003": "partial-lab-command-self-dispatch-and-local-claims",
+    "EZS-ARCH-004": "not-implemented",
+    "EZS-ARCH-005": "not-implemented",
+    "EZS-ARCH-006": "not-implemented",
+    "EZS-ARCH-007": "not-implemented",
+    "EZS-ARCH-008": "partial-sensitive-files",
+    "EZS-ARCH-009": "not-implemented",
+    "EZS-ARCH-010": "foundation"
+  }
+}

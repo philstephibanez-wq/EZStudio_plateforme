@@ -86,7 +86,7 @@
     "psr-4": {
         "App\\": "src/",
             "Shared\\": "shared/src/",
-        "Ezs\\Web\\": "apps/orchestrator/src/",
+        "Ezs\\Web\\": "apps/ezs_orchestrator/src/",
         "EZStudioDev\\": "apps/ezstudio_dev/src/",
         "EZSLab\\": "apps/ezs_lab/src/",
         "EZSAssistant\\": "apps/ezs_assistant/src/"

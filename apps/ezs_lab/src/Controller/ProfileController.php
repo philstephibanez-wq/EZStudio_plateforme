@@ -62,6 +62,15 @@ final class ProfileController extends AbstractController
             if ($selected === null && $runs !== []) $selected = $runs[0];
         }
 
+        // All historical expertise entries belong to this song, not only the selected run.
+        $songRevisions = [];
+        foreach ($runs as $historicalRun) {
+            foreach ($externalReview->revisionsForRun((int)$historicalRun['id']) as $revision) {
+                $songRevisions[] = $revision;
+            }
+        }
+        usort($songRevisions, static fn(array $a, array $b): int => (int)$b['id'] <=> (int)$a['id']);
+
         return $this->render('workbench/profile.html.twig', [
             'songs' => $catalog->songs(),
             'selected_song' => $song,
@@ -71,6 +80,7 @@ final class ProfileController extends AbstractController
             'profile_job' => $selected ? $execution->jobForRun((int)$selected['id']) : null,
             'profile_summary' => $selected ? $summary->build($selected) : null,
             'profile_external_revisions' => $selected ? $externalReview->revisionsForRun((int)$selected['id']) : [],
+            'song_external_revisions' => $songRevisions,
             'profile_validation_subjects' => $selected
                 ? $validation->subjectsForRun($selected)
                 : [],

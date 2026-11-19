@@ -252,7 +252,9 @@ def _compare_documentary(key, lab, reference):
                     return float(v.replace(",", "."))
                 p = [int(x) for x in v.split(":")]
                 return 60*p[0]+p[1] if len(p)==2 else 3600*p[0]+60*p[1]+p[2]
-            return "concordant" if abs(seconds(a)-seconds(b)) <= 3 else "discordant"
+            # Sans identification de l'édition pour cette preuve précise, une
+            # différence de durée n'établit pas que l'analyse LAB est fausse.
+            return "concordant" if abs(seconds(a)-seconds(b)) <= 3 else "indeterminate"
         except (ValueError, IndexError):
             return "indeterminate"
     if key == "tempo":
@@ -265,6 +267,12 @@ def _compare_documentary(key, lab, reference):
             # a misleading provisional discrepancy in this ambiguous case.
             if any(abs(x-y*k) <= 2 for k in (0.5, 2)):
                 return "indeterminate"
+            # Une dérive de quelques pourcents peut accompagner une erreur
+            # de subdivision/estimation. Ne jamais en déduire un BPM juste.
+            doubled = (2.0 * x, 2.0 * y)
+            if any(abs(candidate - reference) / max(candidate, reference) <= 0.05
+                   for candidate, reference in ((doubled[0], y), (x, doubled[1]))):
+                return "indeterminate"
             return "discordant"
         except ValueError:
             return "indeterminate"
@@ -272,6 +280,11 @@ def _compare_documentary(key, lab, reference):
         return "concordant" if a.replace(" ","")==b.replace(" ","") else "discordant"
     if key == "genre":
         if not b: return "indeterminate"
+        # Un auteur-interprète peut aussi appartenir à la pop : taxonomies
+        # compatibles, pas preuve de contradiction. Ne pas changer les
+        # autres écarts (ex. ballad/folk) couverts par les tests historiques.
+        if {a, b} == {"singer-songwriter", "pop"}:
+            return "indeterminate"
         return "concordant" if (a == b or a in b or b in a) else "discordant"
     if key.startswith(("instruments:", "instrument:")):
         return "concordant" if _instrument_matches(a,b) else "indeterminate"

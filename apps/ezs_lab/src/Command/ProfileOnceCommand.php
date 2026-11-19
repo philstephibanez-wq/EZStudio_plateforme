@@ -105,35 +105,58 @@ final class ProfileOnceCommand extends Command
         }
         $jobId = null;
         try {
-            // Refuse coexistence with any LAB analysis already recorded running.
-            if ($queuedJob !== null && (string)($queuedJob['status'] ?? '') === 'running') {
-                $resetStmt = $this->database->pdo()->prepare("UPDATE analysis_jobs SET status='queued', progress=0, updated_at=? WHERE id=? AND status='running' AND kind='profile' AND dispatch_owner='lab'");
-                $resetStmt->execute([gmdate('c'), (int)$queuedJob['id']]);
-                $queuedJob = $this->database->analysisJob((int)$queuedJob['id']) ?: $queuedJob;
-            }
-            $active = $this->database->pdo()->query("SELECT COUNT(*) FROM analysis_jobs WHERE status='running'")->fetchColumn();
-            if ((int)$active > 0) {
-                $output->writeln('<error>PROFILE_ONCE_LAB_ALREADY_RUNNING</error>');
+            // Orchestrator is the sole FIFO authority. A local scientific record is
+            // only a technical execution record, never an independent queue head.
+            $orchestratorJobId = (int) ($input->getOption('orchestrator-job-id') ?: getenv('ORCHESTRATOR_JOB_ID') ?: 0);
+            if ($orchestratorJobId <= 0) {
+                $output->writeln('<error>PROFILE_ORCHESTRATOR_JOB_ID_REQUIRED</error>');
                 return Command::FAILURE;
             }
-            if ($queuedJob === null) {
-                $output->writeln('<error>PROFILE_QUEUE_REQUIRED</error>');
+            if ($queuedJob === null || (string)($queuedJob['status'] ?? '') !== 'queued') {
+                $output->writeln('<error>PROFILE_LOCAL_EXECUTION_RECORD_NOT_QUEUED</error>');
                 return Command::FAILURE;
             }
-            // Claim the single canonical head within an IMMEDIATE transaction.
+            // Global GO fence: a numeric CLI argument is not authorization.
+            // Read the authoritative Orchestrator queue without modifying it.
+            // Never fall back to a local FIFO or a missing/unreadable queue.
+            $orchestratorDatabase = dirname(__DIR__, 4) . '/data/orchestrator.sqlite';
+            if (!is_file($orchestratorDatabase)) {
+                $output->writeln('<error>PROFILE_GLOBAL_GO_DATABASE_MISSING</error>');
+                return Command::FAILURE;
+            }
+            try {
+                $uri = 'file:' . str_replace('\\', '/', $orchestratorDatabase) . '?mode=ro';
+                $globalDb = new \PDO('sqlite:' . $uri);
+                $globalDb->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+                $proofQuery = $globalDb->prepare('SELECT source,status,payload FROM job_queue WHERE id=?');
+                $proofQuery->execute([$orchestratorJobId]);
+                $globalRow = $proofQuery->fetch(\PDO::FETCH_ASSOC);
+                $globalDb = null;
+                $globalPayload = is_array($globalRow)
+                    ? json_decode((string)($globalRow['payload'] ?? ''), true) : null;
+                if (!is_array($globalRow)
+                    || (string)($globalRow['source'] ?? '') !== 'lab'
+                    || (string)($globalRow['status'] ?? '') !== 'progressing'
+                    || !is_array($globalPayload)
+                    || (string)($globalPayload['job'] ?? '') !== 'profile'
+                    || (int)($globalPayload['analysis_job_id'] ?? 0) !== (int)$queuedJob['id']
+                    || (int)($globalPayload['scientific_run_id'] ?? 0) !== (int)$queuedJob['scientific_run_id']
+                    || (int)($globalPayload['song_id'] ?? 0) !== (int)$queuedJob['song_id']) {
+                    $output->writeln('<error>PROFILE_GLOBAL_GO_PROOF_MISMATCH</error>');
+                    return Command::FAILURE;
+                }
+            } catch (\Throwable $error) {
+                $output->writeln('<error>PROFILE_GLOBAL_GO_PROOF_UNAVAILABLE</error>');
+                return Command::FAILURE;
+            }
+            // Atomic local state transition only: no local FIFO/priority decision.
+            // Keep the execution lock above to prevent parallel PROFILE on this host.
             $pdo = $this->database->pdo();
             $pdo->exec('BEGIN IMMEDIATE');
             try {
-                $head = $pdo->query(\EZSLab\Service\LocalProfileQueue::headSql())->fetch(\PDO::FETCH_ASSOC);
-                $busy = (int)$pdo->query(\EZSLab\Service\LocalProfileQueue::activeSql())->fetchColumn();
-                if (!$head || (int)$head['id'] !== (int)$queuedJob['id'] || $busy > 0) {
-                    $pdo->commit();
-                    $output->writeln('<error>PROFILE_QUEUE_NOT_HEAD_OR_ACTIVE</error>');
-                    return Command::FAILURE;
-                }
                 $stmt = $pdo->prepare("UPDATE analysis_jobs SET status='running',progress=1,updated_at=? WHERE id=? AND status='queued' AND kind='profile' AND dispatch_owner='lab'");
                 $stmt->execute([gmdate('c'),(int)$queuedJob['id']]);
-                if ($stmt->rowCount() !== 1) throw new \RuntimeException('profile_queue_claim_conflict');
+                if ($stmt->rowCount() !== 1) throw new \RuntimeException('profile_execution_record_claim_conflict');
                 $pdo->commit();
             } catch (\Throwable $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();

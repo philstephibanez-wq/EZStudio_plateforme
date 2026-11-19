@@ -34,55 +34,52 @@ from profile_identity import resolve_missing_artist
 from profile_sequential_review import examine_modules
 from profile_module_qwen import infer_module
 from profile_final_verifier import verify_final_values, attach_documentary_findings
+from profile_expertise_registry import record_verified_assertions
 from profile_recording_disambiguation import duration_from_catalog
 from profile_web_investigator import research_each_assertion
 from profile_web_local_review import review_web_items
 
-STEP_PCT = {
-    'identity_resolver': 10,
-    'recording_duration': 20,
-    'public_source_research': 35,
-    'review_payload_builder': 45,
-    'independent_verifier': 55,
-    'assertion_web_investigator': 70,
-    'local_ai_document_review': 85,
-    'documentary_verdict_merger': 92,
-    'documentary_payload_enricher': 95,
-    'ai_draft_payload_enricher': 98,
+# Domain steps are owned by LAB; no foreign SQLite access or direct Orchestrator call.
+CHECKPOINT_PHASES = {
+    'identity_resolver': 'identity',
+    'recording_duration': 'identity',
+    'public_source_research': 'discovery',
+    'review_payload_builder': 'evidence',
+    'independent_verifier': 'verification',
+    'assertion_web_investigator': 'evidence',
+    'local_ai_document_review': 'evidence',
+    'documentary_verdict_merger': 'verification',
+    'documentary_payload_enricher': 'persistence',
+    'ai_draft_payload_enricher': 'persistence',
+    'lab_revision_submit': 'persistence',
 }
-
 _CURRENT_STEPS = []
 
 def _report_step(job_id, step):
+    engine = str(step.get('engine') or '').strip()
+    state = str(step.get('status') or '').strip().upper()
     _CURRENT_STEPS.append({
-        'engine': step.get('engine'),
+        'engine': engine,
         'status': step.get('status'),
         'duration_ms': step.get('duration_ms'),
     })
+    if engine not in CHECKPOINT_PHASES:
+        raise RuntimeError('assistant_unknown_checkpoint_engine:' + engine[:90])
+    if state not in ('OK', 'FAILED', 'ERROR', 'BLOCKED'):
+        raise RuntimeError('assistant_unknown_checkpoint_status:' + state[:40])
+    envelope = {
+        'schema': 'ezstudio.assistant-checkpoint.v1',
+        'event_key': 'engine.' + engine,
+        'phase': CHECKPOINT_PHASES[engine],
+        'outcome': 'ok' if state == 'OK' else ('blocked' if state == 'BLOCKED' else 'failed'),
+        'detail': {},
+    }
+    # An HTTP rejection must be observable, not silently lost.
     try:
-        api(PATH + '/' + str(job_id) + '/checkpoints', {'event_key': 'engine.' + step['engine'], 'phase': 'engine.' + step['engine'], 'outcome': 'ok' if step['status']=='OK' else step['status'].lower(), 'detail': step})
-    except Exception:
-        pass
-    pct = STEP_PCT.get(step.get('engine'))
-    if pct is not None:
-        try:
-            import sqlite3 as _sq
-            _db = Path(__file__).resolve().parents[2] / 'ezs_lab' / 'data' / 'benchmark.sqlite'
-            with _sq.connect(str(_db), timeout=5.0) as _con:
-                _con.execute("UPDATE analysis_jobs SET progress = ?, updated_at = ? WHERE id = ? AND status = 'running'", (int(pct), datetime.now(timezone.utc).isoformat(), int(job_id)))
-        except Exception:
-            pass
-        orch_id = os.environ.get('ORCHESTRATOR_JOB_ID', '').strip()
-        if orch_id.isdigit() and int(orch_id) > 0:
-            orch_base = os.environ.get('ORCHESTRATOR_BASE_URL', 'http://ezstudio.local').rstrip('/')
-            orch_url = f"{orch_base}/api/queue/{orch_id}/progress"
-            body = json.dumps({'progress': max(0, min(100, int(pct)))}).encode('utf-8')
-            req = urllib.request.Request(orch_url, data=body, headers={'Content-Type': 'application/json', 'Accept': 'application/json', 'X-EZS-Queue-Token': os.environ.get('EZS_QUEUE_INTERNAL_TOKEN', '')}, method='POST')
-            try:
-                with urllib.request.urlopen(req, timeout=2.0):
-                    pass
-            except Exception:
-                pass
+        api(PATH + '/' + str(job_id) + '/checkpoints', envelope)
+    except Exception as exc:
+        print('PROFILE_CHECKPOINT_REST_ERROR=' + type(exc).__name__, flush=True)
+        raise
 
 WORKER_START_UTC = datetime.now(timezone.utc).isoformat()
 WORKER_START_PID = os.getpid()
@@ -317,6 +314,22 @@ def process(run_id, client, check_cancel=None):
     snap('lab.submit.response', submitted)
     if not submitted.get('ok') or not isinstance((submitted.get('revision') or {}).get('id'), int) or (submitted.get('revision') or {}).get('id') < 1:
         raise RuntimeError('revision_non_confirmee')
+    # Documentary archive only, after LAB acknowledges the existing draft.
+    # This has no checkpoint or Orchestrator progress side effects.
+    try:
+        registry_result = record_verified_assertions(
+            run_id, submitted['revision']['id'], ident, row, verification
+        )
+        emit('profile.expertise_registry.persisted', {
+            'status': registry_result['status'],
+            'inserted': registry_result['inserted'],
+            'reused': registry_result['reused'],
+            'skipped': registry_result['skipped'],
+        })
+    except Exception as registry_exc:
+        # A secondary archive cannot invalidate a LAB revision already saved.
+        emit('profile.expertise_registry.error', {'error_type': type(registry_exc).__name__})
+        print('PROFILE_EXPERTISE_DB_ERROR=' + type(registry_exc).__name__, flush=True)
     return {
         'run_id': run_id,
         'revision': (submitted.get('revision') or {}).get('id'),
@@ -328,28 +341,22 @@ def process(run_id, client, check_cancel=None):
     }
 
 def once(client, target_job_id=None, target_run_id=None):
-    requests = api(PATH)['requests']
-    if target_job_id is not None:
-        if not isinstance(requests, list):
-            raise RuntimeError('one_shot_invalid_requests_payload')
-        matched = [
-            r for r in requests
-            if isinstance(r, dict)
-            and type(r.get('job_id')) is int
-            and type(r.get('run_id')) is int
-            and r['job_id'] == target_job_id
-            and r['run_id'] == target_run_id
-        ]
-        if not matched:
-            print(f'LAB_PROFILE_IA_ONESHOT_SKIPPED job={target_job_id} run={target_run_id} reason=not_queued', flush=True)
-            return
-        requests = [matched[0]]
+    # Worker cannot choose its own work; exact GO comes from Orchestrator.
+    if not target_job_id or not target_run_id:
+        raise RuntimeError('orchestrator_go_required')
+    orch_id = int(os.environ.get('ORCHESTRATOR_JOB_ID', '0') or '0')
+    if orch_id <= 0:
+        raise RuntimeError('orchestrator_job_id_required')
+    state = (api(PATH + '/' + str(target_run_id) + '/state?job_id=' + str(target_job_id)).get('request') or {})
+    if (state.get('job_id') != target_job_id or state.get('run_id') != target_run_id or state.get('status') != 'queued'):
+        raise RuntimeError('orchestrator_go_target_mismatch')
+    requests = [{'job_id': target_job_id, 'run_id': target_run_id}]
     if requests:
         print('LAB_PROFILE_IA_PENDING=' + str(len(requests)), flush=True)
     for item in requests:
         rid = int(item['run_id'])
         job_id = int(item['job_id'])
-        claim = api(PATH + '/' + str(rid) + '/claim', {})
+        claim = api(PATH + '/' + str(rid) + '/claim', {'job_id': job_id, 'orchestrator_job_id': orch_id})
         if claim.get('claimed') is not True:
             if target_job_id is not None:
                 raise RuntimeError('one_shot_claim_refused')
@@ -430,7 +437,9 @@ def main():
     parser.add_argument('--service-stop-file', type=Path, default=None)
     # Signal owned by the existing WinSW/PHP service; only read between jobs.
     args = parser.parse_args()
-    # One-shot calls MUST be bounded; background polling keeps its previous behavior.
+    # No standalone polling: only Orchestrator may initiate execution.
+    if not args.once:
+        parser.error('orchestrator_go_required')
     if args.once:
         if not args.job_id or args.job_id < 1 or not args.run_id or args.run_id < 1:
             parser.error('--once requires positive --job-id and --run-id')

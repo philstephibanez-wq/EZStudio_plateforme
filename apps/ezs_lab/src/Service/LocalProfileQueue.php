@@ -44,11 +44,50 @@ final class LocalProfileQueue
             $stmt->execute($songIds);
             $existing = $stmt->fetch(\PDO::FETCH_ASSOC);
             if ($existing) {
+                // The LAB row is a technical work record, NOT the authoritative FIFO.
+                // A queued record without an Orchestrator ID must be admitted globally.
                 $pdo->commit();
+                $jobId = (int)$existing['id'];
+                $runId = (int)$existing['scientific_run_id'];
+                $job = $this->db->analysisJob($jobId);
+                if (!$job || (string)($job['status'] ?? '') !== 'queued') {
+                    throw new \RuntimeException('profile_existing_job_not_queueable');
+                }
+                $request = json_decode((string)($job['request_json'] ?? ''), true);
+                if (!is_array($request) || (int)($request['scientific_run_id'] ?? 0) !== $runId) {
+                    throw new \RuntimeException('profile_existing_job_context_invalid');
+                }
+                if ((int)($request['orchestrator_queue_id'] ?? 0) > 0) {
+                    // Do not silently re-admit a potentially failed/ended global job.
+                    throw new \RuntimeException('profile_existing_global_job_requires_status_check');
+                }
+                $dispatched = $this->orchestratorQueue->dispatch('lab', [
+                    'job' => 'profile',
+                    'category' => 'Analyse',
+                    'label' => trim((string)($song['title'] ?? '')),
+                    'analysis_job_id' => $jobId,
+                    'scientific_run_id' => $runId,
+                    'song_id' => (int)$job['song_id'],
+                    'source_path' => $source,
+                    'request' => $request,
+                ]);
+                $queueId = (int)($dispatched['queue_id'] ?? 0);
+                if ($queueId <= 0 || !in_array((string)($dispatched['status'] ?? ''), ['waiting','progressing'], true)) {
+                    throw new \RuntimeException('profile_global_admission_not_confirmed');
+                }
+                $request['orchestrator_queue_id'] = $queueId;
+                $update = $pdo->prepare("UPDATE analysis_jobs SET request_json=?,source_path=?,updated_at=? WHERE id=? AND kind='profile' AND status='queued' AND dispatch_owner='lab'");
+                $update->execute([
+                    json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    $source, gmdate('c'), $jobId,
+                ]);
+                // The worker may already have claimed this record after dispatch;
+                // a zero-row CAS here is not permission to launch another job.
+                $this->runs->setLabel($runId, 'orchestrator_queue_id', (string)$queueId);
                 return [
-                    'job_id' => (int)$existing['id'],
-                    'run_id' => (int)$existing['scientific_run_id'],
-                    'queue_id' => null,
+                    'job_id' => $jobId,
+                    'run_id' => $runId,
+                    'queue_id' => $queueId,
                     'created' => false,
                 ];
             }

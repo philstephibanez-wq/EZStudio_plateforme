@@ -1,0 +1,21 @@
+name: EZS Architecture Contracts
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  architecture-contracts:
+    name: EZS fail-closed contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Negative tests (must detect violations)
+        run: python -m unittest discover -s architecture_contracts/tests -p 'test_*.py' -v
+      - name: Validate committed snapshot
+        run: python architecture_contracts/validate.py --mode ref --ref HEAD

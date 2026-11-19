@@ -26,6 +26,57 @@ class QueueManager
 
     public function dispatch(string $source, array $payload): JobQueue
     {
+        // A PROFILE expertise is identified by its LAB job AND scientific run.
+        // Deduplication includes terminal jobs: a lost HTTP response must not
+        // permit replay of an already completed expertise.
+        if ($source === 'assistant' && ($payload['job'] ?? null) === 'profile.review') {
+            $jobId = filter_var($payload['job_id'] ?? null, FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1]]);
+            $runId = filter_var($payload['run_id'] ?? null, FILTER_VALIDATE_INT,
+                ['options' => ['min_range' => 1]]);
+            if ($jobId === false || $runId === false) {
+                throw new \InvalidArgumentException('assistant_review_identity_required');
+            }
+            $conn = $this->entityManager->getConnection();
+            // SQLite serializes the insertion. On contention an operation may
+            // fail closed; no alternative job is issued on that failure.
+            $conn->beginTransaction();
+            try {
+                $rows = $conn->fetchAllAssociative(<<<'SQL'
+SELECT id,payload FROM job_queue
+WHERE source='assistant'
+  AND json_valid(payload)=1
+  AND json_extract(payload, '$.job')='profile.review'
+  AND CAST(json_extract(payload, '$.job_id') AS INTEGER)=:job_id
+ORDER BY id ASC LIMIT 2
+SQL, ['job_id' => (int) $jobId]);
+                if (count($rows) > 1) {
+                    throw new \RuntimeException('assistant_review_duplicate_history_conflict');
+                }
+                if ($rows !== []) {
+                    $recorded = json_decode((string) $rows[0]['payload'], true);
+                    if (!is_array($recorded) || (int) ($recorded['run_id'] ?? 0) !== (int) $runId) {
+                        throw new \RuntimeException('assistant_review_identity_conflict');
+                    }
+                    $this->entityManager->clear();
+                    $existing = $this->entityManager->find(JobQueue::class, (int) $rows[0]['id']);
+                    if (!$existing instanceof JobQueue) {
+                        throw new \RuntimeException('assistant_review_duplicate_identity_lost');
+                    }
+                    $conn->commit();
+                    return $existing;
+                }
+                $job = new JobQueue($source, $payload);
+                $this->entityManager->persist($job);
+                $this->entityManager->flush();
+                $conn->commit();
+                return $job;
+            } catch (\Throwable $e) {
+                if ($conn->isTransactionActive()) { $conn->rollBack(); }
+                throw $e;
+            }
+        }
+
         $existing = $this->findActiveDuplicate($source, $payload);
         if ($existing instanceof JobQueue) { return $existing; }
         $job = new JobQueue($source, $payload);

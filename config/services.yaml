@@ -1,5 +1,6 @@
 parameters:
-    app.queue_database_path: '%kernel.project_dir%/data/orchestrator.sqlite'
+    app.queue_database_path: '%kernel.project_dir%/data/databases/orchestrator.sqlite'
+    app.lab_database_path: '%kernel.project_dir%/data/databases/benchmark.sqlite'
 
 services:
     _defaults:

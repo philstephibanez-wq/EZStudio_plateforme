@@ -17,7 +17,7 @@ class Kernel extends BaseKernel
     public function __construct(string $environment, bool $debug, ?string $appId = null)
     {
         $resolved = $appId ?? $_SERVER['APP_ID'] ?? $_ENV['APP_ID'] ?? getenv('APP_ID') ?: 'orchestrator';
-        $this->appId = in_array($resolved, ['orchestrator', 'ezs_lab', 'ezs_assistant', 'ezstudio_dev', 'ezstudio'], true)
+        $this->appId = in_array($resolved, ['orchestrator', 'ezs_orchestrator', 'ezs_lab', 'ezs_assistant', 'ezstudio_dev', 'ezstudio', 'ezscore_dev', 'ezscore'], true)
             ? $resolved
             : 'orchestrator';
 
@@ -31,7 +31,13 @@ class Kernel extends BaseKernel
 
     public function getAppDir(): string
     {
-        return $this->getProjectDir() . '/apps/' . $this->appId;
+        $directory = match ($this->appId) {
+            'orchestrator', 'ezs_orchestrator' => 'ezs_orchestrator',
+            'ezstudio', 'ezscore' => 'ezscore',
+            'ezstudio_dev', 'ezscore_dev' => 'ezscore_dev',
+            default => $this->appId,
+        };
+        return $this->getProjectDir() . '/apps/' . $directory;
     }
 
     public function getCacheDir(): string
@@ -47,7 +53,7 @@ class Kernel extends BaseKernel
     public function getBundlesPath(): string
     {
         $appBundles = $this->getAppDir() . '/config/bundles.php';
-        return is_file($appBundles) ? $appBundles : parent::getBundlesPath();
+        return is_file($appBundles) ? $appBundles : $this->getProjectDir() . '/config/bundles.php';
     }
 
     protected function configureContainer(ContainerBuilder $container, LoaderInterface $loader): void

@@ -20,7 +20,7 @@ final class ProfileAiRequestService
 
     private function latest(int $runId): ?array
     {
-        $sql = "SELECT id, scientific_run_id AS run_id, status, progress, error AS message, updated_at
+        $sql = "SELECT id, scientific_run_id AS run_id, status, progress, error AS message, updated_at, request_json
                 FROM analysis_jobs WHERE scientific_run_id=? AND kind=? ORDER BY id DESC LIMIT 1";
         $stmt = $this->pdo()->prepare($sql);
         $stmt->execute([$runId,self::KIND]);
@@ -28,6 +28,11 @@ final class ProfileAiRequestService
         if (!$row) return null;
         $row['run_id'] = (int)$row['run_id'];
         $row['job_id'] = (int)$row['id'];
+        // EZS_FIFO_F1_PUBLIC_QUEUE_ID: keep local job_id for worker/cancel,
+        // expose the confirmed Orchestrator queue_id to the HTTP controller.
+        $admission = json_decode((string)($row['request_json'] ?? ''), true);
+        $row['queue_id'] = is_array($admission) ? (int)($admission['orchestrator_queue_id'] ?? 0) : 0;
+        unset($row['request_json']);
         $row['attempt'] = 0;
         $row['message'] = $row['message'] ?? '';
         return $row;
@@ -37,6 +42,10 @@ final class ProfileAiRequestService
 
     public function enqueue(int $runId): array
     {
+        // Fail closed: absence of the queue client must never produce a local-only expertise.
+        if ($this->orchestratorQueue === null) {
+            throw new \RuntimeException('expertise_orchestrator_client_missing');
+        }
         $pdo = $this->pdo();
         $pdo->exec('BEGIN IMMEDIATE');
         try {
@@ -46,7 +55,48 @@ final class ProfileAiRequestService
             if (!$run) throw new \RuntimeException('run_profile_non_termine');
             $current=$this->latest($runId);
             if ($current && in_array($current['status'],['queued','running','cancelling'],true)) {
-                $pdo->commit(); return $current;
+                // Release LAB's SQLite write lock before the Orchestrator REST call.
+                $pdo->commit();
+                $admissionStmt = $pdo->prepare('SELECT request_json FROM analysis_jobs WHERE id=?');
+                $admissionStmt->execute([(int)$current['job_id']]);
+                $admission = json_decode((string)$admissionStmt->fetchColumn(), true);
+                if (!is_array($admission)) { $admission = []; }
+                if ($current['status'] !== 'queued') {
+                    // Never re-dispatch a running or cancelling local execution.
+                    if ((int)($admission['orchestrator_queue_id'] ?? 0) < 1) {
+                        throw new \RuntimeException('expertise_active_job_without_global_admission');
+                    }
+                    return $current + ['queue_id'=>(int)$admission['orchestrator_queue_id'], 'created'=>false];
+                }
+                // R2B deduplicates this exact (job_id, run_id) in the global queue.
+                // Always consult the global queue: a saved queue_id may be stale.
+                $title = trim((string)($run['title'] ?? ''));
+                if ($title === '' && !empty($run['source_path'])) {
+                    $title = pathinfo((string)$run['source_path'], PATHINFO_FILENAME);
+                }
+                $dispatched = $this->orchestratorQueue->dispatch('assistant', [
+                    'job'=>'profile.review', 'category'=>'Expertise',
+                    'label'=>$title !== '' ? $title : ('Run #'.$runId),
+                    'job_id'=>(int)$current['job_id'], 'run_id'=>$runId,
+                ]);
+                $queueId = (int)($dispatched['queue_id'] ?? 0);
+                $globalStatus = (string)($dispatched['status'] ?? '');
+                if ($queueId < 1 || !in_array($globalStatus, ['waiting','progressing','cancelling'], true)) {
+                    throw new \RuntimeException('expertise_global_admission_not_active');
+                }
+                $admission['orchestrator_queue_id'] = $queueId;
+                $save = $pdo->prepare("UPDATE analysis_jobs SET request_json=? WHERE id=? AND scientific_run_id=? AND kind=? AND status='queued'");
+                $save->execute([json_encode($admission, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    (int)$current['job_id'], $runId, self::KIND]);
+                if ($save->rowCount() !== 1) {
+                    throw new \RuntimeException('expertise_admission_state_changed');
+                }
+                return $current + ['queue_id'=>$queueId, 'created'=>false];
+            }
+            // A timed-out dispatch may already have created a global job.
+            // Never retry it without an authoritative reconciliation.
+            if ($current && (string)($current['message'] ?? '') === 'expertise_admission_unverified') {
+                throw new \RuntimeException('expertise_admission_reconciliation_required');
             }
             $now=gmdate('c');
             // Reuse an existing logical job; never create duplicates for the same run.
@@ -62,17 +112,34 @@ final class ProfileAiRequestService
             $created = $this->latest($runId) ?? throw new \RuntimeException('ai_job_insert_failed');
             $songTitle = trim((string) ($run['title'] ?? ''));
             if ($songTitle === '' && !empty($run['source_path'])) { $songTitle = pathinfo((string) $run['source_path'], PATHINFO_FILENAME); }
-            $dispatched = $this->orchestratorQueue?->dispatch('assistant', [
-                'job' => 'profile.review',
-                'category' => 'Expertise',
-                'label' => $songTitle !== '' ? $songTitle : ('Run #' . $runId),
-                'job_id' => (int) $created['job_id'],
-                'run_id' => $runId,
-            ]);
-            $orchQueueId = (int) ($dispatched['queue_id'] ?? 0);
-            if ($orchQueueId > 0) {
-                $reqPatch = json_encode(['phase'=>'profile','scientific_run_id'=>$runId,'processor'=>'qwen','schema'=>'ezs.assistant.profile.job.v1','orchestrator_queue_id'=>$orchQueueId], JSON_UNESCAPED_UNICODE);
-                $pdo->prepare('UPDATE analysis_jobs SET request_json=? WHERE id=?')->execute([$reqPatch, (int) $created['job_id']]);
+            try {
+                $dispatched = $this->orchestratorQueue->dispatch('assistant', [
+                    'job' => 'profile.review',
+                    'category' => 'Expertise',
+                    'label' => $songTitle !== '' ? $songTitle : ('Run #' . $runId),
+                    'job_id' => (int) $created['job_id'],
+                    'run_id' => $runId,
+                ]);
+                $orchQueueId = (int) ($dispatched['queue_id'] ?? 0);
+                if ($orchQueueId < 1) {
+                    throw new \RuntimeException('expertise_orchestrator_queue_id_missing');
+                }
+                $reqPatch = json_encode([
+                    'phase'=>'profile', 'scientific_run_id'=>$runId,
+                    'processor'=>'qwen', 'schema'=>'ezs.assistant.profile.job.v1',
+                    'orchestrator_queue_id'=>$orchQueueId,
+                ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+                $patch = $pdo->prepare('UPDATE analysis_jobs SET request_json=? WHERE id=? AND status=?');
+                $patch->execute([$reqPatch, (int)$created['job_id'], 'queued']);
+                if ($patch->rowCount() !== 1) {
+                    throw new \RuntimeException('expertise_admission_identity_lost');
+                }
+            } catch (\Throwable $admissionError) {
+                // The remote request may have succeeded before the connection failed.
+                // Quarantine the local job: no legacy FIFO execution or blind retry.
+                $quarantine = $pdo->prepare("UPDATE analysis_jobs SET status='error', progress=0, error='expertise_admission_unverified', updated_at=? WHERE id=? AND status='queued'");
+                $quarantine->execute([gmdate('c'), (int)$created['job_id']]);
+                throw new \RuntimeException('expertise_admission_unverified_reconciliation_required', 0, $admissionError);
             }
             return $created;
         } catch (\Throwable $e) {
@@ -180,24 +247,29 @@ SQL);
         return array_map(static function(array $r): array {$r['run_id']=(int)$r['run_id'];$r['job_id']=(int)$r['job_id'];return $r;},$rows);
     }
 
-    public function claim(int $runId): bool
+    /** GO Orchestrator only: exact queued attempt, never a local FIFO head claim. */
+    public function claim(int $runId, int $jobId, int $orchestratorJobId): bool
     {
-        $pdo=$this->pdo();
+        if ($runId < 1 || $jobId < 1 || $orchestratorJobId < 1) {
+            throw new \InvalidArgumentException('invalid_orchestrator_go');
+        }
+        $pdo = $this->pdo();
         $pdo->exec('BEGIN IMMEDIATE');
         try {
             $this->ensureMaintenanceTable();
             if ((bool)$pdo->query('SELECT paused FROM profile_ai_maintenance WHERE id=1')->fetchColumn()) {
                 $pdo->commit(); return false;
             }
-            $head=$pdo->query(LocalProfileQueue::headSql())->fetch(\PDO::FETCH_ASSOC);
-            $busy=(int)$pdo->query(LocalProfileQueue::activeSql())->fetchColumn();
-            if (!$head || (string)$head['kind'] !== self::KIND
-                || (int)$head['scientific_run_id'] !== $runId || $busy > 0) {
+            $stmt = $pdo->prepare("SELECT id,request_json FROM analysis_jobs WHERE id=? AND scientific_run_id=? AND kind=? AND dispatch_owner='lab' AND status='queued' LIMIT 1");
+            $stmt->execute([$jobId,$runId,self::KIND]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $request = $row ? json_decode((string)$row['request_json'],true) : null;
+            if (!is_array($request) || (int)($request['orchestrator_queue_id'] ?? 0) !== $orchestratorJobId) {
                 $pdo->commit(); return false;
             }
-            $stmt=$pdo->prepare("UPDATE analysis_jobs SET status='running',progress=1,error=NULL,updated_at=? WHERE id=? AND scientific_run_id=? AND kind=? AND status='queued'");
-            $stmt->execute([gmdate('c'),(int)$head['id'],$runId,self::KIND]);
-            $claimed=$stmt->rowCount()===1;
+            $update=$pdo->prepare("UPDATE analysis_jobs SET status='running',progress=1,error=NULL,updated_at=? WHERE id=? AND scientific_run_id=? AND kind=? AND dispatch_owner='lab' AND status='queued'");
+            $update->execute([gmdate('c'),$jobId,$runId,self::KIND]);
+            $claimed=$update->rowCount()===1;
             $pdo->commit();
             return $claimed;
         } catch (\Throwable $e) {

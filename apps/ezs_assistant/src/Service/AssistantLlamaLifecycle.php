@@ -9,7 +9,7 @@ final class AssistantLlamaLifecycle
     private static function root(): string { return dirname(__DIR__, 2); }
     private static function llama(): string { return self::root().'\\runtime\\ai\\bin\\llama-server.exe'; }
     private static function original_task(): string { return self::root().'\\runtime\\state\\ai-gpu-task-original-161.xml'; }
-    private static function path_log(): string { return self::root().'\\runtime\\state\\assistant-llama-event.log'; }
+    private static function path_log(): string { return dirname(self::root(), 2).'\\var\\log\\ezs_assistant\\llama\\assistant-llama-event.log'; }
     private static function intent(): string { return self::root().'\\runtime\\state\\assistant-local-ai-intent.json'; }
 
     public function run(): int
@@ -52,7 +52,11 @@ final class AssistantLlamaLifecycle
                 return 0;
             }
             $shell = new \COM('WScript.Shell');
-            $logFile = self::root().'\\runtime\\state\\assistant-llama-native-'.gmdate('Ymd_His').'.log';
+            $logFile = dirname(self::root(), 2).'\\var\\log\\ezs_assistant\\llama\\assistant-llama-native-'.gmdate('Ymd_His').'.log';
+            $logDir = dirname($logFile);
+            if (!is_dir($logDir) && !mkdir($logDir, 0770, true) && !is_dir($logDir)) {
+                throw new \RuntimeException('LLAMA_LOGDIR_CREATE_FAILED');
+            }
             if (preg_match('~(?:^|\s)--log-file(?:\s|=)~i', $args) === 1) {
                 throw new \RuntimeException('LLAMA_LOG_ARGUMENT_CONFLICT');
             }

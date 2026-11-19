@@ -1,23 +1,129 @@
-<?php declare(strict_types=1); namespace App\Tests\Controller;
-use App\Service\JobRetryCoordinator; use App\Service\QueueManager; use Doctrine\ORM\EntityManagerInterface; use PDO; use Psr\Log\NullLogger;
-use Symfony\Bundle\FrameworkBundle\Console\Application; use Symfony\Bundle\FrameworkBundle\Test\WebTestCase; use Symfony\Component\Console\Tester\CommandTester; use Symfony\Component\Lock\LockFactory;
-final class JobRetrySecurityTest extends WebTestCase {
-    private function createTempLabDb(): string { $p = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "ezs_lab_test_" . bin2hex(random_bytes(4)) . ".sqlite"; $pdo = new PDO("sqlite:" . $p); $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); $pdo->exec("CREATE TABLE scientific_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, public_id TEXT, song_id INTEGER, item TEXT, state TEXT, created_at TEXT, finished_at TEXT)"); $pdo->exec("CREATE TABLE analysis_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER, scientific_run_id INTEGER, song_id INTEGER, source_path TEXT, kind TEXT, status TEXT, progress INTEGER, request_json TEXT, error TEXT, created_at TEXT, updated_at TEXT)"); return $p; }
-    public function testRemoteAccessControlAndLocalBypass(): void { $h = password_hash("operator_pass", PASSWORD_BCRYPT); putenv("ORCHESTRATOR_OPERATOR_PASSWORD_HASH=" . $h); $_ENV["ORCHESTRATOR_OPERATOR_PASSWORD_HASH"] = $_SERVER["ORCHESTRATOR_OPERATOR_PASSWORD_HASH"] = $h; $client = static::createClient([], ["ORCHESTRATOR_OPERATOR_PASSWORD_HASH" => $h]); $client->request("POST", "/jobs/999999/retry", [], [], ["REMOTE_ADDR" => "10.99.0.5"]); $this->assertResponseStatusCodeSame(401); $client->request("POST", "/jobs/999999/delete", [], [], ["REMOTE_ADDR" => "10.99.0.5", "PHP_AUTH_USER" => "viewer", "PHP_AUTH_PW" => "viewer_pass"]); $this->assertResponseStatusCodeSame(403); $client->request("POST", "/jobs/999999/retry", [], [], ["REMOTE_ADDR" => "127.0.0.1"]); $this->assertResponseStatusCodeSame(403); $this->assertStringContainsString("CSRF", (string) $client->getResponse()->getContent()); $client->request("POST", "/jobs/999999/retry", [], [], ["REMOTE_ADDR" => "10.99.0.5", "PHP_AUTH_USER" => "operator", "PHP_AUTH_PW" => "operator_pass"]); $this->assertResponseStatusCodeSame(403); $this->assertStringContainsString("Action locale uniquement.", (string) $client->getResponse()->getContent()); $client->request("GET", "/jobs", [], [], ["REMOTE_ADDR" => "10.99.0.5", "PHP_AUTH_USER" => "operator", "PHP_AUTH_PW" => "operator_pass"]); $this->assertResponseStatusCodeSame(200); }
-    public function testDirectResearchHexFileAndKindRunSongIntegrity(): void { static::ensureKernelShutdown(); static::bootKernel(); $c = static::getContainer(); $em = $c->get(EntityManagerInterface::class); $qm = $c->get(QueueManager::class); $lf = $c->get(LockFactory::class); $coord = $c->get(JobRetryCoordinator::class); $db = $this->createTempLabDb(); $pdo = new PDO("sqlite:" . $db); $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . "ezs_dr_" . bin2hex(random_bytes(4)); mkdir($dir, 0777, true); $hex = bin2hex(random_bytes(16));
-        try { $pdo->exec("INSERT INTO scientific_runs (id, public_id, song_id, item, state, created_at, finished_at) VALUES (20, 'pub-20', 601, 'profile', 'failed', 'now', 'now')"); $pdo->exec("INSERT INTO analysis_jobs (id, scientific_run_id, song_id, kind, status, progress, error, updated_at) VALUES (201, 20, 601, 'profile', 'failed', 40, 'err', 'now'), (203, 20, 601, 'stems', 'cancelled', 10, 'cancel', 'now')");
-            $jBadKind = $qm->dispatch("lab", ["job" => "stems", "analysis_job_id" => 201, "scientific_run_id" => 20, "song_id" => 601]); $qm->claimNextWaiting(); $qm->markFailed($jBadKind->getId(), "err"); $this->assertSame("incoherence_kind_metier", $coord->retry($jBadKind->getId(), $db, $dir)["reason"]);
-            $jBadRun = $qm->dispatch("lab", ["job" => "profile", "analysis_job_id" => 201, "scientific_run_id" => 999, "song_id" => 601]); $qm->claimNextWaiting(); $qm->markFailed($jBadRun->getId(), "err"); $this->assertSame("incoherence_scientific_run_id", $coord->retry($jBadRun->getId(), $db, $dir)["reason"]);
-            $jBadSong = $qm->dispatch("lab", ["job" => "profile", "analysis_job_id" => 201, "scientific_run_id" => 20, "song_id" => 888]); $qm->claimNextWaiting(); $qm->markFailed($jBadSong->getId(), "err"); $this->assertSame("incoherence_song_id", $coord->retry($jBadSong->getId(), $db, $dir)["reason"]);
-            file_put_contents($dir . "/" . $hex . ".request.json", '{"prompt":"test"}'); file_put_contents($dir . "/" . $hex . ".result.json", '{"ok":false,"state":"error"}'); $jDr = $qm->dispatch("assistant", ["job" => "profile.direct_research", "job_id" => $hex]); $qm->claimNextWaiting(); $qm->markFailed($jDr->getId(), "err"); $rDr = $coord->retry($jDr->getId(), $db, $dir); $this->assertTrue($rDr["ok"]); $this->assertSame("queued", json_decode((string) file_get_contents($dir . "/" . $hex . ".result.json"), true)["state"]);
-        } finally { $em->getConnection()->executeStatement("DELETE FROM job_queue"); unset($pdo); @unlink($db); @unlink($dir . "/" . $hex . ".request.json"); @unlink($dir . "/" . $hex . ".result.json"); @rmdir($dir); } }
-    public function testSagaRollbackIdempotentReconciliationAndConsumeCommand(): void { static::ensureKernelShutdown(); $kernel = static::bootKernel(); $c = static::getContainer(); $em = $c->get(EntityManagerInterface::class); $qm = $c->get(QueueManager::class); $lf = $c->get(LockFactory::class); $coord = $c->get(JobRetryCoordinator::class); $db = $this->createTempLabDb(); $pdo = new PDO("sqlite:" . $db);
-        try { $pdo->exec("INSERT INTO scientific_runs (id, public_id, song_id, item, state, created_at, finished_at) VALUES (30, 'pub-30', 701, 'stems', 'failed', 'now', 'now')"); $pdo->exec("INSERT INTO analysis_jobs (id, scientific_run_id, song_id, kind, status, progress, error, updated_at) VALUES (301, 30, 701, 'stems', 'failed', 55, 'crash', 'now'), (302, 30, 701, 'chords_scientific', 'queued', 0, NULL, 'now'), (303, 30, 701, 'chords_scientific', 'failed', 65, 'crash_chords', 'now'), (304, 30, 701, 'lyrics_scientific', 'failed', 30, 'crash_lyrics', 'now')");
-            $jLock = $qm->dispatch("lab", ["job" => "stems", "analysis_job_id" => 301, "scientific_run_id" => 30, "song_id" => 701]); $qm->claimNextWaiting(); $qm->markFailed($jLock->getId(), "err");
-            $lk = $lf->createLock("job_retry_" . $jLock->getId(), 30.0); $this->assertTrue($lk->acquire()); try { $this->assertSame("verrou_relance_actif", $coord->retry($jLock->getId(), $db)["reason"]); } finally { $lk->release(); }
-            $stubQm = $this->createStub(QueueManager::class); $stubQm->method("isProcessAlive")->willReturn(false); $stubQm->method("findActiveDuplicate")->willReturn(null); $stubQm->method("retry")->willThrowException(new \RuntimeException("down"));
-            $saga = new JobRetryCoordinator($em, $stubQm, $lf, new NullLogger(), $db); $this->assertSame("echec_rearmement_central", $saga->retry($jLock->getId(), $db)["reason"]); $this->assertSame("failed", $pdo->query("SELECT status FROM analysis_jobs WHERE id = 301")->fetchColumn());
-            $jDiv = $qm->dispatch("lab", ["job" => "chords", "analysis_job_id" => 302, "scientific_run_id" => 30, "song_id" => 701]); $qm->claimNextWaiting(); $qm->markFailed($jDiv->getId(), "interrupted_before_central_commit"); $rRec = $coord->retry($jDiv->getId(), $db); $this->assertTrue($rRec["ok"]); $this->assertSame("relance_reconciliee_idempotente", $rRec["reason"]); $em->getConnection()->executeStatement("DELETE FROM job_queue"); $jCh = $qm->dispatch("lab", ["job" => "chords", "analysis_job_id" => 303, "scientific_run_id" => 30, "song_id" => 701]); $qm->claimNextWaiting(); $qm->markFailed($jCh->getId(), "err"); $rCh = $coord->retry($jCh->getId(), $db); $this->assertTrue($rCh["ok"]); $this->assertSame("relance_acceptee", $rCh["reason"]); $em->getConnection()->executeStatement("DELETE FROM job_queue"); $jLy = $qm->dispatch("lab", ["job" => "lyrics", "analysis_job_id" => 304, "scientific_run_id" => 30, "song_id" => 701]); $qm->claimNextWaiting(); $qm->markFailed($jLy->getId(), "err"); $rLy = $coord->retry($jLy->getId(), $db); $this->assertTrue($rLy["ok"]); $this->assertSame("relance_acceptee", $rLy["reason"]);
-            $em->getConnection()->executeStatement("DELETE FROM job_queue"); $qm->dispatch("lab", ["job" => "healthcheck"]); $app = new Application($kernel); $tester = new CommandTester($app->find("orchestrator:queue:consume")); $tester->execute(["--drain" => true]); $this->assertSame(0, $tester->getStatusCode()); $this->assertStringContainsString("ended (OK)", $tester->getDisplay());
-        } finally { $em->getConnection()->executeStatement("DELETE FROM job_queue"); unset($pdo); @unlink($db); } }
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Controller;
+
+use App\Service\LabRetryClient;
+use App\Service\JobRetryCoordinator;
+use App\Service\QueueManager;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\NullLogger;
+use Symfony\Component\Lock\LockFactory;
+use PHPUnit\Framework\TestCase;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+
+final class JobRetrySecurityTest extends WebTestCase
+{
+    public function testRemoteAccessControlAndLocalBypass(): void
+    {
+        $h=password_hash('operator_pass',PASSWORD_BCRYPT);
+        putenv('ORCHESTRATOR_OPERATOR_PASSWORD_HASH='.$h);
+        $_ENV['ORCHESTRATOR_OPERATOR_PASSWORD_HASH']=$_SERVER['ORCHESTRATOR_OPERATOR_PASSWORD_HASH']=$h;
+        $client=static::createClient([],['ORCHESTRATOR_OPERATOR_PASSWORD_HASH'=>$h]);
+        $client->request('POST','/jobs/999999/retry',[],[],['REMOTE_ADDR'=>'10.99.0.5']);
+        $this->assertResponseStatusCodeSame(401);
+        $client->request('POST','/jobs/999999/delete',[],[],['REMOTE_ADDR'=>'10.99.0.5','PHP_AUTH_USER'=>'viewer','PHP_AUTH_PW'=>'viewer_pass']);
+        $this->assertResponseStatusCodeSame(403);
+        $client->request('POST','/jobs/999999/retry',[],[],['REMOTE_ADDR'=>'127.0.0.1']);
+        $this->assertResponseStatusCodeSame(403);
+        $this->assertStringContainsString('CSRF',(string)$client->getResponse()->getContent());
+        $client->request('POST','/jobs/999999/retry',[],[],['REMOTE_ADDR'=>'10.99.0.5','PHP_AUTH_USER'=>'operator','PHP_AUTH_PW'=>'operator_pass']);
+        $this->assertResponseStatusCodeSame(403);
+        $this->assertStringContainsString('Action locale uniquement.',(string)$client->getResponse()->getContent());
+        $client->request('GET','/jobs',[],[],['REMOTE_ADDR'=>'10.99.0.5','PHP_AUTH_USER'=>'operator','PHP_AUTH_PW'=>'operator_pass']);
+        $this->assertResponseStatusCodeSame(200);
+    }
+
+    public function testLabRestRetryClientRequiresConfiguredToken(): void
+    {
+        // The retry must fail closed; it must never create or read LAB SQLite.
+        $old=$_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']??null;
+        $oldWorker=$_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']??null;
+        try {
+            unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN'],$_SERVER['EZSTUDIOLAB_ASSISTANT_TOKEN'],$_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN'],$_SERVER['EZSTUDIO_ANALYSIS_WORKER_TOKEN']);
+            putenv('EZSTUDIOLAB_ASSISTANT_TOKEN');putenv('EZSTUDIO_ANALYSIS_WORKER_TOKEN');
+            $svc=new LabRetryClient(new MockHttpClient());
+            $this->assertSame('lab_retry_token_not_configured',$svc->request('prepare',368,1,'lab',['job'=>'profile','analysis_job_id'=>1])['reason']);
+        } finally {
+            if ($old!==null) $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']=$old;
+            if ($oldWorker!==null) $_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']=$oldWorker;
+        }
+    }
+
+    public function testCentralFailureCallsRemoteCompensation(): void
+    {
+        static::ensureKernelShutdown();static::bootKernel();
+        $container=static::getContainer();
+        $em=$container->get(EntityManagerInterface::class);
+        $qm=$container->get(QueueManager::class);
+        $lf=$container->get(LockFactory::class);
+        $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']='test_token';
+        $calls=[];
+        try {
+            $job=$qm->dispatch('lab',['job'=>'profile','analysis_job_id'=>201,'scientific_run_id'=>20,'song_id'=>601]);
+            $qm->claimNextWaiting();$qm->markFailed((int)$job->getId(),'failed');
+            $http=new MockHttpClient(function(string $method,string $url,array $options)use(&$calls):MockResponse {
+                $action=basename($url);$calls[]=$action;
+                return new MockResponse('{"schema":"ezstudio.lab-job-retry.v1","ok":true,"reconciled":false}',['http_code'=>200]);
+            });
+            $stub=$this->createStub(QueueManager::class);
+            $stub->method('isProcessAlive')->willReturn(false);
+            $stub->method('findActiveDuplicate')->willReturn(null);
+            $stub->method('retry')->willThrowException(new \RuntimeException('global failure'));
+            $coord=new JobRetryCoordinator($em,$stub,$lf,new NullLogger(),new LabRetryClient($http));
+            $result=$coord->retry((int)$job->getId());
+            $this->assertFalse($result['ok']);
+            $this->assertSame('echec_rearmement_central',$result['reason']);
+            $this->assertSame(['prepare','abort'],$calls);
+        } finally {
+            $em->getConnection()->executeStatement('DELETE FROM job_queue');
+            unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']);
+        }
+    }
+
+    public function testIdempotentPreparedRemoteStateThenGlobalRetry(): void
+    {
+        static::ensureKernelShutdown();static::bootKernel();
+        $container=static::getContainer();
+        $em=$container->get(EntityManagerInterface::class);
+        $qm=$container->get(QueueManager::class);
+        $lf=$container->get(LockFactory::class);
+        $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']='test_token';
+        $calls=[];
+        try {
+            $job=$qm->dispatch('lab',['job'=>'profile','analysis_job_id'=>202,'scientific_run_id'=>20,'song_id'=>602]);
+            $qm->claimNextWaiting();$qm->markFailed((int)$job->getId(),'failed');
+            $http=new MockHttpClient(function(string $method,string $url,array $options)use(&$calls):MockResponse {
+                $action=basename($url);$calls[]=$action;
+                $reconciled=$action==='prepare'?'true':'false';
+                return new MockResponse('{"schema":"ezstudio.lab-job-retry.v1","ok":true,"reconciled":'.$reconciled.'}',['http_code'=>200]);
+            });
+            $coord=new JobRetryCoordinator($em,$qm,$lf,new NullLogger(),new LabRetryClient($http));
+            $result=$coord->retry((int)$job->getId());
+            $this->assertTrue($result['ok']);
+            $this->assertSame('relance_reconciliee_idempotente',$result['reason']);
+            $this->assertSame(['prepare','commit'],$calls);
+            $this->assertSame('waiting',$em->getConnection()->fetchOne('SELECT status FROM job_queue WHERE id=?',[(int)$job->getId()]));
+        } finally {
+            $em->getConnection()->executeStatement('DELETE FROM job_queue');
+            unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']);
+        }
+    }
+
+    public function testLabRestRetryClientContract(): void
+    {
+        $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']='test_token';
+        try {
+            $http=new MockHttpClient(function(string $method,string $url,array $options): MockResponse {
+                $this->assertSame('POST',$method);
+                $this->assertStringContainsString('/internal/analysis/desktop/jobs/retry/prepare',$url);
+                return new MockResponse('{"schema":"ezstudio.lab-job-retry.v1","ok":true,"reconciled":false}', ['http_code'=>200]);
+            });
+            $svc=new LabRetryClient($http);
+            $this->assertTrue($svc->request('prepare',368,1,'lab',['job'=>'profile','analysis_job_id'=>1])['ok']);
+        } finally { unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']); }
+    }
 }

@@ -14,6 +14,22 @@ final class ProfileAiRequestController extends AbstractController
 {
     public function __construct(private readonly ProfileAiRequestService $queue, private readonly LabAnalysisTokenGuard $guard) {}
 
+    // EZS_FIFO_F1_PUBLIC_QUEUE_ID: user-facing Job # is exclusively Orchestrator's ID.
+    // Local analysis_jobs.id stays available as analysis_job_id for internal cancel.
+    private function publicRequest(?array $item): ?array
+    {
+        if ($item === null) return null;
+        $localId = (int)($item['job_id'] ?? 0);
+        $globalId = (int)($item['queue_id'] ?? 0);
+        $item['analysis_job_id'] = $localId;
+        $item['job_id'] = $globalId > 0 ? $globalId : null;
+        if ($globalId < 1 && in_array((string)($item['status'] ?? ''), ['queued','running','cancelling'], true)) {
+            $item['status'] = 'admission_error';
+            $item['message'] = 'expertise_non_admise_dans_orchestrator';
+        }
+        return $item;
+    }
+
     #[Route('/workbench/profile/{id<\d+>}/ai-review',name:'profile_ai_review_request',methods:['POST'])]
     public function request(int $id,Request $request): JsonResponse
     {
@@ -30,14 +46,21 @@ final class ProfileAiRequestController extends AbstractController
         if ($fetchSite !== null && !in_array($fetchSite, ['same-origin','none'],true)) {
             return $this->json(['error'=>'cross_site_denied'],403);
         }
-        try {return $this->json(['ok'=>true,'request'=>$this->queue->enqueue($id)],202);}
+        try {
+            $this->queue->enqueue($id);
+            $item = $this->publicRequest($this->queue->get($id));
+            if (($item['job_id'] ?? null) === null) {
+                throw new \RuntimeException('expertise_global_admission_missing');
+            }
+            return $this->json(['ok'=>true,'job_id'=>$item['job_id'],'request'=>$item],202);
+        }
         catch (\RuntimeException $e) {return $this->json(['error'=>$e->getMessage()],409);}
     }
 
     #[Route('/workbench/profile/{id<\d+>}/ai-review',name:'profile_ai_review_status',methods:['GET'])]
     public function status(int $id): JsonResponse
     {
-        return $this->json(['request'=>$this->queue->get($id)]);
+        return $this->json(['request'=>$this->publicRequest($this->queue->get($id))]);
     }
 
     #[Route('/internal/analysis/desktop/profile/{id<\d+>}/scientific-items',name:'lab_internal_profile_scientific_items',methods:['GET'])]
@@ -158,13 +181,6 @@ final class ProfileAiRequestController extends AbstractController
             }
             $payload = $request->toArray();
             $event = $service->save($id, $payload);
-            if (isset($payload['progress']) && is_numeric($payload['progress'])) {
-                $pct = max(1, min(99, (int) $payload['progress']));
-                try {
-                    $db = new \PDO('sqlite:' . dirname(__DIR__, 2) . '/data/benchmark.sqlite');
-                    $db->prepare("UPDATE analysis_jobs SET progress = ?, updated_at = ? WHERE id = ? AND status = 'running'")->execute([$pct, gmdate('c'), $id]);
-                } catch (\Throwable) {}
-            }
             return $this->json(['ok'=>true,'event'=>$event],201);
         } catch (\InvalidArgumentException $e) {return $this->json(['error'=>$e->getMessage()],422);}
         catch (\Throwable $e) {return $this->json(['error'=>$e->getMessage()],409);}
@@ -174,7 +190,11 @@ final class ProfileAiRequestController extends AbstractController
     public function claim(Request $request,int $id): JsonResponse
     {
         $this->guard->assertAuthorized($request);
-        return $this->json(['claimed'=>$this->queue->claim($id)]);
+        $payload=json_decode($request->getContent(),true);
+        $jobId=is_array($payload) ? filter_var($payload['job_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]) : false;
+        $orchestratorJobId=is_array($payload) ? filter_var($payload['orchestrator_job_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]) : false;
+        if (!$jobId || !$orchestratorJobId) return $this->json(['claimed'=>false,'error'=>'orchestrator_go_required'],422);
+        return $this->json(['claimed'=>$this->queue->claim($id,(int)$jobId,(int)$orchestratorJobId)]);
     }
 
     /** Cooperative cancellation probe, protected by the existing LAB token. */

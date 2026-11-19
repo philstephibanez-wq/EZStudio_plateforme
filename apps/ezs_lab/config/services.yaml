@@ -1,5 +1,5 @@
 parameters:
-    app.database_path: '%kernel.project_dir%/apps/ezs_lab/data/benchmark.sqlite'
+    app.database_path: '%kernel.project_dir%/data/databases/EZS_Lab.sqlite'
     ezs_lab.app_dir: '%kernel.project_dir%/apps/ezs_lab'
     env(ORCHESTRATOR_BASE_URL): 'http://orchestrator.ezstudio.local:8000'
     orchestrator.base_url: '%env(ORCHESTRATOR_BASE_URL)%'

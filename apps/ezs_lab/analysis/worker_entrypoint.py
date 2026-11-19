@@ -104,6 +104,32 @@ def _is_under(path: Path, root: Path) -> bool:
         return False
 
 
+def _source_in_authorized_roots(source: Path, project_root: Path) -> bool:
+    """Permit historic LAB inputs or canonical shared imports, never an escaped symlink.
+
+    EZSTUDIO_IMPORTS_ROOT is deployment configuration, not job-controlled input.
+    This check uses resolved paths to reject source symlink/junction escapes.
+    """
+    platform_root = project_root.resolve(strict=True).parents[1]
+    imports_path = os.getenv("EZSTUDIO_IMPORTS_ROOT", "").strip()
+    imports_root = Path(imports_path) if imports_path else platform_root / "data" / "imports"
+    try:
+        resolved_source = source.resolve(strict=True)
+        if not resolved_source.is_file():
+            return False
+        historic_root = project_root.resolve(strict=True)
+        canonical_root = imports_root.resolve(strict=True)
+        # A junction used as the canonical root must not escape the platform tree.
+        if not canonical_root.is_relative_to(platform_root):
+            return False
+        return any(
+            resolved_source.is_relative_to(root)
+            for root in (historic_root, canonical_root)
+        )
+    except (OSError, RuntimeError, ValueError):
+        return False
+
+
 def _required_string(mapping: dict[str, Any], key: str) -> str:
     value = str(mapping.get(key) or "").strip()
     if not value:
@@ -220,8 +246,8 @@ def main() -> int:
         )
     )
 
-    if not _is_under(source, project_root):
-        raise RuntimeError(f"source_outside_lab_root:{source}")
+    if not _source_in_authorized_roots(source, project_root):
+        raise RuntimeError(f"source_outside_authorized_import_roots:{source}")
     if not _is_under(progress_file, tmp_root):
         raise RuntimeError(f"progress_outside_lab_tmp:{progress_file}")
 

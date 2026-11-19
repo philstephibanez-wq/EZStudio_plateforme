@@ -24,7 +24,7 @@ if ($h -or ($Action -in @("-h", "--help", "help", "/?"))) {
 
 $frankenBin = "H:\FRANKENPHP\bin\frankenphp.exe"
 $caddyConfig = "$PlatformRoot\config\frankenphp\Caddyfile"
-$phpBin = "H:\PHP\php-8.5-x64\php.exe"
+$phpBin = "H:\FRANKENPHP\bin\php.exe"
 
 function Get-FrankenProcess {
     Get-CimInstance Win32_Process -Filter "Name = 'frankenphp.exe'" -ErrorAction SilentlyContinue |
@@ -64,10 +64,12 @@ switch ($Action.ToLower()) {
             Remove-Item Env:APP_ID -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 1
         }
+        & "$PSScriptRoot\ezs_llama_lifecycle.ps1" start
         Show-Status
     }
     "stop" {
         Write-Host "[EZS] Arret de la plateforme..." -ForegroundColor Yellow
+        & "$PSScriptRoot\ezs_llama_lifecycle.ps1" stop
         Get-FrankenProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
         Get-OrchestratorQueueProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
         Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match "EZStudio_plateforme" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
@@ -81,6 +83,7 @@ switch ($Action.ToLower()) {
     }
     "status" {
         Show-Status
+        & "$PSScriptRoot\ezs_llama_lifecycle.ps1" status
     }
     default {
         Write-Host "Commande inconnue : $Action (utilisez 'ezs -h' pour l aide)" -ForegroundColor Red

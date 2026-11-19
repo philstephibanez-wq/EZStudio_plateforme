@@ -28,3 +28,6 @@
 
 __pycache__/
 *.py[cod]
+
+# EZStudio - local persistent data (audio, SQLite, backups)
+/data/

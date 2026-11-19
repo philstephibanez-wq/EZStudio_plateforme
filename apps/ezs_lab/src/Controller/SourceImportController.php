@@ -13,7 +13,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class SourceImportController extends AbstractController
 {
     #[Route('/import/source', name: 'workbench_import_source', methods: ['POST'])]
-    public function import(Request $request, Database $db): Response
+    public function import(Request $request, Database $db, \EZSLab\Service\AudioSourceResolver $audioSources): Response
     {
         /** @var UploadedFile|null $audio */
         $audio = $request->files->get('audio');
@@ -36,19 +36,23 @@ final class SourceImportController extends AbstractController
         }
 
         $projectDir = (string)$this->getParameter('kernel.project_dir');
-        $targetDir = $projectDir.DIRECTORY_SEPARATOR.'data'.DIRECTORY_SEPARATOR.'imports';
+        $targetDir = $audioSources->root();
         if (!is_dir($targetDir) && !mkdir($targetDir, 0777, true) && !is_dir($targetDir)) {
             return new Response('Impossible de créer le stockage IMPORT.', 500);
         }
 
         $targetPath = $targetDir.DIRECTORY_SEPARATOR.$sha.'.'.$ext;
+        if (is_file($targetPath) && hash_file('sha256', $targetPath) !== $sha) {
+            throw new \RuntimeException('existing_audio_sha256_mismatch');
+        }
         if (!is_file($targetPath)) {
             $audio->move($targetDir, basename($targetPath));
         }
 
         $songId = $db->createSong($title, $artist, $original, $sha);
-        $stmt = $db->pdo()->prepare('UPDATE songs SET source_path=? WHERE id=?');
-        $stmt->execute([$targetPath, $songId]);
+        // The canonical source is resolved by audio_sha256; no absolute path stored.
+        $stmt = $db->pdo()->prepare('UPDATE songs SET source_path=NULL WHERE id=?');
+        $stmt->execute([$songId]);
 
         // Contract: IMPORT stops here. PROFILE is only the next screen.
         return new RedirectResponse($this->generateUrl('workbench_profile', ['song' => $songId]));

@@ -64,15 +64,47 @@ final class AssistantJobCheckpointService {
     }
 
     private function syncProgress(\PDO $pdo, int $jobId, string $key, string $phase): void {
-        $map = ['identity_resolver'=>15,'recording_duration'=>25,'public_source_research'=>45,'review_payload_builder'=>55,'independent_verifier'=>70,'assertion_web_investigator'=>82,'local_ai_document_review'=>94,'documentary_verdict_merger'=>98];
+        // Single owner: LAB receives REST checkpoints, stores local progress,
+        // and publishes the resulting global percent to Orchestrator.
+        $map = [
+            'identity_resolver'=>15, 'recording_duration'=>25,
+            'public_source_research'=>45, 'review_payload_builder'=>55,
+            'independent_verifier'=>70, 'assertion_web_investigator'=>82,
+            'local_ai_document_review'=>94, 'documentary_verdict_merger'=>98,
+            'documentary_payload_enricher'=>98, 'ai_draft_payload_enricher'=>99,
+            'lab_revision_submit'=>99,
+        ];
         $percent = 0;
-        foreach ($map as $eng => $pct) { if (stripos($key, $eng) !== false || stripos($phase, $eng) !== false) { $percent = $pct; break; } }
-        if ($percent <= 0) { $cnt = (int)$pdo->query('SELECT COUNT(*) FROM assistant_job_checkpoints WHERE job_id=' . $jobId)->fetchColumn(); $percent = min(95, max(5, $cnt * 12)); }
-        $pdo->prepare('UPDATE analysis_jobs SET progress = MAX(COALESCE(progress,0), ?), updated_at = ? WHERE id = ?')->execute([$percent, gmdate('c'), $jobId]);
-        $req = json_decode((string)$pdo->query('SELECT COALESCE(request_json,\'\') FROM analysis_jobs WHERE id=' . $jobId)->fetchColumn(), true);
+        foreach ($map as $eng => $pct) {
+            if ($key === 'engine.' . $eng) { $percent = $pct; break; }
+        }
+        if ($percent <= 0) {
+            $cnt = $pdo->prepare('SELECT COUNT(*) FROM assistant_job_checkpoints WHERE job_id=?');
+            $cnt->execute([$jobId]);
+            $percent = min(95, max(5, (int)$cnt->fetchColumn() * 12));
+        }
+        $previous = $pdo->prepare("SELECT COALESCE(progress,0) FROM analysis_jobs WHERE id=? AND status='running'");
+        $previous->execute([$jobId]);
+        $before = $previous->fetchColumn();
+        if ($before === false || $percent <= (int)$before) {
+            return; // Idempotent retry, no backward movement, no duplicate notification.
+        }
+        $update = $pdo->prepare("UPDATE analysis_jobs SET progress=?, updated_at=? WHERE id=? AND status='running' AND COALESCE(progress,0) < ?");
+        $update->execute([$percent, gmdate('c'), $jobId, $percent]);
+        if ($update->rowCount() !== 1) {
+            return;
+        }
+        $reqStmt = $pdo->prepare('SELECT request_json FROM analysis_jobs WHERE id=?');
+        $reqStmt->execute([$jobId]);
+        $req = json_decode((string)$reqStmt->fetchColumn(), true);
         $orchId = (int)($req['orchestrator_queue_id'] ?? 0);
         if ($orchId > 0) {
-            try { $this->orchestratorQueue?->reportProgress($orchId, $percent); } catch (\Throwable) {}
+            try {
+                $this->orchestratorQueue?->reportProgress($orchId, $percent);
+            } catch (\Throwable $e) {
+                // LAB progress remains authoritative even if Orchestrator is down.
+                error_log('EZS_ASSISTANT_ORCHESTRATOR_PROGRESS_ERROR:' . get_class($e));
+            }
         }
     }
 

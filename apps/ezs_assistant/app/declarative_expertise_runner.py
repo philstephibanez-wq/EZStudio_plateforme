@@ -1,4 +1,5 @@
 import hashlib, json, os, sqlite3, time
+from contextlib import closing
 from pathlib import Path
 
 ROOT = Path(os.environ.get("EZS_ROOT", Path(__file__).resolve().parents[3]))
@@ -106,7 +107,7 @@ def set_explicit_baseline(phase: str, preset_id: str, db_path: Path = DB_PATH, p
 
 def record_run_preset(run_id: int, preset_id: str, preset_sha256: str, db_path: Path = DB_PATH, content_json: str | None = None, expertise_job_id: int | None = None) -> int:
     """Enregistre la provenance initiale immuable et chaque tentative avec son contenu exact."""
-    with sqlite3.connect(str(db_path)) as con:
+    with closing(sqlite3.connect(str(db_path))) as con, con:
         ensure_tables(con)
         if content_json is None:
             rev = con.execute("SELECT content_json FROM assistant_preset_revisions WHERE preset_id=? AND sha256=?", (preset_id, preset_sha256)).fetchone()

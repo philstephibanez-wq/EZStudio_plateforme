@@ -20,6 +20,7 @@
   const root=document.getElementById('profile-ai-request'), form=document.getElementById('profile-ai-request-form'), state=document.getElementById('profile-ai-request-state'), button=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), progress=document.getElementById('profile-ai-progress'), stepCurrent=document.getElementById('profile-ai-step-current'), stepHistory=document.getElementById('profile-ai-step-history'), currentItem=document.getElementById('profile-ai-current-item');
   const engineLabels={identity_resolver:'Résolution d’identité musicale (MusicBrainz / IA)',recording_duration:'Vérification de durée catalogue',public_source_research:'Recherche sur sources publiques',review_payload_builder:'Construction du dossier d’expertise',independent_verifier:'Vérification indépendante des assertions',assertion_web_investigator:'Investigation web des assertions',local_ai_document_review:'Revue documentaire IA locale (Qwen 2.5 1.5B)',documentary_verdict_merger:'Synthèse finale des verdicts'};
   if (!root || !form || !state || !button || !progress || !currentItem) return;
+  // EZS_FIFO_F1_PUBLIC_QUEUE_ID: cancellation uses the technical local ID.
   let activeJobId=0, wasActive=false;
 
   function applyFsm(s) {
@@ -35,7 +36,7 @@
   }
 
   function show(item) {
-    activeJobId=Number(item?.job_id || 0);
+    activeJobId=Number(item?.analysis_job_id || 0);
     const s=item?.status || 'idle';
     if (s==='running' || s==='queued' || s==='cancelling') { wasActive=true; }
     applyFsm(s);
@@ -46,7 +47,7 @@
     else if (s==='running' && (!known || number<=1)) progress.removeAttribute('value');
     else if (s==='running' && known) progress.value=number;
     else progress.value=0;
-    const info=s==='completed' ? 'Expertise IA terminée' : s==='running' ? 'Expertise IA en cours'+(known && number>1 ? ' · '+pct+' %' : '') : s==='queued' ? 'Expertise IA en attente' : s==='cancelling' ? 'Annulation de l’expertise IA demandée' : s==='cancelled' ? 'Expertise IA annulée' : s==='error' ? 'Erreur d’expertise IA' : 'Aucune expertise en cours';
+    const info=s==='completed' ? 'Expertise IA terminée' : s==='running' ? 'Expertise IA en cours'+(known && number>1 ? ' · '+pct+' %' : '') : s==='queued' ? 'Expertise IA en attente' : s==='cancelling' ? 'Annulation de l’expertise IA demandée' : s==='cancelled' ? 'Expertise IA annulée' : s==='error' ? 'Erreur d’expertise IA' : s==='admission_error' ? 'Admission Orchestrator non confirmée' : 'Aucune expertise en cours';
     state.textContent=info+(item?.job_id ? ' · Job #'+item.job_id : '')+(item?.message ? ' · '+item.message : '');
     const cps=Array.isArray(item?.checkpoints) ? item.checkpoints : [];
     if (stepHistory) {
@@ -94,6 +95,7 @@
     try {
       const r=await fetch(form.action,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Profile-AI-Action':'request','Accept':'application/json'}});
       const j=await r.json();if(!r.ok) throw new Error(j.error||'HTTP '+r.status);
+      if (!Number(j?.request?.job_id || 0)) throw new Error('expertise_global_admission_missing');
       show(j.request);
     } catch(err){state.textContent='Erreur : '+err.message;progress.value=0;applyFsm('idle');}
   });

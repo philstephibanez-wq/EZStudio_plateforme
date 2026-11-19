@@ -3,8 +3,9 @@ from __future__ import annotations
 import numpy as np
 
 from meter_shared import estimate_meter_from_chords_engine
-from module import ModuleContext
+from module import ModuleContext, ModuleConfig
 import os
+import math
 
 
 def _cache_harmonic(context: ModuleContext, harmonic: np.ndarray) -> None:
@@ -14,11 +15,18 @@ def _cache_harmonic(context: ModuleContext, harmonic: np.ndarray) -> None:
         context._meter_harmonic_sr = int(context.sr)
 
 
-def run(context: ModuleContext) -> dict:
+def run(context: ModuleContext, config: ModuleConfig) -> dict:
+    thresholds = config.thresholds
+    if not isinstance(thresholds, dict) or "confidence" not in thresholds:
+        raise ValueError("profile_meter_confidence_threshold_missing")
+    value = thresholds["confidence"]
+    if type(value) not in (int, float) or not math.isfinite(value) or not (0.0 <= value <= 1.0):
+        raise ValueError("profile_meter_confidence_threshold_invalid: expected finite number in [0,1]")
+    confidence_threshold = float(value)
     result = estimate_meter_from_chords_engine(
         np.asarray(context.y, dtype=np.float32),
         int(context.sr),
-        confidence_threshold=0.50,
+        confidence_threshold=confidence_threshold,
         harmonic_sink=(
             (lambda harmonic: _cache_harmonic(context, harmonic))
             if os.getenv("EZSTUDIO_PROFILE_HPSS_REUSE") == "1"
