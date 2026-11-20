@@ -73,9 +73,7 @@ final class StemsExecutionService
             'analysis_job_id' => $jobId,
             'scientific_run_id' => $scientificRunId,
             'song_id' => (int) $run['song_id'],
-            'source_path' => $source,
             'audio_hash' => $audioHash,
-            'storage_root' => $storageRoot,
             'force' => $force,
             'engine_profile' => $engineProfile,
             'previous_job_id' => $previousJobId,
@@ -132,10 +130,7 @@ final class StemsExecutionService
         }
 
         $request = $this->decodeRequest($job);
-        $storageRoot = trim((string)($request['storage_root'] ?? ''));
-        if ($storageRoot === '') {
-            throw new \RuntimeException('stems_storage_root_missing');
-        }
+        $storageRoot = (new LabResourceResolver(new AudioSourceResolver()))->stemsStorage((string)$job['audio_sha256']);
 
         $current = $this->readJson($storageRoot.DIRECTORY_SEPARATOR.'current.json');
         $runName = trim((string)($current['run'] ?? ''));
@@ -203,7 +198,7 @@ final class StemsExecutionService
         }
 
         $this->runRegistry->setLabel($scientificRunId, 'progress', '100');
-        $this->runRegistry->setLabel($scientificRunId, 'stems_run_dir', $runDir);
+        $this->runRegistry->setLabel($scientificRunId, 'stems_source_run', $runName);
         $this->runRegistry->setState(
             $scientificRunId,
             'done',
@@ -258,7 +253,7 @@ final class StemsExecutionService
             (string)(getenv('EZSTUDIO_TMP_ROOT') ?: dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'tmp'),
             '\\/'
         );
-        $storageRoot = trim((string)($request['storage_root'] ?? ''));
+        $storageRoot = (new LabResourceResolver(new AudioSourceResolver()))->stemsStorage((string)$row['audio_sha256']);
         $progressFile = $tmpRoot
             .DIRECTORY_SEPARATOR.'jobs'
             .DIRECTORY_SEPARATOR.(string)$row['id']
@@ -290,7 +285,7 @@ final class StemsExecutionService
             'error' => $row['error'] ?? null,
             'request' => $request,
             'paths' => [
-                'source' => (string)$row['source_path'],
+                'source' => (new LabResourceResolver(new AudioSourceResolver()))->audio((string)$row['audio_sha256']),
                 'storage_root' => $storageRoot,
                 'progress_file' => $progressFile,
             ],

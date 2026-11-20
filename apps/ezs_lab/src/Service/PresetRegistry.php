@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS preset_module_revisions (
     revision_number INTEGER NOT NULL,
     revision_ref TEXT NOT NULL UNIQUE,
     fingerprint TEXT NOT NULL,
+    content_sha256 TEXT NOT NULL,
     composition_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE(module_key, revision_number),
@@ -28,8 +29,8 @@ CREATE TABLE IF NOT EXISTS preset_phase_revisions (
     revision_number INTEGER NOT NULL,
     revision_ref TEXT NOT NULL UNIQUE,
     fingerprint TEXT NOT NULL,
-    pipeline_revision TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'candidate'
+    content_sha256 TEXT NOT NULL,
+    pipeline_revision TEXT NOT NULL DEFAULT '',     status TEXT NOT NULL DEFAULT 'candidate'
         CHECK(status IN ('candidate','promoted','rejected','superseded')),
     metadata_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
@@ -80,6 +81,13 @@ CREATE TABLE IF NOT EXISTS preset_phase_baselines (
         REFERENCES preset_phase_revisions(id) ON DELETE RESTRICT
 );
 SQL);
+        // Never silently migrate a production database while bootstrapping services.
+        foreach (['preset_module_revisions', 'preset_phase_revisions'] as $table) {
+            $columns = $this->db->pdo()->query('PRAGMA table_info('.$table.')')->fetchAll();
+            if (!in_array('content_sha256', array_column($columns, 'name'), true)) {
+                throw new \RuntimeException('preset_normalized_identity_schema_missing:'.$table);
+            }
+        }
     }
 
     public function captureRunPreset(
@@ -128,12 +136,13 @@ SQL);
                     throw new \RuntimeException('preset_module_id_missing');
                 }
 
-                $composition = $this->canonicalize($module);
+                $composition = $this->canonicalize($this->withoutMachinePaths($module));
                 $fingerprint = hash('sha256', $this->canonicalJson($composition));
 
                 $stmt = $pdo->prepare(
                     'SELECT * FROM preset_module_revisions
-                     WHERE module_key=? AND fingerprint=?'
+                     WHERE module_key=? AND content_sha256=?
+                     ORDER BY id DESC LIMIT 1'
                 );
                 $stmt->execute([$moduleKey, $fingerprint]);
                 $moduleRow = $stmt->fetch();
@@ -150,12 +159,13 @@ SQL);
                     $pdo->prepare(
                         'INSERT INTO preset_module_revisions(
                             module_key,revision_number,revision_ref,
-                            fingerprint,composition_json,created_at
-                         ) VALUES(?,?,?,?,?,?)'
+                            fingerprint,content_sha256,composition_json,created_at
+                         ) VALUES(?,?,?,?,?,?,?)'
                     )->execute([
                         $moduleKey,
                         $revisionNumber,
                         $revisionRef,
+                        $fingerprint,
                         $fingerprint,
                         $this->canonicalJson($composition),
                         gmdate('c'),
@@ -172,7 +182,7 @@ SQL);
             }
 
             $phaseIdentity = [
-                'schema' => 'ezstudio.preset.phase.v1',
+                'schema' => 'ezstudio.preset.phase.v2',
                 'phase' => $phase,
                 'pipeline_revision' => $pipelineRevision,
                 'modules' => array_map(
@@ -180,7 +190,7 @@ SQL);
                         'position' => (int)$entry['position'],
                         'module_key' => (string)$entry['row']['module_key'],
                         'module_revision' => (string)$entry['row']['revision_ref'],
-                        'fingerprint' => (string)$entry['row']['fingerprint'],
+                        'fingerprint' => (string)$entry['row']['content_sha256'],
                     ],
                     $moduleRows
                 ),
@@ -192,7 +202,8 @@ SQL);
 
             $stmt = $pdo->prepare(
                 'SELECT * FROM preset_phase_revisions
-                 WHERE phase=? AND fingerprint=?'
+                 WHERE phase=? AND content_sha256=?
+                 ORDER BY id DESC LIMIT 1'
             );
             $stmt->execute([$phase, $phaseFingerprint]);
             $phaseRow = $stmt->fetch();
@@ -228,12 +239,13 @@ SQL);
                 $pdo->prepare(
                     'INSERT INTO preset_phase_revisions(
                         phase,revision_number,revision_ref,fingerprint,
-                        pipeline_revision,status,metadata_json,created_at
-                     ) VALUES(?,?,?,?,?,?,?,?)'
+                        content_sha256,pipeline_revision,status,metadata_json,created_at
+                     ) VALUES(?,?,?,?,?,?,?,?,?)'
                 )->execute([
                     $phase,
                     $revisionNumber,
                     $revisionRef,
+                    $phaseFingerprint,
                     $phaseFingerprint,
                     $pipelineRevision,
                     $status,
@@ -473,6 +485,36 @@ SQL);
         $stmt->execute([$runId]);
         $row = $stmt->fetch();
         return $row ?: null;
+    }
+
+    /** Replace location-specific fields with identity-only data before persistence.
+     * Explicit fields are removed; unknown physical locations are rejected.
+     */
+    private function withoutMachinePaths(mixed $value): mixed
+    {
+        if (is_string($value) && (preg_match('~^[A-Za-z]:[\\\\/]~', $value) === 1 || str_starts_with($value, '\\\\'))) {
+            throw new \RuntimeException('preset_unmapped_physical_path');
+        }
+        if (!is_array($value)) {
+            return $value;
+        }
+        $out = [];
+        foreach ($value as $key => $item) {
+            if (is_string($key) && in_array(strtolower($key), [
+                'source_path', 'input_path', 'output_path', 'output_dir',
+                'model_path', 'artifact_path',
+            ], true)) {
+                continue;
+            }
+            if ($key === 'path' && $item !== null && $item !== '') {
+                if (!isset($value['id']) || trim((string)$value['id']) === '') {
+                    throw new \RuntimeException('preset_path_without_resource_identity');
+                }
+                continue;
+            }
+            $out[$key] = $this->withoutMachinePaths($item);
+        }
+        return $out;
     }
 
     private function canonicalJson(array $value): string

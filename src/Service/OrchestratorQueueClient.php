@@ -42,6 +42,7 @@ final class OrchestratorQueueClient
     {
         $url = rtrim($this->orchestratorBaseUrl, '/') . '/api/queue/dispatch';
 
+        EzsFifoTrace::log('ORCHESTRATOR_DISPATCH_START',['source'=>$source,'local_job_id'=>(int)($payload['job_id']??0),'run_id'=>(int)($payload['run_id']??0)]);
         $response = $this->httpClient->request('POST', $url, [
             'headers' => $this->defaultHeaders(true),
             'json' => [
@@ -53,6 +54,7 @@ final class OrchestratorQueueClient
 
         $statusCode = $response->getStatusCode();
         $data = $response->toArray(false);
+        EzsFifoTrace::log('ORCHESTRATOR_DISPATCH_HTTP',['source'=>$source,'http_status'=>$statusCode,'ack_queue_id'=>(int)($data['queue_id']??0),'ack_status'=>(string)($data['status']??'unknown'),'remote_error'=>(string)($data['error']??'none')]);
 
         if (!in_array($statusCode, [200, 201], true) || !($data['ok'] ?? false)) {
             throw new \RuntimeException(
@@ -61,6 +63,23 @@ final class OrchestratorQueueClient
         }
 
         return $data;
+    }
+
+    /** Authenticated and read-only execution fence; Orchestrator is authoritative. */
+    public function executionProof(int $globalJobId): array
+    {
+        if ($globalJobId <= 0) { throw new \InvalidArgumentException('invalid_global_job_id'); }
+        $url = rtrim($this->orchestratorBaseUrl, '/') . '/api/queue/' . $globalJobId . '/execution-proof';
+        $response = $this->httpClient->request('GET', $url, [
+            'headers' => $this->defaultHeaders(false), 'timeout' => 5.0,
+        ]);
+        $status = $response->getStatusCode();
+        $data = $response->toArray(false);
+        EzsFifoTrace::log('E2E_GO_PROOF_HTTP',['global_job_id'=>$globalJobId,'http_status'=>$status,'result'=>(string)($data['error']??'ok')]);
+        if ($status !== 200 || !($data['ok'] ?? false) || !is_array($data['proof'] ?? null)) {
+            throw new \RuntimeException('orchestrator_execution_proof_unavailable_http_'.$status);
+        }
+        return $data['proof'];
     }
 
     public function attachPid(int $jobId, int $pid): void

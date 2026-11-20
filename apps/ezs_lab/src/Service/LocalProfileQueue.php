@@ -68,18 +68,18 @@ final class LocalProfileQueue
                     'analysis_job_id' => $jobId,
                     'scientific_run_id' => $runId,
                     'song_id' => (int)$job['song_id'],
-                    'source_path' => $source,
-                    'request' => $request,
+                    // R4B1: Orchestrator stores identity only. LAB resolves its own resources.
+                    'audio_sha256' => (string)$song['audio_sha256'],
                 ]);
                 $queueId = (int)($dispatched['queue_id'] ?? 0);
                 if ($queueId <= 0 || !in_array((string)($dispatched['status'] ?? ''), ['waiting','progressing'], true)) {
                     throw new \RuntimeException('profile_global_admission_not_confirmed');
                 }
                 $request['orchestrator_queue_id'] = $queueId;
-                $update = $pdo->prepare("UPDATE analysis_jobs SET request_json=?,source_path=?,updated_at=? WHERE id=? AND kind='profile' AND status='queued' AND dispatch_owner='lab'");
+                $update = $pdo->prepare("UPDATE analysis_jobs SET request_json=?,updated_at=? WHERE id=? AND kind='profile' AND status='queued' AND dispatch_owner='lab'");
                 $update->execute([
                     json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                    $source, gmdate('c'), $jobId,
+                    gmdate('c'), $jobId,
                 ]);
                 // The worker may already have claimed this record after dispatch;
                 // a zero-row CAS here is not permission to launch another job.
@@ -102,21 +102,17 @@ final class LocalProfileQueue
             ]);
             $runId = (int)$run['id'];
             $hash = (string)$song['audio_sha256'];
-            $storage = rtrim((string)(getenv('EZSTUDIO_STORAGE_ROOT') ?: dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'storage'), '\\/');
-            $output = $storage.DIRECTORY_SEPARATOR.'profile'.DIRECTORY_SEPARATOR.$hash.DIRECTORY_SEPARATOR.sprintf('run-%06d', $runId);
             $request = [
                 'scientific_run_id' => $runId,
                 'audio_hash' => $hash,
-                'output_dir' => $output,
-                'output_path' => $output.DIRECTORY_SEPARATOR.'profile.json',
                 'output_contract' => 'ezstudio.profile.v1',
                 'automatic_next_stage' => false,
             ];
             $now = gmdate('c');
             $stmt = $pdo->prepare('INSERT INTO analysis_jobs
-                (run_id,scientific_run_id,song_id,source_path,kind,status,progress,request_json,error,created_at,updated_at,dispatch_owner)
-                VALUES(NULL,?,?,?,?,?,?,?,?,?,?,?)');
-            $stmt->execute([$runId,(int)$song['id'],$source,'profile','queued',0,
+                (run_id,scientific_run_id,song_id,kind,status,progress,request_json,error,created_at,updated_at,dispatch_owner)
+                VALUES(NULL,?,?,?,?,?,?,?,?,?,?)');
+            $stmt->execute([$runId,(int)$song['id'],'profile','queued',0,
                 json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 null,$now,$now,'lab']);
             $jobId = (int)$pdo->lastInsertId();
@@ -135,14 +131,33 @@ final class LocalProfileQueue
                 'analysis_job_id' => $jobId,
                 'scientific_run_id' => $runId,
                 'song_id' => (int)$song['id'],
-                'source_path' => $source,
-                'request' => $request,
+                // R4B1: no physical path or LAB-private request in the global FIFO.
+                'audio_sha256' => (string)$song['audio_sha256'],
             ]);
 
+            // The global FIFO is authoritative: a successful HTTP call alone is
+            // not proof that Orchestrator admitted the job.
+            $queueId = (int)($dispatched['queue_id'] ?? 0);
+            if ($queueId <= 0 || !in_array((string)($dispatched['status'] ?? ''), ['waiting', 'progressing'], true)) {
+                throw new \RuntimeException('profile_global_admission_not_confirmed');
+            }
+            // Preserve the global identity before returning to the caller.
+            // No automatic re-dispatch on failure: a partial admission requires
+            // explicit reconciliation by an authenticated REST workflow.
+            $request['orchestrator_queue_id'] = $queueId;
+            $update = $pdo->prepare("UPDATE analysis_jobs SET request_json=?,updated_at=? WHERE id=? AND kind='profile' AND dispatch_owner='lab'");
+            $update->execute([
+                json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                gmdate('c'), $jobId,
+            ]);
+            if ($update->rowCount() !== 1) {
+                throw new \RuntimeException('profile_global_admission_local_link_failed');
+            }
+            $this->runs->setLabel($runId, 'orchestrator_queue_id', (string)$queueId);
             return [
                 'job_id' => $jobId,
                 'run_id' => $runId,
-                'queue_id' => (int)($dispatched['queue_id'] ?? 0),
+                'queue_id' => $queueId,
                 'created' => true,
             ];
         } catch (\Throwable $error) {
@@ -160,24 +175,12 @@ final class LocalProfileQueue
             $queueId = (int)($labels['orchestrator_queue_id'] ?? 0);
         }
         if ($queueId <= 0 && !empty($job['request_json'])) { $rq = json_decode((string)$job['request_json'], true); $queueId = (int)($rq['orchestrator_queue_id'] ?? 0); }
+        // A missing foreign queue ID must be reconciled via authenticated REST,
+        // never by opening the Orchestrator private SQLite database.
         if ($queueId <= 0) {
-            $analysisJobId = (int)($job['id'] ?? 0);
-            $orchDb = dirname(__DIR__, 4) . '/data/orchestrator.sqlite';
-            if ($analysisJobId > 0 && is_file($orchDb)) {
-                try {
-                    $uri = 'file:' . str_replace(['%', '?', '#'], ['%25', '%3F', '%23'], str_replace('\\', '/', $orchDb)) . '?mode=ro';
-                    $pdo = new \PDO('sqlite:' . $uri);
-                    $stmt = $pdo->prepare("SELECT id FROM job_queue WHERE source = 'lab' AND status IN ('waiting', 'progressing') AND json_extract(payload, '$.analysis_job_id') = :jid ORDER BY id DESC LIMIT 1");
-                    $stmt->execute([':jid' => $analysisJobId]);
-                    $queueId = (int)$stmt->fetchColumn();
-                } catch (\Throwable) {}
-            }
+            throw new \RuntimeException('profile_cancel_global_queue_id_unresolved');
         }
-        if ($queueId > 0) {
-            try {
-                $this->orchestratorQueue->cancel($queueId);
-            } catch (\Throwable) {}
-        }
+        $this->orchestratorQueue->cancel($queueId);
     }
 
 public function lifecycleSubject(string $localStatus): JobQueue

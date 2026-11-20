@@ -13,7 +13,7 @@ final class CatalogService
     public function songs(): array
     {
         $rows = $this->db->pdo()->query(
-            'SELECT id,title,artist,source_filename,audio_sha256,source_path,created_at
+            'SELECT id,title,artist,source_filename,audio_sha256,created_at
              FROM songs
              ORDER BY id DESC'
         )->fetchAll();
@@ -406,17 +406,20 @@ final class CatalogService
                 }
 
                 $stmt = $this->db->pdo()->prepare(
-                    "SELECT path
-                     FROM scientific_artifacts
-                     WHERE run_id IN ($runMarks)"
+                    "SELECT a.*,s.audio_sha256 FROM scientific_artifacts a
+                     JOIN scientific_runs sr ON sr.id=a.run_id
+                     JOIN songs s ON s.id=sr.song_id
+                     WHERE a.run_id IN ($runMarks)"
                 );
                 $this->bindIds($stmt, $scientificRunIds);
                 $stmt->execute();
 
                 foreach ($stmt->fetchAll() as $row) {
-                    $path = trim((string)($row['path'] ?? ''));
-                    if ($path !== '') {
+                    try {
+                        $path = (new LabResourceResolver(new AudioSourceResolver()))->artifact($row);
                         $files[$path] = true;
+                    } catch (\RuntimeException|\InvalidArgumentException) {
+                        // The artifact is no longer present; never delete an unverified file.
                     }
                 }
             }
@@ -638,7 +641,7 @@ final class CatalogService
     public function deleteGroup(int $songId): array
     {
         $stmt = $this->db->pdo()->prepare(
-            'SELECT id,title,artist,audio_sha256,source_path
+            'SELECT id,title,artist,audio_sha256
              FROM songs WHERE id=?'
         );
         $stmt->execute([$songId]);
@@ -649,7 +652,7 @@ final class CatalogService
 
         $hash = (string)$seed['audio_sha256'];
         $stmt = $this->db->pdo()->prepare(
-            'SELECT id,title,artist,audio_sha256,source_path
+            'SELECT id,title,artist,audio_sha256
              FROM songs WHERE audio_sha256=? ORDER BY id'
         );
         $stmt->execute([$hash]);
@@ -689,25 +692,20 @@ final class CatalogService
 
         $files = [];
         foreach ($songs as $song) {
-            $path = trim((string)($song['source_path'] ?? ''));
-            if ($path !== '') {
-                $files[$path] = true;
-            }
+            // Delete only the canonical resource referenced by this content identity.
+            $path = (new AudioSourceResolver())->findBySha256((string)$song['audio_sha256']);
+            if ($path !== null) $files[$path] = true;
         }
 
         $benchmarkRunIds = [];
         $stmt = $this->db->pdo()->prepare(
-            "SELECT id,input_path FROM benchmark_runs
+            "SELECT id FROM benchmark_runs
              WHERE song_id IN ($marks)"
         );
         $this->bindIds($stmt, $songIds);
         $stmt->execute();
         foreach ($stmt->fetchAll() as $row) {
             $benchmarkRunIds[] = (int)$row['id'];
-            $path = trim((string)($row['input_path'] ?? ''));
-            if ($path !== '') {
-                $files[$path] = true;
-            }
         }
 
         $scientificRunIds = [];
@@ -767,15 +765,19 @@ final class CatalogService
             }
 
             $stmt = $this->db->pdo()->prepare(
-                "SELECT path FROM scientific_artifacts
-                 WHERE run_id IN ($runMarks)"
+                "SELECT a.*,s.audio_sha256 FROM scientific_artifacts a
+                 JOIN scientific_runs sr ON sr.id=a.run_id
+                 JOIN songs s ON s.id=sr.song_id
+                 WHERE a.run_id IN ($runMarks)"
             );
             $this->bindIds($stmt, $scientificRunIds);
             $stmt->execute();
             foreach ($stmt->fetchAll() as $row) {
-                $path = trim((string)($row['path'] ?? ''));
-                if ($path !== '') {
+                try {
+                    $path = (new LabResourceResolver(new AudioSourceResolver()))->artifact($row);
                     $files[$path] = true;
+                } catch (\RuntimeException|\InvalidArgumentException) {
+                    // The artifact is no longer present; never delete an unverified file.
                 }
             }
         }

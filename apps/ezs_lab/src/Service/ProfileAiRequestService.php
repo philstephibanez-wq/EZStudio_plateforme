@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace EZSLab\Service;
 
 use App\Service\OrchestratorQueueClient;
+use App\Service\EzsFifoTrace;
 
 /** Canonical analysis_jobs-backed PROFILE AI requests. No sidecar queue. */
 final class ProfileAiRequestService
@@ -42,77 +43,38 @@ final class ProfileAiRequestService
 
     public function enqueue(int $runId): array
     {
+        EzsFifoTrace::log('EXPERTISE_ENQUEUE',['run_id'=>$runId]);
         // Fail closed: absence of the queue client must never produce a local-only expertise.
         if ($this->orchestratorQueue === null) {
+            EzsFifoTrace::log('EXPERTISE_REJECT',['run_id'=>$runId,'reason'=>'expertise_orchestrator_client_missing']);
             throw new \RuntimeException('expertise_orchestrator_client_missing');
         }
         $pdo = $this->pdo();
         $pdo->exec('BEGIN IMMEDIATE');
         try {
-            $stmt=$pdo->prepare("SELECT sr.id,sr.song_id,s.source_path,s.title FROM scientific_runs sr JOIN songs s ON s.id=sr.song_id WHERE sr.id=? AND sr.item='profile' AND sr.state='done'");
+            $stmt=$pdo->prepare("SELECT sr.id,sr.song_id,s.title FROM scientific_runs sr JOIN songs s ON s.id=sr.song_id WHERE sr.id=? AND sr.item='profile' AND sr.state='done'");
             $stmt->execute([$runId]);
             $run=$stmt->fetch(\PDO::FETCH_ASSOC);
             if (!$run) throw new \RuntimeException('run_profile_non_termine');
             $current=$this->latest($runId);
-            if ($current && in_array($current['status'],['queued','running','cancelling'],true)) {
-                // Release LAB's SQLite write lock before the Orchestrator REST call.
-                $pdo->commit();
-                $admissionStmt = $pdo->prepare('SELECT request_json FROM analysis_jobs WHERE id=?');
-                $admissionStmt->execute([(int)$current['job_id']]);
-                $admission = json_decode((string)$admissionStmt->fetchColumn(), true);
-                if (!is_array($admission)) { $admission = []; }
-                if ($current['status'] !== 'queued') {
-                    // Never re-dispatch a running or cancelling local execution.
-                    if ((int)($admission['orchestrator_queue_id'] ?? 0) < 1) {
-                        throw new \RuntimeException('expertise_active_job_without_global_admission');
-                    }
-                    return $current + ['queue_id'=>(int)$admission['orchestrator_queue_id'], 'created'=>false];
-                }
-                // R2B deduplicates this exact (job_id, run_id) in the global queue.
-                // Always consult the global queue: a saved queue_id may be stale.
-                $title = trim((string)($run['title'] ?? ''));
-                if ($title === '' && !empty($run['source_path'])) {
-                    $title = pathinfo((string)$run['source_path'], PATHINFO_FILENAME);
-                }
-                $dispatched = $this->orchestratorQueue->dispatch('assistant', [
-                    'job'=>'profile.review', 'category'=>'Expertise',
-                    'label'=>$title !== '' ? $title : ('Run #'.$runId),
-                    'job_id'=>(int)$current['job_id'], 'run_id'=>$runId,
-                ]);
-                $queueId = (int)($dispatched['queue_id'] ?? 0);
-                $globalStatus = (string)($dispatched['status'] ?? '');
-                if ($queueId < 1 || !in_array($globalStatus, ['waiting','progressing','cancelling'], true)) {
-                    throw new \RuntimeException('expertise_global_admission_not_active');
-                }
-                $admission['orchestrator_queue_id'] = $queueId;
-                $save = $pdo->prepare("UPDATE analysis_jobs SET request_json=? WHERE id=? AND scientific_run_id=? AND kind=? AND status='queued'");
-                $save->execute([json_encode($admission, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                    (int)$current['job_id'], $runId, self::KIND]);
-                if ($save->rowCount() !== 1) {
-                    throw new \RuntimeException('expertise_admission_state_changed');
-                }
-                return $current + ['queue_id'=>$queueId, 'created'=>false];
-            }
-            // A timed-out dispatch may already have created a global job.
-            // Never retry it without an authoritative reconciliation.
-            if ($current && (string)($current['message'] ?? '') === 'expertise_admission_unverified') {
-                throw new \RuntimeException('expertise_admission_reconciliation_required');
-            }
+            EzsFifoTrace::log('EXPERTISE_LOCAL_STATE',['run_id'=>$runId,'local_job_id'=>(int)($current['job_id']??0),'global_job_id'=>(int)($current['queue_id']??0),'state'=>(string)($current['status']??'none')]);
+            // A user-triggered request is NEW: never recycle an older LAB job.
+            // An Orchestrator retry uses a separate endpoint, retaining its global ID.
+            EzsFifoTrace::log('EXPERTISE_NEW_REQUEST',['run_id'=>$runId,'previous_local_job_id'=>(int)($current['job_id']??0),'previous_global_job_id'=>(int)($current['queue_id']??0)]);
             $now=gmdate('c');
-            // Reuse an existing logical job; never create duplicates for the same run.
-            if ($current && $current['status'] !== 'cancelled') {
-                $pdo->prepare("UPDATE analysis_jobs SET status='queued',progress=0,error=NULL,created_at=?,updated_at=? WHERE id=?")
-                    ->execute([$now,$now,(int)$current['job_id']]);
-            } else {
-                $req=json_encode(['phase'=>'profile','scientific_run_id'=>$runId,'processor'=>'qwen','schema'=>'ezs.assistant.profile.job.v1'],JSON_UNESCAPED_UNICODE);
-                $pdo->prepare('INSERT INTO analysis_jobs(run_id,scientific_run_id,song_id,source_path,kind,status,progress,request_json,error,created_at,updated_at) VALUES(NULL,?,?,?, ?,\'queued\',0,?,NULL,?,?)')
-                    ->execute([$runId,(int)$run['song_id'],(string)($run['source_path']??''),self::KIND,$req,$now,$now]);
-            }
+            // Each explicit NEW expertise request owns a fresh local job identity.
+            // Do not reset a completed/failed historical job: Orchestrator dedupes
+            // by LAB job ID, and reusing a terminal ID makes admission appear to
+            // succeed while returning an already-ended global job.
+            // An active pending request is handled above, idempotently.
+            $req=json_encode(['phase'=>'profile','scientific_run_id'=>$runId,'processor'=>'qwen','schema'=>'ezs.assistant.profile.job.v1'],JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            $pdo->prepare('INSERT INTO analysis_jobs(run_id,scientific_run_id,song_id,kind,status,progress,request_json,error,created_at,updated_at) VALUES(NULL,?,?,?,\'queued\',0,?,NULL,?,?)')
+                ->execute([$runId,(int)$run['song_id'],self::KIND,$req,$now,$now]);
             $pdo->commit();
             $created = $this->latest($runId) ?? throw new \RuntimeException('ai_job_insert_failed');
             $songTitle = trim((string) ($run['title'] ?? ''));
-            if ($songTitle === '' && !empty($run['source_path'])) { $songTitle = pathinfo((string) $run['source_path'], PATHINFO_FILENAME); }
             try {
+                EzsFifoTrace::log('EXPERTISE_DISPATCH',['run_id'=>$runId,'local_job_id'=>(int)$created['job_id'],'source'=>'assistant']);
                 $dispatched = $this->orchestratorQueue->dispatch('assistant', [
                     'job' => 'profile.review',
                     'category' => 'Expertise',
@@ -121,8 +83,13 @@ final class ProfileAiRequestService
                     'run_id' => $runId,
                 ]);
                 $orchQueueId = (int) ($dispatched['queue_id'] ?? 0);
-                if ($orchQueueId < 1) {
-                    throw new \RuntimeException('expertise_orchestrator_queue_id_missing');
+                EzsFifoTrace::log('EXPERTISE_ACK',['run_id'=>$runId,'global_job_id'=>$orchQueueId,'ack_status'=>(string)($dispatched['status']??'unknown'),'local_job_id'=>(int)$created['job_id']]);
+                // Admission is authoritative only with a real global job ID
+                // and an acknowledged state. The global consumer may finish
+                // quickly, so an already-ended response is still a valid receipt.
+                $globalStatus = (string)($dispatched['status'] ?? '');
+                if ($orchQueueId < 1 || !in_array($globalStatus, ['waiting','progressing','ended'], true)) {
+                    throw new \RuntimeException('expertise_orchestrator_admission_invalid');
                 }
                 $reqPatch = json_encode([
                     'phase'=>'profile', 'scientific_run_id'=>$runId,
@@ -131,17 +98,19 @@ final class ProfileAiRequestService
                 ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
                 $patch = $pdo->prepare('UPDATE analysis_jobs SET request_json=? WHERE id=? AND status=?');
                 $patch->execute([$reqPatch, (int)$created['job_id'], 'queued']);
+                EzsFifoTrace::log('EXPERTISE_PERSIST',['run_id'=>$runId,'local_job_id'=>(int)$created['job_id'],'global_job_id'=>$orchQueueId,'result'=>$patch->rowCount()===1?'ok':'failed']);
                 if ($patch->rowCount() !== 1) {
                     throw new \RuntimeException('expertise_admission_identity_lost');
                 }
             } catch (\Throwable $admissionError) {
+                EzsFifoTrace::log('EXPERTISE_DISPATCH_ERROR',['run_id'=>$runId,'local_job_id'=>(int)$created['job_id'],'exception'=>get_class($admissionError),'reason'=>$admissionError->getMessage()]);
                 // The remote request may have succeeded before the connection failed.
                 // Quarantine the local job: no legacy FIFO execution or blind retry.
                 $quarantine = $pdo->prepare("UPDATE analysis_jobs SET status='error', progress=0, error='expertise_admission_unverified', updated_at=? WHERE id=? AND status='queued'");
                 $quarantine->execute([gmdate('c'), (int)$created['job_id']]);
                 throw new \RuntimeException('expertise_admission_unverified_reconciliation_required', 0, $admissionError);
             }
-            return $created;
+            return $this->latest($runId) ?? throw new \RuntimeException('expertise_global_admission_lost');
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
@@ -231,6 +200,23 @@ SQL);
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
+    }
+
+    /** Exact global one-shot lookup; does not depend on the stale LAB queue head. */
+    public function pendingForGlobal(int $runId, int $localJobId, int $globalJobId): array
+    {
+        if ($runId < 1 || $localJobId < 1 || $globalJobId < 1) {
+            throw new \InvalidArgumentException('invalid_global_expertise_identity');
+        }
+        if ($this->maintenance('status')['maintenance']) { return []; }
+        $stmt = $this->pdo()->prepare("SELECT id AS job_id,scientific_run_id AS run_id,status,request_json FROM analysis_jobs WHERE id=? AND scientific_run_id=? AND kind=? AND dispatch_owner='lab' AND status='queued'");
+        $stmt->execute([$localJobId, $runId, self::KIND]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!is_array($row)) { return []; }
+        $receipt = json_decode((string)($row['request_json'] ?? ''), true);
+        if (!is_array($receipt) || (int)($receipt['orchestrator_queue_id'] ?? 0) !== $globalJobId) { return []; }
+        EzsFifoTrace::log('EXPERTISE_TARGET_READY',['run_id'=>$runId,'local_job_id'=>$localJobId,'global_job_id'=>$globalJobId]);
+        return [['job_id'=>$localJobId, 'run_id'=>$runId, 'status'=>'queued']];
     }
 
     public function pending(): array

@@ -27,16 +27,25 @@ final class QueueDispatchController extends AbstractController
     #[Route('/api/queue/dispatch', name: 'orchestrator_queue_dispatch', methods: ['POST'])]
     public function dispatch(Request $request, QueueManager $queueManager): JsonResponse
     {
-        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
+        \App\Service\EzsFifoTrace::log('E2E_DISPATCH_HTTP_RECEIVED_R2',['source'=>'orchestrator']);
+        if ($denied = $this->denyIfUnauthorized($request)) { \App\Service\EzsFifoTrace::log('E2E_DISPATCH_REJECT_R2',['source'=>'orchestrator','reason'=>'unauthorized']); return $denied; }
         $data = json_decode($request->getContent(), true);
-        if (!is_array($data)) { return $this->json(['ok' => false, 'error' => 'invalid_json'], 400); }
+        if (!is_array($data)) { \App\Service\EzsFifoTrace::log('E2E_DISPATCH_REJECT_R2',['source'=>'orchestrator','reason'=>'invalid_json']); return $this->json(['ok' => false, 'error' => 'invalid_json'], 400); }
         $source = trim((string) ($data['source'] ?? ''));
         $payload = $data['payload'] ?? null;
         if (!in_array($source, ['lab', 'assistant'], true) || !is_array($payload)) {
+            \App\Service\EzsFifoTrace::log('E2E_DISPATCH_REJECT_R2',['source'=>'orchestrator','reason'=>'invalid_dispatch_envelope']);
             return $this->json(['ok' => false, 'error' => 'invalid_dispatch_envelope'], 422);
         }
-        $duplicate = $queueManager->findActiveDuplicate($source, $payload);
-        $job = $duplicate ?? $queueManager->dispatch($source, $payload);
+        \App\Service\EzsFifoTrace::log('E2E_DISPATCH_VALIDATED_R2',['source'=>$source,'local_job_id'=>(int)($payload['job_id']??$payload['analysis_job_id']??0),'run_id'=>(int)($payload['run_id']??0)]);
+        try {
+            $duplicate = $queueManager->findActiveDuplicate($source, $payload);
+            $job = $duplicate ?? $queueManager->dispatch($source, $payload);
+        } catch (\Throwable $e) {
+            \App\Service\EzsFifoTrace::log('E2E_DISPATCH_EXCEPTION_R2',['source'=>$source,'exception'=>get_class($e)]);
+            throw $e;
+        }
+        \App\Service\EzsFifoTrace::log('E2E_DISPATCH_ACK_R2',['source'=>$source,'global_job_id'=>(int)$job->getId(),'local_job_id'=>(int)($payload['job_id']??$payload['analysis_job_id']??0),'state'=>(string)$job->getStatus(),'created'=>$duplicate===null]);
         if ($duplicate === null) { $this->wakeConsumer(); }
         return $this->json([
             'ok' => true,
@@ -47,6 +56,30 @@ final class QueueDispatchController extends AbstractController
             'deduplicated' => $duplicate !== null,
             'created_at' => $job->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ], $duplicate !== null ? 200 : 201);
+    }
+
+    // Only the owning application may assert that a global job may run.
+    #[Route('/api/queue/{id}/execution-proof', name: 'orchestrator_queue_execution_proof', methods: ['GET'], requirements: ['id' => '\\d+'])]
+    public function executionProof(int $id, Request $request, \Doctrine\ORM\EntityManagerInterface $entityManager): JsonResponse
+    {
+        if ($denied = $this->denyIfUnauthorized($request)) { return $denied; }
+        $entityManager->clear();
+        $job = $entityManager->find(JobQueue::class, $id);
+        if (!$job instanceof JobQueue) {
+            \App\Service\EzsFifoTrace::log('E2E_GO_PROOF_NOT_FOUND',['global_job_id'=>$id]);
+            return $this->json(['ok'=>false,'error'=>'global_job_not_found'],404);
+        }
+        $payload = $job->getPayload();
+        if (!is_array($payload)) { $payload = []; }
+        $proof = [
+            'queue_id'=>$job->getId(), 'source'=>$job->getSource(),
+            'status'=>$job->getStatus(), 'job'=>(string)($payload['job']??''),
+            'analysis_job_id'=>(int)($payload['analysis_job_id']??0),
+            'scientific_run_id'=>(int)($payload['scientific_run_id']??0),
+            'song_id'=>(int)($payload['song_id']??0),
+        ];
+        \App\Service\EzsFifoTrace::log('E2E_GO_PROOF',['global_job_id'=>$id,'source'=>$proof['source'],'status'=>$proof['status'],'local_job_id'=>$proof['analysis_job_id']]);
+        return $this->json(['ok'=>true,'proof'=>$proof]);
     }
 
     #[Route('/api/queue/claim', name: 'orchestrator_queue_claim', methods: ['POST'])]

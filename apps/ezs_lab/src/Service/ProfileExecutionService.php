@@ -18,23 +18,19 @@ final class ProfileExecutionService
             throw new \InvalidArgumentException('profile_run_not_startable');
         }
         if (!is_file($sourcePath)) throw new \RuntimeException('profile_source_missing');
-        $runtimeRoot = rtrim((string)(getenv('EZSTUDIO_STORAGE_ROOT') ?: dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'storage'), '\\/');
-        $outputDir = $runtimeRoot.DIRECTORY_SEPARATOR.'profile'.DIRECTORY_SEPARATOR.$audioHash.DIRECTORY_SEPARATOR.sprintf('run-%06d', $scientificRunId);
         $request = [
             'scientific_run_id' => $scientificRunId,
             'audio_hash' => $audioHash,
-            'output_dir' => $outputDir,
-            'output_path' => $outputDir.DIRECTORY_SEPARATOR.'profile.json',
             'output_contract' => 'ezstudio.profile.v1',
             'automatic_next_stage' => false,
         ];
         $now = gmdate('c');
         $stmt = $this->db->pdo()->prepare(
-            'INSERT INTO analysis_jobs(run_id,scientific_run_id,song_id,source_path,kind,status,progress,request_json,error,created_at,updated_at,dispatch_owner)
-             VALUES(NULL,?,?,?,?,?,?,?,?,?,?,?)'
+            'INSERT INTO analysis_jobs(run_id,scientific_run_id,song_id,kind,status,progress,request_json,error,created_at,updated_at,dispatch_owner)
+             VALUES(NULL,?,?,?,?,?,?,?,?,?,?)'
         );
         $stmt->execute([
-            $scientificRunId, (int)$run['song_id'], $sourcePath, 'profile', 'running', 1,
+            $scientificRunId, (int)$run['song_id'], 'profile', 'running', 1,
             json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             null, $now, $now, 'lab',
         ]);
@@ -74,7 +70,7 @@ final class ProfileExecutionService
 
         $request = json_decode((string)($job['request_json'] ?? ''), true);
         if (!is_array($request)) throw new \RuntimeException('profile_request_invalid');
-        $outputPath = trim((string)($request['output_path'] ?? ''));
+        $outputPath = (new LabResourceResolver(new AudioSourceResolver()))->profileOutput($runId, (string)($request['audio_hash'] ?? ''));
         if ($outputPath === '' || !is_file($outputPath)) throw new \RuntimeException('profile_output_missing');
 
         $raw = file_get_contents($outputPath);

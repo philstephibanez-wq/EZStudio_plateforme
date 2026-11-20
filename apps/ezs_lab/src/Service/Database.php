@@ -62,7 +62,6 @@ CREATE TABLE IF NOT EXISTS benchmark_runs (
     status TEXT NOT NULL,
     progress INTEGER NOT NULL DEFAULT 0,
     engine_version TEXT NOT NULL,
-    input_path TEXT NOT NULL,
     error TEXT,
     result_json TEXT,
     FOREIGN KEY(song_id) REFERENCES songs(id) ON DELETE CASCADE
@@ -124,7 +123,6 @@ CREATE TABLE IF NOT EXISTS analysis_jobs (
     run_id INTEGER,
     scientific_run_id INTEGER,
     song_id INTEGER NOT NULL,
-    source_path TEXT NOT NULL,
     kind TEXT NOT NULL,
     status TEXT NOT NULL,
     progress INTEGER NOT NULL DEFAULT 0,
@@ -196,14 +194,6 @@ BEGIN
     SELECT RAISE(ABORT,'global_queue_cancel_protocol_required');
 END;
 QUEUE_SQL);
-        $songColumns = $this->pdo->query("PRAGMA table_info(songs)")->fetchAll();
-        $songColumnNames = array_map(
-            static fn(array $row): string => (string)$row['name'],
-            $songColumns
-        );
-        if (!in_array('source_path', $songColumnNames, true)) {
-            $this->pdo->exec('ALTER TABLE songs ADD COLUMN source_path TEXT');
-        }
     }
 
     public function allRuns(): array
@@ -238,8 +228,8 @@ QUEUE_SQL);
         $stmt = $this->pdo()->prepare(
             'INSERT INTO benchmark_runs(
                 song_id,created_at,updated_at,requested_signature,status,
-                progress,engine_version,input_path
-             ) VALUES(?,?,?,?,?,?,?,?)'
+                progress,engine_version
+             ) VALUES(?,?,?,?,?,?,?)'
         );
 
         $stmt->execute([
@@ -250,7 +240,6 @@ QUEUE_SQL);
             'running',
             0,
             'r6-app-v2',
-            $inputPath,
         ]);
 
         return (int)$this->pdo()->lastInsertId();
@@ -392,7 +381,7 @@ QUEUE_SQL);
         $songId = (int)$run['song_id'];
 
         $stmt = $this->pdo()->prepare(
-            'SELECT id, input_path FROM benchmark_runs WHERE song_id=? ORDER BY id'
+            'SELECT id FROM benchmark_runs WHERE song_id=? ORDER BY id'
         );
         $stmt->execute([$songId]);
         $runs = $stmt->fetchAll();
@@ -402,10 +391,7 @@ QUEUE_SQL);
             $runs
         );
 
-        $audioPaths = array_values(array_unique(array_filter(array_map(
-            static fn(array $row): string => (string)$row['input_path'],
-            $runs
-        ))));
+        $audioPaths = []; // Cleanup by physical path is not a DB concern.
 
         $this->pdo()->beginTransaction();
 
@@ -522,9 +508,7 @@ SQL;
 
         $request = [
             'run_id' => $runId,
-            'database' => $this->path(),
             'signature' => $signature,
-            'deps' => (string)(getenv('EZSTUDIO_DEP_ROOT') ?: dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'runtime'.DIRECTORY_SEPARATOR.'deps'),
             'keep_upload' => ((string)(getenv('KEEP_UPLOADS') ?: '1')) !== '0',
             'audio_sha256' => (string)($run['audio_sha256'] ?? ''),
         ];
@@ -532,13 +516,12 @@ SQL;
 
         $stmt = $this->pdo()->prepare(
             'INSERT INTO analysis_jobs(
-                run_id,scientific_run_id,song_id,source_path,
+                run_id,scientific_run_id,song_id,
                 kind,status,progress,request_json,error,created_at,updated_at
-             ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+             ) VALUES(?,?,?,?,?,?,?,?,?,?)
              ON CONFLICT(run_id,kind)
              DO UPDATE SET
                 song_id=excluded.song_id,
-                source_path=excluded.source_path,
                 status=excluded.status,
                 progress=excluded.progress,
                 request_json=excluded.request_json,
@@ -549,7 +532,6 @@ SQL;
             $runId,
             null,
             (int)$run['song_id'],
-            $audioPath,
             'benchmark',
             'queued',
             0,
@@ -609,7 +591,6 @@ SQL;
         $request = [
             'scientific_run_id' => $scientificRunId,
             'audio_hash' => $audioHash,
-            'storage_root' => $storageRoot,
             'force' => $force,
             'engine_profile' => $engineProfile,
             'parent_job_id' => $parentJobId,
@@ -619,14 +600,13 @@ SQL;
 
         $stmt = $this->pdo()->prepare(
             'INSERT INTO analysis_jobs(
-                run_id,scientific_run_id,song_id,source_path,
+                run_id,scientific_run_id,song_id,
                 kind,status,progress,request_json,error,created_at,updated_at,dispatch_owner
-             ) VALUES(NULL,?,?,?,?,?,?,?,?,?,?,?)'
+             ) VALUES(NULL,?,?,?,?,?,?,?,?,?,?)'
         );
         $stmt->execute([
             $scientificRunId,
             $songId,
-            $sourcePath,
             'stems',
             'queued',
             0,
@@ -660,27 +640,23 @@ SQL;
         $request = [
             'run_id' => $benchmarkRunId,
             'scientific_run_id' => $scientificRunId,
-            'database' => $this->path(),
             'signature' => $signature,
-            'deps' => (string)(getenv('EZSTUDIO_DEP_ROOT') ?: dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'var'.DIRECTORY_SEPARATOR.'runtime'.DIRECTORY_SEPARATOR.'deps'),
             'keep_upload' => true,
             'audio_sha256' => (string)($run['audio_sha256'] ?? ''),
-            'selection_request' => $selectionRequestPath,
             'execution_contract' => 'ezstudio.chords.selection.v1',
         ];
         $now = gmdate('c');
 
         $stmt = $this->pdo()->prepare(
             'INSERT INTO analysis_jobs(
-                run_id,scientific_run_id,song_id,source_path,
+                run_id,scientific_run_id,song_id,
                 kind,status,progress,request_json,error,created_at,updated_at,dispatch_owner
-             ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
+             ) VALUES(?,?,?,?,?,?,?,?,?,?,?)'
         );
         $stmt->execute([
             $benchmarkRunId,
             $scientificRunId,
             (int)$run['song_id'],
-            (string)$run['input_path'],
             'chords_scientific',
             'queued',
             0,
@@ -888,6 +864,20 @@ SQL;
             .DIRECTORY_SEPARATOR.(string)$id
             .DIRECTORY_SEPARATOR.'progress.json';
 
+        $resources = new LabResourceResolver(new AudioSourceResolver());
+        $kind = (string)$job['kind'];
+        // Physical locations are created in the one-shot runtime envelope only.
+        if ($kind === 'profile') {
+            $request['output_path'] = $resources->profileOutput((int)$job['scientific_run_id'], (string)$job['audio_sha256']);
+        } elseif ($kind === 'stems') {
+            $request['storage_root'] = $resources->stemsStorage((string)$job['audio_sha256']);
+        } elseif (in_array($kind, ['benchmark', 'chords_scientific'], true)) {
+            $request['database'] = $this->path();
+            $request['deps'] = (string) (getenv('EZSTUDIO_DEP_ROOT') ?: dirname(__DIR__, 2).'/var/runtime/deps');
+            if ($kind === 'chords_scientific') {
+                $request['selection_request'] = $resources->chordsRequest((int)$job['scientific_run_id']);
+            }
+        }
         return [
             'protocol' => 'ezscore.analysis-job.v2',
             'job_id' => (int)$job['id'],
@@ -897,7 +887,7 @@ SQL;
             'priority' => 50,
             'song_id' => (int)$job['song_id'],
             'paths' => [
-                'source' => (string)$job['source_path'],
+                'source' => (new LabResourceResolver(new AudioSourceResolver()))->audio((string)$job['audio_sha256']),
                 'progress_file' => $progressFile,
             ],
             'request' => $request,

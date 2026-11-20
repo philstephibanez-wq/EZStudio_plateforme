@@ -48,7 +48,6 @@ CREATE TABLE IF NOT EXISTS scientific_artifacts (
     artifact_id TEXT NOT NULL UNIQUE,
     role TEXT NOT NULL,
     label TEXT NOT NULL DEFAULT '',
-    path TEXT NOT NULL,
     sha256 TEXT NOT NULL,
     metadata_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
@@ -165,11 +164,10 @@ SQL;
 
         $stmt = $this->db->pdo()->prepare(
             'INSERT INTO scientific_artifacts(
-                run_id,artifact_id,role,label,path,sha256,metadata_json,created_at
-             ) VALUES(?,?,?,?,?,?,?,?)
+                run_id,artifact_id,role,label,sha256,metadata_json,created_at
+             ) VALUES(?,?,?,?,?,?,?)
              ON CONFLICT(artifact_id) DO UPDATE SET
                 label=excluded.label,
-                path=excluded.path,
                 sha256=excluded.sha256,
                 metadata_json=excluded.metadata_json'
         );
@@ -178,7 +176,6 @@ SQL;
             $artifactId,
             $role,
             $label ?? $role,
-            $path,
             strtolower($sha256),
             json_encode($metadata, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
             gmdate('c'),
@@ -411,15 +408,17 @@ SQL;
         $this->ensureSchema();
 
         $stmt = $this->db->pdo()->prepare(
-            'SELECT a.*,sr.song_id,sr.item,sr.public_id
+            'SELECT a.*,sr.song_id,sr.item,sr.public_id,s.audio_sha256
              FROM scientific_artifacts a
              JOIN scientific_runs sr ON sr.id=a.run_id
+             JOIN songs s ON s.id=sr.song_id
              WHERE a.artifact_id=?'
         );
         $stmt->execute([$artifactId]);
         $row = $stmt->fetch();
 
-        return $row ?: null;
+        if (!$row) return null;
+        return $this->decorateArtifact($row);
     }
 
     public function songIdByAudioHash(string $audioHash): ?int
@@ -475,25 +474,43 @@ SQL;
     private function artifacts(int $runId): array
     {
         $stmt = $this->db->pdo()->prepare(
-            'SELECT * FROM scientific_artifacts
-             WHERE run_id=?
-             ORDER BY role,artifact_id'
+            'SELECT a.*,s.audio_sha256 FROM scientific_artifacts a
+             JOIN scientific_runs sr ON sr.id=a.run_id
+             JOIN songs s ON s.id=sr.song_id
+             WHERE a.run_id=?
+             ORDER BY a.role,a.artifact_id'
         );
         $stmt->execute([$runId]);
-        return $stmt->fetchAll();
+        return array_map($this->decorateArtifact(...), $stmt->fetchAll());
     }
 
     private function inputs(int $runId): array
     {
         $stmt = $this->db->pdo()->prepare(
-            'SELECT i.input_role,a.*
+            'SELECT i.input_role,a.*,s.audio_sha256
              FROM scientific_run_inputs i
              JOIN scientific_artifacts a ON a.artifact_id=i.artifact_id
+             JOIN scientific_runs sr ON sr.id=a.run_id
+             JOIN songs s ON s.id=sr.song_id
              WHERE i.run_id=? AND i.selected=1
              ORDER BY i.input_role,a.role'
         );
         $stmt->execute([$runId]);
-        return $stmt->fetchAll();
+        return array_map($this->decorateArtifact(...), $stmt->fetchAll());
+    }
+
+    /** Runtime-only projection. Missing artifacts are observable, never given stale DB paths. */
+    private function decorateArtifact(array $row): array
+    {
+        try {
+            $row['path'] = (new LabResourceResolver(new AudioSourceResolver()))->artifact($row);
+            $row['resource_available'] = true;
+        } catch (\RuntimeException|\InvalidArgumentException $e) {
+            $row['path'] = null;
+            $row['resource_available'] = false;
+            $row['resource_error'] = $e->getMessage();
+        }
+        return $row;
     }
 
     private function labels(int $runId): array

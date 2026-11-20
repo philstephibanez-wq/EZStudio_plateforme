@@ -187,6 +187,7 @@ def assert_running(run_id, job_id):
 
 
 def process(run_id, client, check_cancel=None):
+    print('E2E_ASSISTANT_PROCESS_R2', 'global_job_id=' + str(os.environ.get('ORCHESTRATOR_JOB_ID', 'missing')), 'run_id=' + str(run_id), flush=True)
     _CURRENT_STEPS.clear()
     check_cancel = check_cancel or (lambda: None)
     check_cancel()
@@ -341,6 +342,7 @@ def process(run_id, client, check_cancel=None):
     }
 
 def once(client, target_job_id=None, target_run_id=None):
+    print('E2E_ASSISTANT_ONCE_R2', 'global_job_id=' + str(os.environ.get('ORCHESTRATOR_JOB_ID', 'missing')), 'local_job_id=' + str(target_job_id), 'run_id=' + str(target_run_id), flush=True)
     # Worker cannot choose its own work; exact GO comes from Orchestrator.
     if not target_job_id or not target_run_id:
         raise RuntimeError('orchestrator_go_required')
@@ -350,7 +352,13 @@ def once(client, target_job_id=None, target_run_id=None):
     state = (api(PATH + '/' + str(target_run_id) + '/state?job_id=' + str(target_job_id)).get('request') or {})
     if (state.get('job_id') != target_job_id or state.get('run_id') != target_run_id or state.get('status') != 'queued'):
         raise RuntimeError('orchestrator_go_target_mismatch')
-    requests = [{'job_id': target_job_id, 'run_id': target_run_id}]
+    # Keep the R2A GO fence, but obtain the exact LAB record tied to this global job.
+    global_job_id = orch_id
+    target_path = (PATH + '?job_id=' + str(target_job_id) + '&run_id=' + str(target_run_id)
+                   + '&orchestrator_job_id=' + str(orch_id))
+    requests = api(target_path)['requests']
+    if not isinstance(requests, list) or len(requests) != 1:
+        raise RuntimeError('one_shot_global_target_not_queued')
     if requests:
         print('LAB_PROFILE_IA_PENDING=' + str(len(requests)), flush=True)
     for item in requests:
@@ -429,6 +437,7 @@ def once(client, target_job_id=None, target_run_id=None):
     return 0
 
 def main():
+    print('E2E_ASSISTANT_MAIN_R2', 'global_job_id=' + str(os.environ.get('ORCHESTRATOR_JOB_ID', 'missing')), flush=True)
     parser = argparse.ArgumentParser()
     parser.add_argument('--once', action='store_true')
     parser.add_argument('--job-id', type=int)

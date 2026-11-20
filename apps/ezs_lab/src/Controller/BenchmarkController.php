@@ -3,6 +3,9 @@ namespace EZSLab\Controller;
 
 use EZSLab\Service\BenchmarkLauncher;
 use EZSLab\Service\Database;
+use EZSLab\Service\AudioSourceResolver;
+use EZSLab\Service\LabResourceResolver;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,7 +26,7 @@ final class BenchmarkController extends AbstractController
     }
 
     #[Route('/run', name: 'bench_start', methods: ['POST'])]
-    public function start(Request $request, Database $db, BenchmarkLauncher $launcher): Response
+    public function start(Request $request, Database $db, BenchmarkLauncher $launcher, AudioSourceResolver $audioSources): Response
     {
         /** @var UploadedFile|null $audio */
         $audio = $request->files->get('audio');
@@ -41,20 +44,19 @@ final class BenchmarkController extends AbstractController
         if ($sha === false) return new Response('Impossible de calculer SHA-256.', 500);
 
         $songId = $db->createSong($title, $artist, $original, $sha);
-        $projectDir = (string)$this->getParameter('kernel.project_dir');
-        $audioDir = $projectDir.DIRECTORY_SEPARATOR.'public'.DIRECTORY_SEPARATOR.'benchmark-audio';
-        if (!is_dir($audioDir)) mkdir($audioDir, 0777, true);
-
+        $audioDir = $audioSources->root();
         $ext = strtolower(pathinfo($original, PATHINFO_EXTENSION));
         $allowedExt = ['mp3','wav','flac','ogg','oga','m4a','mp4','aac'];
-        if (!in_array($ext, $allowedExt, true)) $ext = 'bin';
-
-        $placeholder = $audioDir.DIRECTORY_SEPARATOR.'pending-'.$songId.'.'.$ext;
-        $audio->move($audioDir, basename($placeholder));
-        $runId = $db->createRun($songId, $signature, $placeholder);
-        $final = $audioDir.DIRECTORY_SEPARATOR.'run-'.$runId.'.'.$ext;
-        rename($placeholder, $final);
-        $db->pdo()->prepare('UPDATE benchmark_runs SET input_path=? WHERE id=?')->execute([$final, $runId]);
+        if (!in_array($ext, $allowedExt, true)) return new Response('Extension audio invalide.', 415);
+        $final = $audioDir.DIRECTORY_SEPARATOR.$sha.'.'.$ext;
+        if (is_file($final)) {
+            if (!hash_equals($sha, (string)hash_file('sha256', $final))) {
+                throw new \RuntimeException('benchmark_audio_sha256_collision');
+            }
+        } else {
+            $audio->move($audioDir, basename($final));
+        }
+        $runId = $db->createRun($songId, $signature, $final);
 
         try {
             $launcher->launch($runId, $final, $signature);
@@ -66,13 +68,14 @@ final class BenchmarkController extends AbstractController
     }
 
     #[Route('/run/{id<\d+>}', name: 'bench_view', methods: ['GET'])]
-    public function view(int $id, Database $db): Response
+    public function view(int $id, Database $db, AudioSourceResolver $audioSources): Response
     {
         $run = $db->run($id);
         if (!$run) throw $this->createNotFoundException();
 
-        $audioAvailable = is_file((string)$run['input_path']);
-        $audioUrl = $audioAvailable ? '/benchmark-audio/'.rawurlencode(basename((string)$run['input_path'])) : null;
+        $audioPath = $audioSources->findBySha256((string)$run['audio_sha256']);
+        $audioAvailable = $audioPath !== null;
+        $audioUrl = $audioAvailable ? $this->generateUrl('bench_audio', ['id' => $id]) : null;
         $result = !empty($run['result_json']) ? json_decode((string)$run['result_json'], true) : null;
 
         $phaseDiagnostics = [];
@@ -95,19 +98,34 @@ final class BenchmarkController extends AbstractController
         ]);
     }
 
+    #[Route('/run/{id<\d+>}/audio', name: 'bench_audio', methods: ['GET'])]
+    public function audio(int $id, Database $db, AudioSourceResolver $audioSources): Response
+    {
+        $run = $db->run($id);
+        if (!$run) throw $this->createNotFoundException();
+        $path = $audioSources->findBySha256((string)$run['audio_sha256']);
+        if ($path === null) throw $this->createNotFoundException();
+        $response = new BinaryFileResponse($path);
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-store');
+        return $response;
+    }
+
     #[Route('/run/{id<\d+>}/reanalyze-cached-stems', name: 'bench_reanalyze_cached_stems', methods: ['GET','POST'])]
     public function reanalyzeCachedStems(
         int $id,
         Database $db,
-        BenchmarkLauncher $launcher
+        BenchmarkLauncher $launcher,
+        AudioSourceResolver $audioSources,
+        LabResourceResolver $resources,
     ): Response {
         $sourceRun = $db->run($id);
         if (!$sourceRun) {
             throw $this->createNotFoundException();
         }
 
-        $audioPath = (string)($sourceRun['input_path'] ?? '');
-        if ($audioPath === '' || !is_file($audioPath)) {
+        $audioPath = $audioSources->findBySha256((string)$sourceRun['audio_sha256']);
+        if ($audioPath === null) {
             return new Response(
                 'Ré-analyse impossible : audio source absent.',
                 409
@@ -128,10 +146,7 @@ final class BenchmarkController extends AbstractController
 
         // Contract V8B: this path MUST reuse already-generated stems.
         // It must never trigger a new stem separation.
-        $cacheRoot = 'H:\\temp\\EZStudio_lab\\stems';
-        $currentJson = $cacheRoot
-            .DIRECTORY_SEPARATOR.$audioHash
-            .DIRECTORY_SEPARATOR.'current.json';
+        $currentJson = $resources->stemsStorage($audioHash).DIRECTORY_SEPARATOR.'current.json';
 
         if (!is_file($currentJson)) {
             return new Response(

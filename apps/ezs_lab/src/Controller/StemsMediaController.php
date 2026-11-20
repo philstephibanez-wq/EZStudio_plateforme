@@ -30,19 +30,13 @@ final class StemsMediaController extends AbstractController
     }
 
     #[Route('/workbench/stems/master/{songId<\d+>}',name:'workbench_stems_master_audio',methods:['GET'])]
-    public function master(int $songId,Database $db): Response
+    public function master(int $songId,Database $db, \EZSLab\Service\AudioSourceResolver $audioSources): Response
     {
-        $stmt=$db->pdo()->prepare('SELECT audio_sha256,source_path FROM songs WHERE id=?');
+        $stmt=$db->pdo()->prepare('SELECT audio_sha256 FROM songs WHERE id=?');
         $stmt->execute([$songId]);
         $song=$stmt->fetch();
         if(!$song) throw $this->createNotFoundException();
-        $path=trim((string)($song['source_path']??''));
-        if($path==='' || !is_file($path)){
-            $stmt=$db->pdo()->prepare('SELECT r.input_path FROM benchmark_runs r JOIN songs s ON s.id=r.song_id WHERE s.audio_sha256=? ORDER BY r.id DESC');
-            $stmt->execute([(string)$song['audio_sha256']]);
-            $path='';
-            foreach($stmt->fetchAll() as $row){$candidate=trim((string)($row['input_path']??''));if($candidate!==''&&is_file($candidate)){$path=$candidate;break;}}
-        }
+        $path=$audioSources->findBySha256((string)$song['audio_sha256']);
         if($path===''||!is_file($path)) throw $this->createNotFoundException();
         $response=new BinaryFileResponse($path);
         $response->setPrivate();

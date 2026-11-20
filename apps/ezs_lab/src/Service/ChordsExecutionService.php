@@ -22,24 +22,13 @@ final class ChordsExecutionService
             throw new \InvalidArgumentException('chords_run_not_configured');
         }
 
-        $requestPath = trim((string)($run['labels']['execution_request'] ?? ''));
+        $resources = new LabResourceResolver(new AudioSourceResolver());
+        $requestPath = $resources->chordsRequest($scientificRunId);
         if ($requestPath === '' || !is_file($requestPath)) {
             throw new \RuntimeException('chords_execution_request_missing');
         }
 
-        $stmt = $this->db->pdo()->prepare("SELECT source_path FROM songs WHERE id=?");
-        $stmt->execute([(int)$run['song_id']]);
-        $source = $stmt->fetchColumn();
-        if (!is_string($source) || $source === '' || !is_file($source)) {
-            $stmt = $this->db->pdo()->prepare(
-                "SELECT input_path FROM benchmark_runs WHERE song_id=? AND input_path<>'' ORDER BY id DESC LIMIT 1"
-            );
-            $stmt->execute([(int)$run['song_id']]);
-            $source = $stmt->fetchColumn();
-        }
-        if (!is_string($source) || $source === '' || !is_file($source)) {
-            throw new \RuntimeException('song_master_source_missing');
-        }
+        $source = $resources->audio((string)$run['audio_sha256']);
 
         $signature = trim((string)($run['config']['signature'] ?? 'Auto')) ?: 'Auto';
         $benchmarkRunId = $this->db->createRun(
@@ -67,9 +56,7 @@ final class ChordsExecutionService
             'scientific_run_id' => $scientificRunId,
             'benchmark_run_id' => $benchmarkRunId,
             'song_id' => (int) $run['song_id'],
-            'source_path' => $source,
             'signature' => $signature,
-            'selection_request' => $requestPath,
         ]);
 
         return [

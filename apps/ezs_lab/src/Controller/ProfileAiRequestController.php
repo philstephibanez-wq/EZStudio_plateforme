@@ -5,6 +5,7 @@ namespace EZSLab\Controller;
 
 use EZSLab\Service\LabAnalysisTokenGuard;
 use EZSLab\Service\ProfileAiRequestService;
+use App\Service\EzsFifoTrace;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,26 +36,31 @@ final class ProfileAiRequestController extends AbstractController
     {
         // LAB does not install symfony/form or Twig csrf_token().
         // Require a non-simple same-origin AJAX request instead of a cross-site form POST.
+        EzsFifoTrace::log('EXPERTISE_REQUEST', ['run_id'=>$id]);
         if ($request->headers->get('X-EZS-Profile-AI-Action') !== 'request') {
+            EzsFifoTrace::log('EXPERTISE_REJECT', ['run_id'=>$id,'http_status'=>403,'reason'=>'same_origin_ajax_required']);
             return $this->json(['error'=>'same_origin_ajax_required'],403);
         }
         $origin = $request->headers->get('Origin');
         if ($origin !== null && $origin !== $request->getSchemeAndHttpHost()) {
+            EzsFifoTrace::log('EXPERTISE_REJECT', ['run_id'=>$id,'http_status'=>403,'reason'=>'cross_origin_denied']);
             return $this->json(['error'=>'cross_origin_denied'],403);
         }
         $fetchSite = $request->headers->get('Sec-Fetch-Site');
         if ($fetchSite !== null && !in_array($fetchSite, ['same-origin','none'],true)) {
+            EzsFifoTrace::log('EXPERTISE_REJECT', ['run_id'=>$id,'http_status'=>403,'reason'=>'cross_site_denied']);
             return $this->json(['error'=>'cross_site_denied'],403);
         }
         try {
             $this->queue->enqueue($id);
             $item = $this->publicRequest($this->queue->get($id));
+            EzsFifoTrace::log('EXPERTISE_RESPONSE', ['run_id'=>$id,'local_job_id'=>(int)($item['analysis_job_id']??0),'global_job_id'=>(int)($item['job_id']??0),'state'=>(string)($item['status']??'unknown')]);
             if (($item['job_id'] ?? null) === null) {
                 throw new \RuntimeException('expertise_global_admission_missing');
             }
             return $this->json(['ok'=>true,'job_id'=>$item['job_id'],'request'=>$item],202);
         }
-        catch (\RuntimeException $e) {return $this->json(['error'=>$e->getMessage()],409);}
+        catch (\RuntimeException $e) { EzsFifoTrace::log('EXPERTISE_REJECT',['run_id'=>$id,'http_status'=>409,'reason'=>$e->getMessage(),'exception'=>get_class($e)]); return $this->json(['error'=>$e->getMessage()],409);}
     }
 
     #[Route('/workbench/profile/{id<\d+>}/ai-review',name:'profile_ai_review_status',methods:['GET'])]
@@ -119,6 +125,15 @@ final class ProfileAiRequestController extends AbstractController
     public function pending(Request $request): JsonResponse
     {
         $this->guard->assertAuthorized($request);
+        $global = $request->query->get('orchestrator_job_id');
+        if ($global !== null) {
+            $jobId = filter_var($request->query->get('job_id'), FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+            $runId = filter_var($request->query->get('run_id'), FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+            $globalId = filter_var($global, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+            if (!$jobId || !$runId || !$globalId) { return $this->json(['error'=>'invalid_global_expertise_identity'],422); }
+            return $this->json(['schema'=>'ezstudio.profile-ai-requests.v1',
+                'requests'=>$this->queue->pendingForGlobal((int)$runId,(int)$jobId,(int)$globalId)]);
+        }
         return $this->json(['schema'=>'ezstudio.profile-ai-requests.v1','requests'=>$this->queue->pending()]);
     }
 

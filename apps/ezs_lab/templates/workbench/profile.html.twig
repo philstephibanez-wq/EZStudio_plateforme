@@ -278,15 +278,24 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
   const root=document.getElementById('profile-ai-request'), btn=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), state=document.getElementById('profile-ai-request-state'), prog=document.getElementById('profile-ai-progress');
   if(!root||!btn||!state||!prog) return;
   let activeJob=0, wasActive=false;
-  function setFsm(s){ const busy=(s==='running'||s==='queued'||s==='cancelling'); btn.disabled=busy; if(cancelBtn){cancelBtn.disabled=!busy || s==='cancelling';} }
+  function setFsm(s){ const busy=(s==='running'||s==='queued'||s==='cancelling'); btn.disabled=(s==='cancelling'); if(cancelBtn){cancelBtn.disabled=!busy || s==='cancelling';} }
   function render(item){
     activeJob=Number(item?.job_id||0); const s=item?.status||'idle'; if(s==='running'||s==='queued') wasActive=true; setFsm(s);
     const pct=s==='completed'?100:(Number.isFinite(Number(item?.progress))?Math.round(Number(item.progress)):0);
-    prog.value=pct; state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='error'?'Erreur':'Prêt')+(item?.job_id?' · #'+item.job_id:'')+(item?.message?' · '+item.message:'');
+    prog.value=pct; state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='error'?'Erreur':'Prêt')+(item?.queue_id?' · #'+item.queue_id : item?.job_id?' · LAB #'+item.job_id:'')+(item?.message?' · '+item.message:'');
     if(wasActive && s==='completed'){ wasActive=false; window.location.reload(); }
   }
   async function poll(){ try{ const r=await fetch(root.dataset.url,{credentials:'same-origin',cache:'no-store'}); if(r.ok){const j=await r.json(); render(j.request);} }catch(_){} }
-  btn.addEventListener('click',async()=>{ setFsm('queued'); state.textContent='Lancement…'; try{ const r=await fetch(root.dataset.action,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Profile-AI-Action':'request','Accept':'application/json'}}); const j=await r.json(); if(r.ok) render(j.request); }catch(e){state.textContent='Err: '+e.message; setFsm('idle');} });
+  btn.addEventListener('click',async()=>{ setFsm('queued'); state.textContent='Lancement…'; try{ const r=await fetch(root.dataset.action,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Profile-AI-Action':'request','Accept':'application/json'}}); const raw=await r.text(); let j={};
+      try { j=raw ? JSON.parse(raw) : {}; } catch (_) { j={}; }
+      if (!r.ok || j.ok===false) {
+        const detail=String(j.error||j.reason||j.message||'rÃ©ponse REST inexploitable');
+        throw new Error('HTTP '+r.status+' Â· '+detail);
+      }
+      if (!j.request || !Number(j.request.job_id)) {
+        throw new Error('HTTP '+r.status+' Â· admission globale non confirmÃ©e');
+      }
+      render(j.request); }catch(e){state.textContent='Err: '+e.message; setFsm('idle');} });
   cancelBtn?.addEventListener('click',async()=>{ if(!activeJob)return; setFsm('cancelling'); await fetch('/analysis/jobs/'+activeJob+'/cancel',{method:'POST',credentials:'same-origin'}); poll(); });
   poll(); setInterval(poll,2500);
   // Suivi temps reel de la barre de progression Analyse LAB (profile_oneshot_status)

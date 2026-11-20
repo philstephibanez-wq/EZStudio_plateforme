@@ -31,8 +31,34 @@ def _append_line(path: Path | None, message: str) -> None:
         handle.write(message.rstrip("\r\n") + "\n")
 
 
+def _e2e_stage(message: str) -> None:
+    import re
+    stage = message.split(' ', 1)[0]
+    if stage not in {'job_start','process_start','process_end','worker_fatal',
+                     'profile_oneshot_cancel_requested','profile_oneshot_cancel_worker_terminated'}:
+        return
+    try:
+        global_id = int(os.getenv('ORCHESTRATOR_JOB_ID', '0'))
+        local_id = int(os.getenv('EZSTUDIO_E2E_LOCAL_JOB_ID', '0'))
+        if global_id < 1:
+            return
+        payload = {'time': _utc_now(), 'event':'E2E_PYTHON_STAGE',
+                   'global_job_id':global_id, 'local_job_id':local_id,
+                   'stage':stage, 'pid':os.getpid()}
+        if stage == 'process_end':
+            match = re.search(r'returncode=(-?\d+)', message)
+            if match: payload['exit_code'] = int(match.group(1))
+        path = Path('H:/temp/EZS_FIFO_TRACE_R1/events.jsonl')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('a', encoding='utf-8', newline='\n') as stream:
+            stream.write(json.dumps(payload,ensure_ascii=False)+'\n')
+    except (OSError, ValueError):
+        pass
+
+
 def _log_event(message: str) -> None:
-    line = f"{_utc_now()} {message}"
+    _e2e_stage(message)
+    line = f'{_utc_now()} {message}'
     _append_line(_CURRENT_LOG_PATH, line)
     _append_line(_CURRENT_LAB_LOG_PATH, line)
 

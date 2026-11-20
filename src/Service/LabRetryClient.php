@@ -16,7 +16,7 @@ final class LabRetryClient
         if (!in_array($action,['prepare','commit','abort','state'],true)) throw new \InvalidArgumentException('invalid_retry_action');
         $token=trim((string)($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']??$_SERVER['EZSTUDIOLAB_ASSISTANT_TOKEN']??getenv('EZSTUDIOLAB_ASSISTANT_TOKEN')?:''));
         if ($token==='') $token=trim((string)($_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']??$_SERVER['EZSTUDIO_ANALYSIS_WORKER_TOKEN']??getenv('EZSTUDIO_ANALYSIS_WORKER_TOKEN')?:''));
-        if ($token==='') return ['ok'=>false,'reason'=>'lab_retry_token_not_configured'];
+        if ($token==='') { EzsFifoTrace::log('RETRY_TRANSPORT_ERROR',['action'=>$action,'global_job_id'=>$globalJobId,'attempt'=>$attempt,'reason'=>'lab_retry_token_not_configured']); return ['ok'=>false,'reason'=>'lab_retry_token_not_configured']; }
         $base=trim((string)($_ENV['EZSTUDIOLAB_ASSISTANT_BASE_URL']??$_SERVER['EZSTUDIOLAB_ASSISTANT_BASE_URL']??getenv('EZSTUDIOLAB_ASSISTANT_BASE_URL')?:'http://lab.ezstudio.local:8000'));
         try {
             $response=$this->httpClient->request('POST',rtrim($base,'/').'/internal/analysis/desktop/jobs/retry/'.$action,[
@@ -26,6 +26,7 @@ final class LabRetryClient
             ]);
             $code=$response->getStatusCode();
             $data=$response->toArray(false);
+            EzsFifoTrace::log('RETRY_HTTP_RESULT',['action'=>$action,'global_job_id'=>$globalJobId,'attempt'=>$attempt,'http_status'=>$code,'result'=>(($data['ok']??false)===true)?'ok':'rejected','reason'=>(string)($data['reason']??'none')]);
             if (!is_array($data) || ($data['schema']??'')!=='ezstudio.lab-job-retry.v1') {
                 return ['ok'=>false,'reason'=>'lab_retry_contract_invalid'];
             }
@@ -34,6 +35,7 @@ final class LabRetryClient
             }
             return $data;
         } catch (\Throwable $e) {
+            EzsFifoTrace::log('RETRY_TRANSPORT_ERROR',['action'=>$action,'global_job_id'=>$globalJobId,'attempt'=>$attempt,'exception'=>get_class($e)]);
             return ['ok'=>false,'reason'=>'lab_retry_transport_unavailable'];
         }
     }

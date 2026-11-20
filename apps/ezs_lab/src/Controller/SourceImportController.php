@@ -50,9 +50,7 @@ final class SourceImportController extends AbstractController
         }
 
         $songId = $db->createSong($title, $artist, $original, $sha);
-        // The canonical source is resolved by audio_sha256; no absolute path stored.
-        $stmt = $db->pdo()->prepare('UPDATE songs SET source_path=NULL WHERE id=?');
-        $stmt->execute([$songId]);
+        // audio_sha256 is the sole persisted media identity.
 
         // Contract: IMPORT stops here. PROFILE is only the next screen.
         return new RedirectResponse($this->generateUrl('workbench_profile', ['song' => $songId]));

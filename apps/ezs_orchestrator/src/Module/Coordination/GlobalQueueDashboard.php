@@ -10,7 +10,7 @@ final class GlobalQueueDashboard
 {
     public static function read(?string $path = null, array $filters = []): array
     {
-        $path ??= dirname(__DIR__, 5) . '/data/orchestrator.sqlite';
+        $path ??= dirname(__DIR__, 5) . '/data/databases/EZS_Orchestrator.sqlite';
         $stateFilter = in_array((string) ($filters['state'] ?? 'all'), ['all', 'active', 'waiting', 'progressing', 'cancelling', 'cancelled', 'ended_ok', 'ended_ko'], true) ? (string) $filters['state'] : 'all';
         $actorFilter = in_array((string) ($filters['actor'] ?? 'all'), ['all', 'lab', 'assistant'], true) ? (string) $filters['actor'] : 'all';
         $categoryFilter = in_array((string) ($filters['category'] ?? 'all'), ['all', 'Analyse', 'Expertise'], true) ? (string) $filters['category'] : 'all';

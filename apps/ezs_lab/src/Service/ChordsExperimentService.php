@@ -131,7 +131,6 @@ final class ChordsExperimentService
             $this->runRegistry->run($runId),
             $available
         );
-        $this->runRegistry->setLabel($runId, 'execution_request', $requestPath);
 
         return $this->runRegistry->run($runId);
     }
@@ -151,8 +150,7 @@ final class ChordsExperimentService
     private function writeExecutionRequest(array $run, array $available): string
     {
         $runId = (int)$run['id'];
-        $root = 'H:\temp\EZStudio_lab\chords'
-            .DIRECTORY_SEPARATOR.sprintf('scientific-run-%06d', $runId);
+        $root = dirname((new LabResourceResolver(new AudioSourceResolver()))->chordsRequest($runId));
 
         if (!is_dir($root) && !mkdir($root, 0777, true) && !is_dir($root)) {
             throw new \RuntimeException('chords_request_dir_create_failed');

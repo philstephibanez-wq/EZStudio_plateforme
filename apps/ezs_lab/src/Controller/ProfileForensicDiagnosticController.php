@@ -87,6 +87,64 @@ final class ProfileForensicDiagnosticController extends AbstractController
         ]);
     }
 
+
+    /** Live FIFO/worker timeline rendered in the EXISTING forensic/profile_trace.html.twig.
+     * Local-only, read-only, whitelisted JSONL. Does not expose paths, subprocess output or secrets.
+     */
+    #[Route('/workbench/profile/forensic-diagnostic/live', name: 'profile_forensic_live', methods: ['GET'])]
+    public function live(Request $request): Response
+    {
+        if (getenv('EZS_RAW_DIAGNOSTIC_LOCAL') !== '1'
+            || !in_array((string)$request->server->get('REMOTE_ADDR'), ['127.0.0.1','::1'], true)) {
+            return new Response('Diagnostic local désactivé.', 403);
+        }
+        $run = filter_var($request->query->get('run_id'), FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        $global = filter_var($request->query->get('global_job_id'), FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        if (($run === false || $run === null) && ($global === false || $global === null)) {
+            return new Response('run_id ou global_job_id requis.', 422);
+        }
+        $runId = is_int($run) ? $run : 0;
+        $globalId = is_int($global) ? $global : 0;
+        $file = 'H:/temp/EZS_FIFO_TRACE_R1/events.jsonl';
+        $events = [];
+        $history = [];
+        $relatedGlobal = [];
+        if (is_file($file) && is_readable($file)) {
+            $handle = fopen($file, 'rb');
+            if (is_resource($handle)) {
+                $size = (int)filesize($file);
+                if ($size > 524288) fseek($handle, -524288, SEEK_END);
+                while (($line = fgets($handle)) !== false) {
+                    $row = json_decode($line, true);
+                    if (!is_array($row) || !is_string($row['event'] ?? null)) continue;
+                    $history[] = $row;
+                    if ($runId && (int)($row['run_id'] ?? 0) === $runId
+                        && (int)($row['global_job_id'] ?? 0) > 0) {
+                        $relatedGlobal[(int)$row['global_job_id']] = true;
+                    }
+                }
+                fclose($handle);
+            }
+        }
+        foreach ($history as $row) {
+            $gid = (int)($row['global_job_id'] ?? 0);
+            if (($runId && (int)($row['run_id'] ?? 0) === $runId)
+                || ($globalId && $gid === $globalId)
+                || ($runId && $gid > 0 && isset($relatedGlobal[$gid]))) {
+                $events[] = $row;
+                if (count($events) > 400) array_shift($events);
+            }
+        }
+        $raw = json_encode(['schema'=>'ezs.e2e-live-diagnostic.r1', 'run_id'=>$runId,
+            'global_job_id'=>$globalId, 'event_count'=>count($events), 'events'=>$events],
+            JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+        return $this->render('forensic/profile_trace.html.twig', [
+            'manifest'=>['completeness'=>'chronologie locale','omissions'=> $events ? [] : ['aucune trace correspondante (ou accès journal refusé)']],
+            'run_id'=>$runId, 'producer'=>'lab', 'trace_id'=>'live',
+            'selected_document'=>'timeline', 'raw_content'=>$raw ?: '{}', 'documents'=>[],
+        ]);
+    }
+
     /** Reassemble and verify the canonical Assistant 1.7a17 raw archive (no schema rewrite). */
     private function renderAssistant(Request $request, array $manifest, string $raw, string $root,
         string $prefix, int $runId, string $trace, string $selected): Response

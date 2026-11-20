@@ -39,6 +39,9 @@ class WorkerCapabilities:
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
+        # Deployment locations are local runtime settings, never network or DB metadata.
+        payload.pop("shared_model_root", None)
+        payload.pop("local_model_cache", None)
         payload["max_vram_mb"] = self.max_vram_mb
         return payload
 

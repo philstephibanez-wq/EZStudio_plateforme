@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace EZSLab\Command;
 
 use App\Service\OrchestratorQueueClient;
+use App\Service\EzsFifoTrace;
 use EZSLab\Service\AnalysisRunRegistry;
 use EZSLab\Service\Database;
 use EZSLab\Service\ProfileExecutionService;
@@ -43,6 +44,9 @@ final class ProfileOnceCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $traceGlobal = (int)($input->getOption('orchestrator-job-id') ?: getenv('ORCHESTRATOR_JOB_ID') ?: 0);
+        $traceLocal = (int)($input->getOption('job-id') ?: 0);
+        EzsFifoTrace::log('E2E_PROFILE_ENTER',['global_job_id'=>$traceGlobal,'local_job_id'=>$traceLocal]);
         $queuedJob = null;
         $requestedJob = $input->getOption('job-id');
         if ($requestedJob !== null) {
@@ -79,6 +83,7 @@ final class ProfileOnceCommand extends Command
         if (!is_string($source) || !is_file($source) || !is_file($python)
             || !is_file($root.'/analysis/worker_entrypoint.py')
             || !is_file($root.'/python/ezstudio/pipeline/profile/runner.py')) {
+            EzsFifoTrace::log('E2E_PROFILE_PREFLIGHT_REJECT',['global_job_id'=>$traceGlobal,'local_job_id'=>$traceLocal,'reason'=>'PROFILE_ONCE_SOURCE_OR_ENGINE_MISSING']);
             $output->writeln('<error>PROFILE_ONCE_SOURCE_OR_ENGINE_MISSING</error>');
             return Command::FAILURE;
         }
@@ -119,34 +124,24 @@ final class ProfileOnceCommand extends Command
             // Global GO fence: a numeric CLI argument is not authorization.
             // Read the authoritative Orchestrator queue without modifying it.
             // Never fall back to a local FIFO or a missing/unreadable queue.
-            $orchestratorDatabase = dirname(__DIR__, 4) . '/data/orchestrator.sqlite';
-            if (!is_file($orchestratorDatabase)) {
-                $output->writeln('<error>PROFILE_GLOBAL_GO_DATABASE_MISSING</error>');
-                return Command::FAILURE;
-            }
             try {
-                $uri = 'file:' . str_replace('\\', '/', $orchestratorDatabase) . '?mode=ro';
-                $globalDb = new \PDO('sqlite:' . $uri);
-                $globalDb->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-                $proofQuery = $globalDb->prepare('SELECT source,status,payload FROM job_queue WHERE id=?');
-                $proofQuery->execute([$orchestratorJobId]);
-                $globalRow = $proofQuery->fetch(\PDO::FETCH_ASSOC);
-                $globalDb = null;
-                $globalPayload = is_array($globalRow)
-                    ? json_decode((string)($globalRow['payload'] ?? ''), true) : null;
-                if (!is_array($globalRow)
+                // Authenticated REST to the queue owner; no cross-application SQLite.
+                $globalRow = $this->orchestratorQueue->executionProof($orchestratorJobId);
+                if ((int)($globalRow['queue_id'] ?? 0) !== $orchestratorJobId
                     || (string)($globalRow['source'] ?? '') !== 'lab'
                     || (string)($globalRow['status'] ?? '') !== 'progressing'
-                    || !is_array($globalPayload)
-                    || (string)($globalPayload['job'] ?? '') !== 'profile'
-                    || (int)($globalPayload['analysis_job_id'] ?? 0) !== (int)$queuedJob['id']
-                    || (int)($globalPayload['scientific_run_id'] ?? 0) !== (int)$queuedJob['scientific_run_id']
-                    || (int)($globalPayload['song_id'] ?? 0) !== (int)$queuedJob['song_id']) {
+                    || (string)($globalRow['job'] ?? '') !== 'profile'
+                    || (int)($globalRow['analysis_job_id'] ?? 0) !== (int)$queuedJob['id']
+                    || (int)($globalRow['scientific_run_id'] ?? 0) !== (int)$queuedJob['scientific_run_id']
+                    || (int)($globalRow['song_id'] ?? 0) !== (int)$queuedJob['song_id']) {
+                    EzsFifoTrace::log('E2E_PROFILE_GO_REJECT',['global_job_id'=>$traceGlobal,'local_job_id'=>$traceLocal,'reason'=>'PROFILE_GLOBAL_GO_PROOF_MISMATCH']);
                     $output->writeln('<error>PROFILE_GLOBAL_GO_PROOF_MISMATCH</error>');
                     return Command::FAILURE;
                 }
+                EzsFifoTrace::log('E2E_PROFILE_GO_GRANTED',['global_job_id'=>$traceGlobal,'local_job_id'=>$traceLocal]);
             } catch (\Throwable $error) {
-                $output->writeln('<error>PROFILE_GLOBAL_GO_PROOF_UNAVAILABLE</error>');
+                EzsFifoTrace::log('E2E_PROFILE_GO_REJECT',['global_job_id'=>$traceGlobal,'local_job_id'=>$traceLocal,'reason'=>'PROFILE_GLOBAL_GO_PROOF_UNAVAILABLE','exception'=>get_class($error)]);
+                $output->writeln('<error>PROFILE_GLOBAL_GO_PROOF_UNAVAILABLE: '.get_class($error).'</error>');
                 return Command::FAILURE;
             }
             // Atomic local state transition only: no local FIFO/priority decision.
@@ -181,10 +176,13 @@ final class ProfileOnceCommand extends Command
             }
             $environment = ProfileOnceEnvironment::build($root);
             $environment['EZSTUDIO_PROFILE_ONESHOT_CANCEL_FILE'] = $cancelFile;
+            $environment['EZSTUDIO_E2E_LOCAL_JOB_ID'] = (string)$jobId;
             $process = new Process([$python, $root.'/analysis/worker_entrypoint.py', '--job-file', $jobFile], $root, $environment);
             $process->setTimeout(null);
             $output->writeln('PROFILE_ONCE_PYTHON_START job='.$jobId.' run='.(int)$run['id']);
+            EzsFifoTrace::log('E2E_PYTHON_SPAWN_REQUEST',['global_job_id'=>$traceGlobal,'local_job_id'=>$traceLocal,'run_id'=>(int)$run['id']]);
             $process->start();
+            EzsFifoTrace::log('E2E_PYTHON_STARTED',['global_job_id'=>$traceGlobal,'local_job_id'=>$traceLocal,'run_id'=>(int)$run['id']]);
             $last = -1;
             while ($process->isRunning()) {
                 $current = $this->database->analysisJob($jobId);
@@ -202,6 +200,7 @@ final class ProfileOnceCommand extends Command
                     $percent = is_array($state) ? ($state['percent'] ?? null) : null;
                     if (is_int($percent) && $percent > $last && $percent <= 99) {
                         $last = $percent;
+                        EzsFifoTrace::log('E2E_PROFILE_PROGRESS',['global_job_id'=>$traceGlobal,'local_job_id'=>$jobId,'run_id'=>(int)$run['id'],'stage'=>'progress_'.$percent]);
                         $this->database->updateAnalysisJobProgress($jobId, $percent);
                         $this->profile->progressFromJob($jobId, $percent);
                         $orchJobId = (int)($input->getOption('orchestrator-job-id') ?: getenv('ORCHESTRATOR_JOB_ID') ?: 0);
@@ -226,6 +225,7 @@ final class ProfileOnceCommand extends Command
                 $output->writeln('PROFILE_ONCE_CANCELLED job='.$jobId.' run='.(int)$run['id']);
                 return Command::SUCCESS;
             }
+            EzsFifoTrace::log('E2E_PYTHON_EXIT',['global_job_id'=>$traceGlobal,'local_job_id'=>$jobId,'run_id'=>(int)$run['id'],'exit_code'=>(int)($process->getExitCode() ?? -1)]);
             if (!$process->isSuccessful()) {
                 throw new \RuntimeException('profile_worker_exit_'.$process->getExitCode());
             }
@@ -233,9 +233,12 @@ final class ProfileOnceCommand extends Command
             $this->profile->completeFromJob($jobId);
             $this->database->completeAnalysisJob($jobId);
             ($this->reports ?? new \EZSLab\Service\ProfileReportPublication())->publish((int) $run['id'], 'lab');
+            EzsFifoTrace::log('E2E_PROFILE_COMPLETED',['global_job_id'=>$traceGlobal,'local_job_id'=>$jobId,'run_id'=>(int)$run['id']]);
             $output->writeln('PROFILE_ONCE_COMPLETED job='.$jobId.' run='.(int)$run['id']);
             return Command::SUCCESS;
         } catch (\Throwable $error) {
+            $safeReason = preg_match('/^[A-Za-z0-9_.:-]{1,95}$/D',$error->getMessage()) ? $error->getMessage() : 'exception_message_redacted';
+            EzsFifoTrace::log('E2E_PROFILE_FAILURE',['global_job_id'=>$traceGlobal,'local_job_id'=>$traceLocal,'reason'=>$safeReason,'exception'=>get_class($error)]);
             if ($jobId !== null) {
                 try {
                     $this->profile->failFromJob($jobId, $error->getMessage());

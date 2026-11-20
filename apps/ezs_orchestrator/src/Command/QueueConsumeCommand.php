@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Ezs\Web\Command;
 
 use App\Entity\JobQueue;
-use App\Service\JobRetryCoordinator;
 use App\Service\QueueManager;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\EzsFifoTrace;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -17,14 +16,12 @@ use Symfony\Component\Process\Process;
 
 #[AsCommand(
     name: 'orchestrator:queue:consume',
-    description: 'Ordonnanceur agnostique : consomme data/orchestrator.sqlite (waiting -> progressing -> ended).'
+    description: 'Ordonnanceur global agnostique : FIFO unique (pending/running/completed/failed).'
 )]
 final class QueueConsumeCommand extends Command
 {
     public function __construct(
         private readonly QueueManager $queueManager,
-        private readonly JobRetryCoordinator $retryCoordinator,
-        private readonly EntityManagerInterface $entityManager,
     ) {
         parent::__construct();
     }
@@ -73,6 +70,13 @@ comment>Consumer already running.
 
                 $id = (int) $job->getId();
                 $source = $job->getSource();
+                $identity = $job->getPayload();
+                EzsFifoTrace::log('E2E_GLOBAL_CLAIM', [
+                    'global_job_id'=>$id,'source'=>$source,'attempt'=>(int)$job->getAttempts(),
+                    'run_id'=>(int)($identity['scientific_run_id'] ?? $identity['run_id'] ?? 0),
+                    'local_job_id'=>(int)($identity['analysis_job_id'] ?? $identity['job_id'] ?? 0),
+                    'phase'=>(string)($identity['job'] ?? 'unknown')
+                ]);
                 $output->writeln(sprintf('
 <
 info>[Job #%d]
@@ -80,8 +84,19 @@ info>[Job #%d]
 /info> progressing (actor=%s, attempt=%d)', $id, $source, $job->getAttempts()));
 
                 try {
+                    EzsFifoTrace::log('E2E_DISPATCH_START',['global_job_id'=>$id,'source'=>$source]);
                     $this->dispatchToActor($job, $platformRoot, $output);
-                    $this->queueManager->markCompletedIfActive($id);
+                    EzsFifoTrace::log('E2E_DISPATCH_RETURN',['global_job_id'=>$id,'source'=>$source]);
+                    $terminal = $this->queueManager->markCompletedIfActive($id);
+                    if (!$terminal instanceof JobQueue || !$terminal->isTerminal()) {
+                        throw new \RuntimeException('queue_success_terminal_commit_missing');
+                    }
+                    if ($terminal->hasError()) {
+                        // A worker may already have finalized a failed job via REST.
+                        // Never overwrite or announce that failure as a success.
+                        throw new \RuntimeException('queue_worker_already_failed');
+                    }
+                    EzsFifoTrace::log('E2E_GLOBAL_TERMINAL',['global_job_id'=>$id,'source'=>$source,'result'=>'completed']);
                     $this->publishReports($source, $platformRoot, $output);
                     $output->writeln(sprintf('
 <
@@ -89,7 +104,17 @@ info>[Job #%d]
 <
 /info> ended (OK)', $id));
                 } catch (\Throwable $e) {
-                    $this->queueManager->markEnded($id, true, $e->getMessage());
+                    $code = preg_match('/^[A-Za-z0-9_.:-]{1,95}$/D',$e->getMessage()) ? $e->getMessage() : 'exception_message_redacted';
+                    EzsFifoTrace::log('E2E_GLOBAL_FAILED',['global_job_id'=>$id,'source'=>$source,'reason'=>$code,'exception'=>get_class($e)]);
+                    $terminal = $this->queueManager->markEnded($id, true, $e->getMessage());
+                    if (!$terminal instanceof JobQueue || !$terminal->isTerminal()) {
+                        // Fail closed: never claim another job while this one might
+                        // still own the unique global running slot.
+                        throw new \RuntimeException('queue_failed_terminal_commit_missing', 0, $e);
+                    }
+                    if (!$terminal->hasError() && $terminal->getStatus() !== JobQueue::STATUS_CANCELLED) {
+                        throw new \RuntimeException('queue_failed_terminal_state_invalid', 0, $e);
+                    }
                     $output->writeln(sprintf('
 <
 error>[Job #%d] ended (KO): %s
@@ -163,17 +188,13 @@ error>[Job #%d] ended (KO): %s
             }
             if (in_array($type, ['stems', 'chords'], true)) {
                 $labRoot = $platformRoot . '/apps/ezs_lab';
-                $runId = (int) ($payload['benchmark_run_id'] ?? $payload['scientific_run_id'] ?? 0);
-                $audio = (string) ($payload['source_path'] ?? '');
-                $signature = (string) ($payload['signature'] ?? 'Auto');
-                if (!($runId > 0) || $audio === '') {
-                    throw new \RuntimeException('missing_lab_worker_parameters');
+                $analysisJobId = (int) ($payload['analysis_job_id'] ?? 0);
+                if ($analysisJobId < 1) {
+                    throw new \RuntimeException('lab_worker_job_identity_missing');
                 }
-                // The LAB Symfony actor resolves its private SQLite path itself.
+                // Orchestrator knows only the LAB job identity; the LAB actor owns resource resolution.
                 $cmd = [$php,$platformRoot.'/bin/console','lab:analysis:global-worker',
-                    '--phase='.$type,'--run-id='.$runId,'--audio='.$audio,'--signature='.$signature];
-                $selectionRequest = trim((string) ($payload['selection_request'] ?? ''));
-                if ($type === 'chords' && $selectionRequest !== '') { $cmd[] = '--selection-request='.$selectionRequest; }
+                    '--job-id='.$analysisJobId];
                 $this->runSubprocess($id, $cmd, $platformRoot, ['APP_ID' => 'ezs_lab', 'EZSTUDIO_DEP_ROOT' => $platformRoot . '/var/runtime/deps', 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 3600, $output);
                 return;
             }
@@ -201,36 +222,20 @@ string,string> $env */
     {
         $process = new Process($command, $cwd, $env);
         $process->setTimeout($timeout);
-        $process->start(); $pid = $process->getPid(); if (is_int($pid) && $pid > 0) { $this->queueManager->attachWorkerPid($queueJobId, $pid); } $process->wait(static function (string $type, string $buffer) use ($output): void { $output->write($buffer); });
-        if (!$process->isSuccessful()) { throw new \RuntimeException(sprintf('subprocess_exit_%d', $process->getExitCode() ?? -1)); }
-    }
-
-    private function reconcileDivergentRetries(string $platformRoot): int
-    {
-        $rows=$this->entityManager->getConnection()->fetchAllAssociative("SELECT id,source,payload,attempts FROM job_queue WHERE status='ended' AND has_error=1 ORDER BY id DESC LIMIT 50");
-        $dirState=$platformRoot.'/apps/ezs_assistant/runtime/state/profile-direct';
-        $count=0;
-        foreach ($rows as $row) {
-            $payload=json_decode((string)($row['payload']??'{}'),true);
-            if (!is_array($payload)) continue;
-            $type=(string)($payload['job']??$payload['type']??'');
-            $queued=false;
-            if ($row['source']==='assistant' && $type==='profile.direct_research') {
-                $id=(string)($payload['job_id']??'');
-                if (preg_match('/^[a-f0-9]{32}$/',$id)) {
-                    $file=$dirState.'/'.$id.'.result.json';
-                    if (is_file($file)) {
-                        $body=json_decode((string)file_get_contents($file),true);
-                        $queued=is_array($body) && ($body['state']??'')==='queued';
-                    }
+        $process->start();
+        $pid = $process->getPid();
+        EzsFifoTrace::log('E2E_CHILD_SPAWN',['global_job_id'=>$queueJobId,'result'=>'spawned']);
+        if (is_int($pid) && $pid > 0) { $this->queueManager->attachWorkerPid($queueJobId, $pid); }
+        $process->wait(static function (string $type, string $buffer) use ($output,$queueJobId): void {
+            $output->write($buffer);
+            foreach (preg_split('/\r?\n/', $buffer) as $line) {
+                // Only stable diagnostic markers, never raw argv, paths, exception bodies or tokens.
+                if (preg_match('/\b(PROFILE_[A-Z0-9_]{4,90}|(?:[A-Z]+_){1,}[A-Z0-9_]{3,90})\b/', $line, $match)) {
+                    EzsFifoTrace::log('E2E_CHILD_MARKER',['global_job_id'=>$queueJobId,'marker'=>$match[1]]);
                 }
-            } else {
-                $state=$this->retryCoordinator->labState((int)$row['id'],(int)$row['attempts'],(string)$row['source'],$payload);
-                if ($state===null) break; // LAB unavailable: do not block consumer startup.
-                $queued=$state;
             }
-            if ($queued && ($this->retryCoordinator->retry((int)$row['id'])['ok']??false)) $count++;
-        }
-        return $count;
+        });
+        EzsFifoTrace::log('E2E_CHILD_EXIT',['global_job_id'=>$queueJobId,'exit_code'=>(int)($process->getExitCode() ?? -1)]);
+        if (!$process->isSuccessful()) { throw new \RuntimeException(sprintf('subprocess_exit_%d', $process->getExitCode() ?? -1)); }
     }
 }

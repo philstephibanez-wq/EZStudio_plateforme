@@ -59,7 +59,6 @@ final class ProfileController extends AbstractController
                     }
                 }
             }
-            if ($selected === null && $runs !== []) $selected = $runs[0];
         }
 
         // All historical expertise entries belong to this song, not only the selected run.
@@ -70,6 +69,20 @@ final class ProfileController extends AbstractController
             }
         }
         usort($songRevisions, static fn(array $a, array $b): int => (int)$b['id'] <=> (int)$a['id']);
+
+        // Without an explicit run selection, open the run owning the latest
+        // expertise of this song. Never hide historical expertise just because
+        // the most recent scientific run has not yet been reviewed.
+        if ($selected === null && $runs !== []) {
+            $latestExpertiseRunId = (int)($songRevisions[0]['run_id'] ?? 0);
+            foreach ($runs as $candidate) {
+                if ((int)$candidate['id'] === $latestExpertiseRunId) {
+                    $selected = $candidate;
+                    break;
+                }
+            }
+            $selected ??= $runs[0];
+        }
 
         return $this->render('workbench/profile.html.twig', [
             'songs' => $catalog->songs(),
