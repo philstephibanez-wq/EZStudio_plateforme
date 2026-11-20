@@ -69,6 +69,36 @@ final class ProfileAiRequestController extends AbstractController
         return $this->json(['request'=>$this->publicRequest($this->queue->get($id))]);
     }
 
+    /** Cancel exactly one Assistant expertise attempt; never cancel the scientific LAB run. */
+    #[Route('/workbench/profile/{id<\d+>}/ai-review/cancel',name:'profile_ai_review_cancel',methods:['POST'])]
+    public function cancelExpertise(int $id, Request $request): JsonResponse
+    {
+        if ($request->headers->get('X-EZS-Profile-AI-Action') !== 'cancel') {
+            return $this->json(['ok'=>false,'error'=>'same_origin_ajax_required'],403);
+        }
+        $origin = $request->headers->get('Origin');
+        if ($origin !== null && $origin !== $request->getSchemeAndHttpHost()) {
+            return $this->json(['ok'=>false,'error'=>'cross_origin_denied'],403);
+        }
+        $site = $request->headers->get('Sec-Fetch-Site');
+        if ($site !== null && !in_array($site,['same-origin','none'],true)) {
+            return $this->json(['ok'=>false,'error'=>'cross_site_denied'],403);
+        }
+        try {
+            $data=$request->toArray();
+            $local=filter_var($data['analysis_job_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+            $global=filter_var($data['job_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+            if (!$local || !$global) return $this->json(['ok'=>false,'error'=>'invalid_expertise_identity'],422);
+            $result=$this->queue->requestCancellation($id,(int)$local,(int)$global);
+            return $this->json(['ok'=>true,'request'=>$this->publicRequest($result)],202,['Cache-Control'=>'no-store']);
+        } catch (\JsonException $e) {
+            return $this->json(['ok'=>false,'error'=>'invalid_json'],422);
+        } catch (\RuntimeException $e) {
+            EzsFifoTrace::log('EXPERTISE_CANCEL_REJECT',['run_id'=>$id,'reason'=>$e->getMessage()]);
+            return $this->json(['ok'=>false,'error'=>$e->getMessage()],409);
+        }
+    }
+
     #[Route('/internal/analysis/desktop/profile/{id<\d+>}/scientific-items',name:'lab_internal_profile_scientific_items',methods:['GET'])]
     public function scientificItems(Request $request,int $id,\EZSLab\Service\AnalysisRunRegistry $runs): JsonResponse
     {

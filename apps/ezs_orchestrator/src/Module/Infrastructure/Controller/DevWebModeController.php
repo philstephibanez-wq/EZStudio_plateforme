@@ -11,8 +11,21 @@ use Symfony\Component\Routing\Attribute\Route;
 /** DEV maintenance is a route-only switch, never a process lifecycle operation. */
 final class DevWebModeController
 {
-    private const FLAG_DIR = 'H:/EZS_orchestrator/runtime/web-modes';
-    private const FLAG = self::FLAG_DIR.'/dev.maintenance';
+    // Répertoires propres au monorepo, hors Git et hors document root.
+    private static function flagDir(): string
+    {
+        return dirname(__DIR__, 6).'/var/ezs-orchestrator/web-modes';
+    }
+
+    private static function tokenDir(): string
+    {
+        return dirname(__DIR__, 6).'/var/ezs-orchestrator/security';
+    }
+
+    private static function flagPath(): string
+    {
+        return self::flagDir().'/dev.maintenance';
+    }
 
     public static function allowed(string $environment, string $host, string $ip): bool
     {
@@ -29,10 +42,11 @@ final class DevWebModeController
      */
     private static function token(): string
     {
-        if (!is_dir(self::FLAG_DIR) && !@mkdir(self::FLAG_DIR, 0750, true) && !is_dir(self::FLAG_DIR)) {
+        $tokenDir = self::tokenDir();
+        if (!is_dir($tokenDir) && !@mkdir($tokenDir, 0750, true) && !is_dir($tokenDir)) {
             throw new \RuntimeException('dev_csrf_directory_unavailable');
         }
-        $path = self::FLAG_DIR.'/dev-csrf.key';
+        $path = $tokenDir.'/dev-csrf.key';
         $handle = @fopen($path, 'c+');
         if (!is_resource($handle)) {
             throw new \RuntimeException('dev_csrf_open_failed');
@@ -75,7 +89,7 @@ final class DevWebModeController
         }
         return new JsonResponse([
             'schema'=>'ezs.dev_web_mode.v1',
-            'mode'=>is_file(self::FLAG) ? 'MAINTENANCE' : 'NORMAL',
+            'mode'=>is_file(self::flagPath()) ? 'MAINTENANCE' : 'NORMAL',
             'csrf'=>$csrf,
         ],200,['Cache-Control'=>'no-store']);
     }
@@ -97,21 +111,21 @@ final class DevWebModeController
         if ((string) $request->request->get('confirmation','') !== strtoupper($mode).'_DEV') {
             return new JsonResponse(['error'=>'confirmation_required'],400);
         }
-        if (!is_dir(self::FLAG_DIR) && !@mkdir(self::FLAG_DIR,0750,true) && !is_dir(self::FLAG_DIR)) {
+        if (!is_dir(self::flagDir()) && !@mkdir(self::flagDir(),0750,true) && !is_dir(self::flagDir())) {
             return new JsonResponse(['error'=>'dev_mode_dir_unavailable'],503);
         }
-        $lock=@fopen(self::FLAG_DIR.'/dev-mode.lock','c+');
+        $lock=@fopen(self::flagDir().'/dev-mode.lock','c+');
         if (!is_resource($lock)) return new JsonResponse(['error'=>'dev_mode_lock_unavailable'],503);
         try {
             if (!flock($lock,LOCK_EX|LOCK_NB)) return new JsonResponse(['error'=>'dev_mode_busy'],409);
             if ($mode === 'maintenance') {
-                if (!is_file(self::FLAG) && file_put_contents(self::FLAG,"MAINTENANCE\n",LOCK_EX) === false) {
+                if (!is_file(self::flagPath()) && file_put_contents(self::flagPath(),"MAINTENANCE\n",LOCK_EX) === false) {
                     return new JsonResponse(['error'=>'dev_mode_write_failed'],503);
                 }
-            } elseif (is_file(self::FLAG) && !@unlink(self::FLAG)) {
+            } elseif (is_file(self::flagPath()) && !@unlink(self::flagPath())) {
                 return new JsonResponse(['error'=>'dev_mode_remove_failed'],503);
             }
-            $observed=is_file(self::FLAG) ? 'MAINTENANCE' : 'NORMAL';
+            $observed=is_file(self::flagPath()) ? 'MAINTENANCE' : 'NORMAL';
             if ($observed !== strtoupper($mode)) return new JsonResponse(['error'=>'dev_mode_not_confirmed'],503);
             return new JsonResponse(['schema'=>'ezs.dev_web_mode.v1','mode'=>$observed],200,['Cache-Control'=>'no-store']);
         } finally {

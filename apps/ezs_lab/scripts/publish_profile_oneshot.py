@@ -28,13 +28,14 @@ def enabled():
         return True  # checked by default
 
 
-def record_error(run_id, producer, reason):
+def record_error(run_id, producer, reason, reason_code=None):
     if not enabled():
         return
-    path = transport.REPO / 'logs' / 'profile' / 'publication-errors.jsonl'
+    path = STATE / 'publication-errors.jsonl'
     path.parent.mkdir(parents=True, exist_ok=True)
     item = {'schema': 'ezstudio.profile-publication-error.v1',
             'run_id': run_id, 'producer': producer, 'reason': reason,
+            'reason_code': reason_code,
             'utc': dt.datetime.now(dt.timezone.utc).isoformat()}
     with path.open('a', encoding='utf-8') as handle:
         handle.write(json.dumps(item, sort_keys=True) + '\n')
@@ -146,7 +147,19 @@ def main():
         return 0
     except Exception as exc:
         # Never persist exception message/traceback, which can carry credentials.
-        record_error(args.run_id, args.producer, type(exc).__name__)
+        # No raw exception messages: only allowlisted technical reason codes.
+        allowlisted = {
+            'scientific_artifact_outside_storage_root',
+            'non_json_capture_type', 'report_privacy_audit_failed',
+            'staging_path_not_allowlisted', 'assistant_revision_identity_required',
+            'lab_run_identity_ambiguous', 'profile_result_not_persisted',
+            'invalid_report_target', 'invalid_forensic_identity',
+            'report_schema_invalid', 'report_schema_unexpected',
+            'report_path_not_allowlisted', 'report_identity_mismatch',
+            'assistant_raw_archive_path_invalid', 'assistant_manifest_path_invalid',
+        }
+        reason_code = str(exc) if isinstance(exc, ValueError) and str(exc) in allowlisted else None
+        record_error(args.run_id, args.producer, type(exc).__name__, reason_code)
         return 1
 
 

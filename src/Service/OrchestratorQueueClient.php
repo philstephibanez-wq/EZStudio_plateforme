@@ -126,6 +126,23 @@ final class OrchestratorQueueClient
         ])->getStatusCode();
     }
 
+    /** Require an explicit Orchestrator cancellation acknowledgement, not just HTTP 200. */
+    public function cancelVerified(int $jobId): array
+    {
+        if ($jobId<1) throw new \InvalidArgumentException('invalid_global_job_id');
+        $url=rtrim($this->orchestratorBaseUrl,'/').'/api/queue/'.$jobId.'/cancel';
+        $response=$this->httpClient->request('POST',$url,[
+            'headers'=>$this->defaultHeaders(false),'timeout'=>15.0,
+        ]);
+        $code=$response->getStatusCode();
+        $data=$response->toArray(false);
+        if ($code!==200 || !is_array($data) || ($data['ok']??false)!==true
+            || (int)($data['queue_id']??0)!==$jobId) {
+            throw new \RuntimeException('expertise_global_cancellation_unverified_http_'.$code);
+        }
+        return $data;
+    }
+
     public function cancel(int $jobId): void
     {
         $url = rtrim($this->orchestratorBaseUrl, '/') . '/api/queue/' . $jobId . '/cancel';

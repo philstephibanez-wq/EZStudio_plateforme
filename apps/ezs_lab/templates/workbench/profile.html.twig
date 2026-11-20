@@ -146,7 +146,7 @@
     </div>
 
     {% if selected_profile_run and selected_profile_run.state == 'done' %}
-      <div id="profile-ai-request" class="prof-prog-box" data-url="{{ path('profile_ai_review_status', {id: selected_profile_run.id}) }}" data-action="{{ path('profile_ai_review_request', {id: selected_profile_run.id}) }}">
+      <div id="profile-ai-request" class="prof-prog-box" data-url="{{ path('profile_ai_review_status', {id: selected_profile_run.id}) }}" data-action="{{ path('profile_ai_review_request', {id: selected_profile_run.id}) }}" data-cancel-url="{{ path('profile_ai_review_cancel', {id: selected_profile_run.id}) }}">
         <div class="row" style="justify-content:space-between;font-size:11px"><span id="profile-ai-request-state" class="meta">Prêt</span><span id="profile-ai-step-current" class="meta"></span></div>
         <progress id="profile-ai-progress" max="100" value="0" style="width:100%;height:8px;margin-top:4px"></progress>
       </div>
@@ -190,8 +190,13 @@
               {% endfor %}
               {% set v = found.verdict ?? 'non_trouve' %}
               {% set badge_cls = v == 'bon' ? 'ok' : (v == 'faux' ? 'warn' : '') %}
-              {% set badge_lbl = v == 'bon' ? 'BON' : (v == 'faux' ? 'FAUX' : 'NON TROUVÉ') %}
-              {% set v_desc = v == 'bon' ? 'BON : une source fiable confirme directement l’analyse du LAB.' : (v == 'faux' ? 'FAUX : une source fiable contredit l’analyse du LAB.' : 'NON TROUVÉ : aucune source fiable ne permet de confirmer ou d’infirmer le point.') %}
+              {% set web_item = null %}
+              {% for web_row in (fv.web_investigation.items ?? []) %}
+                {% if web_row.key in row_def.keys and web_item is null %}{% set web_item = web_row %}{% endif %}
+              {% endfor %}
+              {% set search_failure = (web_item.status ?? '') == 'error' or (fv.web_investigation.status ?? '') == 'error' %}
+              {% set badge_lbl = v == 'bon' ? 'BON' : (v == 'faux' ? 'FAUX' : (found is null ? 'SANS EXPERTISE' : (search_failure ? 'RECHERCHE EN ERREUR' : 'NON VÉRIFIÉ'))) %}
+              {% set v_desc = v == 'bon' ? 'BON : une source indépendante confirme directement l’analyse LAB.' : (v == 'faux' ? 'FAUX : une source indépendante contredit l’analyse LAB.' : (search_failure ? 'Recherche Web en erreur ; aucune conclusion documentaire possible.' : 'Vérification documentaire insuffisante ; ce statut ne signifie pas absence de recherche.')) %}
               {% set v_detail = found.reason ?? found.documentary_observation.reason ?? (revs is empty ? 'Aucune expertise lancée sur ce run.' : 'En attente de vérification sur ce point.') %}
               {% set raw_ref = found.reference_value ?? found.documentary_observation.reference_value ?? '' %}
               {% set disp_ref = (row_def.label == 'Durée' and raw_ref matches '/^[0-9.]+$/') ? ((raw_ref / 60)|round(0,'floor') ~ ':' ~ '%02d'|format((raw_ref % 60)|round(0,'floor'))) : (raw_ref ?: '—') %}
@@ -200,11 +205,46 @@
                 <td>{{ ((found.lab_value ?? null) ?: ((found.value ?? null) ?: row_def.lab))|replace({'pr?sent':'présent','ind?termin?':'indéterminé'}) }}</td>
                 <td><span class="badge {{ badge_cls }} v-badge-tip" tabindex="0">{{ badge_lbl }}<span class="v-badge-pop"><strong>{{ v_desc }}</strong><br><span style="color:#94a3b8">{{ v_detail }}</span></span></span></td>
                 <td>{{ disp_ref }}</td>
-                <td class="ana-cell" style="font-size:11px" title="{{ v_detail }}">{% for src in (found.sources ?? []) %}{% if src.url is defined and src.url %}<a href="{{ src.url }}" target="_blank" rel="noopener noreferrer" title="{{ src.url }}">[{{ loop.index }}]</a> {% endif %}{% endfor %}<span class="meta" style="font-size:10.5px">{{ v_detail }}</span></td>
+                <td class="ana-cell" style="font-size:11px" title="{{ v_detail }}">
+                  {% for citation in (found.sources ?? []) %}
+                    {% if citation.url is defined and citation.url starts with 'https://' %}<a href="{{ citation.url }}" target="_blank" rel="noopener noreferrer" title="Preuve retenue : {{ citation.url }}">[P{{ loop.index }}]</a> {% endif %}
+                  {% endfor %}
+                  {% set consulted = [] %}
+                  {% for url in (web_item.citation_urls ?? []) %}
+                    {% if url starts with 'https://' and url not in consulted %}
+                      {% set consulted = consulted|merge([url]) %}
+                    {% endif %}
+                  {% endfor %}
+                  {% if consulted is not empty %}
+                    <span class="meta" style="font-size:10px">Documents consultés (non nécessairement probants) :</span>
+                    {% for url in consulted|slice(0, 12) %}<a href="{{ url }}" target="_blank" rel="noopener noreferrer" title="Document consulté, non certifié comme preuve">[D{{ loop.index }}]</a> {% endfor %}
+                  {% endif %}
+                  {% if search_failure %}<span class="meta"> · Recherche indisponible ({{ web_item.reason ?? fv.web_investigation.reason ?? 'erreur technique' }})</span>{% endif %}
+                  <span class="meta" style="font-size:10.5px">{{ v_detail }}</span>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
+        {% set expertise_engine_steps = revision.comparison.engine_steps ?? [] %}
+        <details style="margin-top:8px">
+          <summary style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ expertise_engine_steps|length }} moteurs</summary>
+          <table class="prof-tbl" style="margin-top:4px">
+            <thead><tr><th>#</th><th>Module</th><th>Device</th><th>Temps</th></tr></thead>
+            <tbody>
+              {% for engine_step in expertise_engine_steps %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td>{{ engine_step.engine ?? '—' }}</td>
+                  <td class="meta">{{ engine_step.status ?? '—' }}</td>
+                  <td class="meta">{% if engine_step.duration_ms is defined and engine_step.duration_ms is not null %}{{ (engine_step.duration_ms / 1000)|number_format(2) }}s{% else %}—{% endif %}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4" class="meta">Détail des moteurs indisponible pour cette révision.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
       </div>
     {% endfor %}
     </div>
@@ -277,12 +317,40 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
   }
   const root=document.getElementById('profile-ai-request'), btn=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), state=document.getElementById('profile-ai-request-state'), prog=document.getElementById('profile-ai-progress');
   if(!root||!btn||!state||!prog) return;
-  let activeJob=0, wasActive=false;
+  let activeJob=0, activeLocalJob=0, wasActive=false;
+  const pipeline=document.getElementById('profile-ai-pipeline');
+  const stepNames={
+    'engine.identity_resolver':'Identification artiste',
+    'engine.recording_duration':'Durée de référence',
+    'engine.public_source_research':'Recherche de sources publiques',
+    'engine.review_payload_builder':'Préparation des observations',
+    'engine.independent_verifier':'Vérification indépendante',
+    'engine.assertion_web_investigator':'Recherche Web par dimension',
+    'engine.local_ai_document_review':'Analyse IA des documents',
+    'engine.documentary_verdict_merger':'Confrontation des preuves',
+    'engine.documentary_payload_enricher':'Assemblage documentaire',
+    'engine.ai_draft_payload_enricher':'Préparation du brouillon',
+    'engine.lab_revision_submit':'Persistance de la révision'
+  };
+  function renderPipeline(item){
+    if(!pipeline) return;
+    const steps=Array.isArray(item?.checkpoints)?item.checkpoints.filter(e=>typeof e?.event_key==='string' && Object.hasOwn(stepNames,e.event_key)):[];
+    const last=steps.length?steps[steps.length-1]:null;
+    const failed=steps.find(e=>e.outcome==='failed'||e.outcome==='blocked');
+    if(failed){
+      pipeline.textContent='Pipeline : échec à l’étape « '+stepNames[failed.event_key]+' » ('+failed.outcome+').';
+      return;
+    }
+    const current=item?.status==='running' ? ' · traitement en cours' : '';
+    pipeline.textContent=steps.length
+      ? 'Pipeline : '+steps.length+' étapes tracées · dernière : '+stepNames[last.event_key]+' ('+last.outcome+')'+current
+      : 'Pipeline : attente du premier checkpoint réel'+current;
+  }
   function setFsm(s){ const busy=(s==='running'||s==='queued'||s==='cancelling'); btn.disabled=(s==='cancelling'); if(cancelBtn){cancelBtn.disabled=!busy || s==='cancelling';} }
   function render(item){
-    activeJob=Number(item?.job_id||0); const s=item?.status||'idle'; if(s==='running'||s==='queued') wasActive=true; setFsm(s);
+    activeJob=Number(item?.job_id||0); activeLocalJob=Number(item?.analysis_job_id||0); const s=item?.status||'idle'; if(s==='running'||s==='queued') wasActive=true; setFsm(s);
     const pct=s==='completed'?100:(Number.isFinite(Number(item?.progress))?Math.round(Number(item.progress)):0);
-    prog.value=pct; state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='error'?'Erreur':'Prêt')+(item?.queue_id?' · #'+item.queue_id : item?.job_id?' · LAB #'+item.job_id:'')+(item?.message?' · '+item.message:'');
+    prog.value=pct; renderPipeline(item); state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='cancelling'?'Annulation en cours':s==='cancelled'?'Annulée':s==='error'?'Erreur':'Prêt')+(item?.queue_id?' · #'+item.queue_id : item?.job_id?' · LAB #'+item.job_id:'')+(item?.message?' · '+item.message:'');
     if(wasActive && s==='completed'){ wasActive=false; window.location.reload(); }
   }
   async function poll(){ try{ const r=await fetch(root.dataset.url,{credentials:'same-origin',cache:'no-store'}); if(r.ok){const j=await r.json(); render(j.request);} }catch(_){} }
@@ -296,7 +364,18 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
         throw new Error('HTTP '+r.status+' Â· admission globale non confirmÃ©e');
       }
       render(j.request); }catch(e){state.textContent='Err: '+e.message; setFsm('idle');} });
-  cancelBtn?.addEventListener('click',async()=>{ if(!activeJob)return; setFsm('cancelling'); await fetch('/analysis/jobs/'+activeJob+'/cancel',{method:'POST',credentials:'same-origin'}); poll(); });
+  cancelBtn?.addEventListener('click',async()=>{
+      if(!activeJob||!activeLocalJob||!root.dataset.cancelUrl){state.textContent='Annulation indisponible : identité du job manquante';return;}
+      setFsm('cancelling');state.textContent='Annulation demandée…';
+      try {
+        const response=await fetch(root.dataset.cancelUrl,{method:'POST',credentials:'same-origin',
+          headers:{'X-EZS-Profile-AI-Action':'cancel','Content-Type':'application/json','Accept':'application/json'},
+          body:JSON.stringify({job_id:activeJob,analysis_job_id:activeLocalJob})});
+        const payload=await response.json();
+        if(!response.ok||payload.ok!==true)throw new Error(payload.error||('HTTP '+response.status));
+        render(payload.request);await poll();
+      } catch(error){state.textContent='Erreur annulation : '+error.message;setFsm('running');}
+    });
   poll(); setInterval(poll,2500);
   // Suivi temps reel de la barre de progression Analyse LAB (profile_oneshot_status)
   const labUrl = {{ selected_song ? path('profile_oneshot_status', {id: selected_song.id})|json_encode|raw : '""' }};

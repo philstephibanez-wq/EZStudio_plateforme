@@ -9,6 +9,35 @@ $port=8720
 $stateDir='H:\EZStudio_plateforme\var\runtime\ezs_assistant\llama'
 $ledger=Join-Path $stateDir 'owner.json'
 function Fail([string]$why) { throw "EZS_LLAMA_$why" }
+function Resolve-NvidiaVulkanDevice {
+    # Vulkan numbering is not stable. Refuse missing or ambiguous RTX 2060.
+    $psi=New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName=$exe
+    $psi.Arguments='--list-devices'
+    $psi.WorkingDirectory=Split-Path $exe
+    $psi.UseShellExecute=$false
+    $psi.CreateNoWindow=$true
+    $psi.RedirectStandardOutput=$true
+    $psi.RedirectStandardError=$true
+    $probe=New-Object System.Diagnostics.Process
+    $probe.StartInfo=$psi
+    try {
+        if(-not $probe.Start()){Fail 'GPU_PROBE_START_FAILED'}
+        $outTask=$probe.StandardOutput.ReadToEndAsync()
+        $errTask=$probe.StandardError.ReadToEndAsync()
+        if(-not $probe.WaitForExit(10000)){
+            try{$probe.Kill()}catch{}
+            Fail 'GPU_PROBE_TIMEOUT'
+        }
+        $listing=$outTask.GetAwaiter().GetResult()+"`n"+$errTask.GetAwaiter().GetResult()
+        if($probe.ExitCode -ne 0){Fail 'GPU_PROBE_FAILED'}
+        $matchesFound=@([regex]::Matches($listing,'(?im)^\s*(Vulkan\d+):\s*NVIDIA GeForce RTX 2060\s*\('))
+        if($matchesFound.Count -ne 1){Fail 'NVIDIA_RTX2060_MISSING_OR_AMBIGUOUS'}
+        $device=$matchesFound[0].Groups[1].Value
+        Write-Host "EZS_LLAMA_GPU_SELECTED=$device NAME=NVIDIA_GEFORCE_RTX_2060"
+        return $device
+    } finally { $probe.Dispose() }
+}
 function Proc([int]$processId) {
     @(Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction Stop) | Select-Object -First 1
 }
@@ -81,7 +110,8 @@ if($Action -eq 'start') {
     $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'
     $stdout=Join-Path $logDir "llama-$stamp.out.log"
     $stderr=Join-Path $logDir "llama-$stamp.err.log"
-    $argsLine='-m "'+$model+'" --host 127.0.0.1 --port 8720 --ctx-size 4096 --parallel 1 --gpu-layers 0'
+    $nvidiaDevice=Resolve-NvidiaVulkanDevice
+    $argsLine='-m "'+$model+'" --host 127.0.0.1 --port 8720 --ctx-size 4096 --parallel 1 -dev '+$nvidiaDevice+' -ngl 99'
     $child=Start-Process -FilePath $exe -ArgumentList $argsLine -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
     $p=$null
     $owner=$null

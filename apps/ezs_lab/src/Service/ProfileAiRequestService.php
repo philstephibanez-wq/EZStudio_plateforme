@@ -36,10 +36,68 @@ final class ProfileAiRequestService
         unset($row['request_json']);
         $row['attempt'] = 0;
         $row['message'] = $row['message'] ?? '';
+        // Lecture seule des jalons réellement enregistrés pour cette tentative.
+        // Tolérance explicite envers les anciennes bases sans cette table.
+        $row['checkpoints'] = [];
+        $exists = $this->pdo()->query(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='assistant_job_checkpoints' LIMIT 1"
+        )->fetchColumn();
+        if ($exists !== false) {
+            $events = $this->pdo()->prepare(
+                'SELECT event_key,phase,outcome,created_at FROM assistant_job_checkpoints WHERE job_id=? ORDER BY id ASC LIMIT 100'
+            );
+            $events->execute([(int)$row['job_id']]);
+            $row['checkpoints'] = array_map(static fn(array $event): array => [
+                'event_key'=>(string)$event['event_key'],
+                'phase'=>(string)$event['phase'],
+                'outcome'=>(string)$event['outcome'],
+                'created_at'=>(string)$event['created_at'],
+            ], $events->fetchAll(\PDO::FETCH_ASSOC));
+        }
         return $row;
     }
 
     public function get(int $runId): ?array { return $this->latest($runId); }
+
+    /** Exact attempt + global identity fence. No mutation of scientific_runs. */
+    public function requestCancellation(int $runId,int $localJobId,int $globalJobId): array
+    {
+        if ($runId<1 || $localJobId<1 || $globalJobId<1) {
+            throw new \RuntimeException('expertise_cancel_identity_invalid');
+        }
+        if ($this->orchestratorQueue===null) {
+            throw new \RuntimeException('expertise_orchestrator_client_missing');
+        }
+        $stmt=$this->pdo()->prepare("SELECT id,status,request_json FROM analysis_jobs WHERE id=? AND scientific_run_id=? AND kind=? AND dispatch_owner='lab'");
+        $stmt->execute([$localJobId,$runId,self::KIND]);
+        $row=$stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!is_array($row)) throw new \RuntimeException('expertise_attempt_not_found');
+        $req=json_decode((string)($row['request_json']??''),true);
+        if (!is_array($req) || (int)($req['orchestrator_queue_id']??0)!==$globalJobId) {
+            throw new \RuntimeException('expertise_global_identity_mismatch');
+        }
+        if (!in_array((string)$row['status'],['queued','running','cancelling'],true)) {
+            throw new \RuntimeException('expertise_job_not_active');
+        }
+        // Request the authoritative global transition before touching LAB's local worker fence.
+        $remote=$this->orchestratorQueue->cancelVerified($globalJobId);
+        $remoteState=(string)($remote['status']??'');
+        if (!in_array($remoteState,['cancelled','cancelling'],true)) {
+            throw new \RuntimeException('expertise_global_cancellation_not_acknowledged');
+        }
+        $now=gmdate('c');
+        $update=$this->pdo()->prepare("UPDATE analysis_jobs SET
+            status=CASE WHEN status='queued' AND ?='cancelled' THEN 'cancelled' ELSE 'cancelling' END,
+            error='cancel_requested_by_user',updated_at=?
+            WHERE id=? AND scientific_run_id=? AND kind=? AND dispatch_owner='lab'
+              AND status IN ('queued','running','cancelling')");
+        $update->execute([$remoteState,$now,$localJobId,$runId,self::KIND]);
+        if ($update->rowCount()!==1) throw new \RuntimeException('expertise_cancel_local_race_reconcile_required');
+        EzsFifoTrace::log('EXPERTISE_CANCEL_ACK',['run_id'=>$runId,'local_job_id'=>$localJobId,'global_job_id'=>$globalJobId,'global_state'=>$remoteState]);
+        return $this->latest($runId) ?? throw new \RuntimeException('expertise_cancel_state_unavailable');
+    }
+
+
 
     public function enqueue(int $runId): array
     {

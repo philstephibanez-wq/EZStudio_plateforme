@@ -81,13 +81,23 @@ def search(query,max_results=10):
         from ddgs import DDGS
     except ImportError as exc:
         raise RuntimeError("DDGS_NOT_INSTALLED: python -m pip install ddgs") from exc
-    try:
-        with DDGS(timeout=18) as engine:
-            hits=list(engine.text(query,max_results=max_results+8,backend="auto"))
-    except Exception as exc:
-        if "no results found" in str(exc).casefold():
-            return []
-        raise RuntimeError("DDGS_SEARCH_FAILED:"+type(exc).__name__+":"+str(exc)[:150]) from exc
+    # Retry independent DDGS backends when automatic discovery is empty or fails.
+    # A transport failure is never interpreted as an absence of musical facts.
+    hits=[]
+    failures=[]
+    replied=False
+    for backend in ("auto","duckduckgo","brave"):
+        try:
+            with DDGS(timeout=12) as engine:
+                hits=list(engine.text(query,max_results=max_results+8,backend=backend))
+            replied=True
+        except Exception as exc:
+            failures.append(backend+":"+type(exc).__name__)
+            continue
+        if hits:
+            break
+    if not hits and failures and not replied:
+        raise RuntimeError("DDGS_SEARCH_UNAVAILABLE:"+",".join(failures)[:150])
     results=[]
     seen=set()
     for item in hits:

@@ -96,8 +96,8 @@ def persist(repo, path, report):
             if modified:
                 raise RuntimeError('existing_report_has_local_edits')
     _write_json_atomic(destination, report)
-    receipt = _status(repo, producer, rid, revision, 'persisted_local')
-    return path, receipt
+    # Only the canonical report is versioned. Operational receipts are redundant.
+    return (path,)
 
 
 def push(repo, paths):
@@ -116,6 +116,19 @@ def push(repo, paths):
         raise RuntimeError('reports_branch_not_main')
     if _git(repo, 'diff', '--cached', '--name-only'):
         raise RuntimeError('reports_index_not_clean')
+    local_head=_git(repo,'rev-parse','HEAD')
+    remote_ref=_git(repo,'ls-remote','origin','refs/heads/main')
+    if not remote_ref:
+        raise RuntimeError('reports_remote_main_unavailable')
+    if remote_ref.split()[0]!=local_head:
+        _git(repo,'fetch','origin','main')
+        # Never rewrite/diverge the user's local history.
+        try:
+            _git(repo,'merge-base','--is-ancestor','HEAD','origin/main')
+        except RuntimeError as err:
+            raise RuntimeError('reports_history_diverged_requires_manual_reconcile') from err
+        _git(repo,'merge','--ff-only','origin/main')
+
     for p in paths:
         if not (ALLOWED.fullmatch(p) or re.fullmatch(r'logs/profile/run-\d{6}/(?:science|revision-\d{6})\.json',p)
                 or re.fullmatch(r'diagnostics/(?:lab|assistant)/profile/run-\d{6}/trace-[a-f0-9]{12}/(?:manifest\.json|data/[a-z0-9_-]+\.part-\d{5}|timeline-\d{4}\.jsonl|(?:source-sets|assistant-preset-evidence|stage-observations)\.json\.part-\d{4}|snapshots/[0-9]{4}_[A-Za-z0-9_.-]+\.json\.part-\d{4})',p)):

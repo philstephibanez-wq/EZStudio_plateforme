@@ -269,8 +269,14 @@ def research_assertions(assertions, identity, *, source_research=None):
             it["status"] = "documents_read"
             it["eligible_for_verdict"] = True
             it["evidence_review"] = evaluate_live_documents({"key": it["key"], "value": it["value"]}, effective_identity, it["documents"])
+    pivot_errors=[]
     for _pq in step1_build_pivot_queries(effective_identity):
-        for _hit in ((lambda r: r if isinstance(r, list) else (r or {}).get("results", []))(search(_pq, max_results=3))):
+        try:
+            pivot_hits=search(_pq, max_results=3)
+        except Exception as exc:
+            pivot_errors.append(type(exc).__name__)
+            continue
+        for _hit in (pivot_hits if isinstance(pivot_hits,list) else []):
             _u = str(_hit.get("url") or "").strip()
             if _u and _u not in shared and len(shared) < 12:
                 _src = fetch_document(_u)
@@ -283,10 +289,12 @@ def research_assertions(assertions, identity, *, source_research=None):
             if (it.get("evidence_review") or {}).get("verdict") == "non_trouve":
                 _u_rev = step5_and_6_confront_and_judge({"key": it["key"], "value": it["value"]}, _u_facts, _u_sets)
                 if _u_rev: it["evidence_review"] = _u_rev
+    degraded = degraded or bool(pivot_errors)
     return {"status":"error" if failed==len(items) and items else "partial" if (failed or degraded) else "completed" if items else "no_assertions",
+            "pivot_search_errors":pivot_errors,
             "reason":"web_search_failed_for_all_items" if failed==len(items) and items else
                      "web_search_partially_unavailable" if degraded else None,
-            "technical_errors":sum(item.get("status")=="error" or bool(item.get("search_error_count")) for item in items),
+            "technical_errors":sum(item.get("status")=="error" or bool(item.get("search_error_count")) for item in items)+len(pivot_errors),
             "unique_documents_fetched":len(document_cache),
             "identity":effective_identity,
             "structured_recording_candidates":structured,
