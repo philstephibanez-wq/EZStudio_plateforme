@@ -1,0 +1,54 @@
+{# EZSTUDIO_HEADERS_R1 : composant commun, LAB et Orchestrator uniquement. #}
+<style id="ezs-app-header-style">
+.ezs-app-header{box-sizing:border-box;min-height:56px;background:#0d141b;color:#eff4fa;border-bottom:1px solid #293745;position:relative;z-index:901;font-family:Arial,Segoe UI,sans-serif}
+.ezs-app-header *, .ezs-app-header *::before,.ezs-app-header *::after{box-sizing:border-box}
+.ezs-app-header .ezs-app-header-inner{width:100%;max-width:none;min-height:56px;margin:0;padding:5px 22px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.ezs-app-header .ezs-app-brand{display:inline-flex;align-items:center;gap:9px;color:#f8fbff;text-decoration:none;white-space:nowrap;flex-shrink:0}
+.ezs-app-header .ezs-app-brand img{width:29px;height:29px;display:block;border-radius:6px}
+.ezs-app-header .ezs-app-name{font-weight:700;font-size:19px;line-height:1.2}
+.ezs-app-header .ezs-app-version{color:#a5b7c8;font-size:10px;font-weight:400}
+.ezs-app-header .ezs-app-tabs{display:flex;align-items:center;flex-wrap:wrap;gap:7px;min-width:0;margin:0;padding:0}
+.ezs-app-header .ezs-app-tabs a{display:inline-flex;align-items:center;padding:8px 11px;text-decoration:none;color:#e5edf5;background:#141e28;border:1px solid #415164;border-radius:5px;font-weight:400;font-size:15px;line-height:1.2;white-space:nowrap}
+.ezs-app-header .ezs-app-tabs a:hover{background:#263545;color:#fff}
+.ezs-app-header .ezs-app-tabs a[aria-current="page"],.ezs-app-header .ezs-app-tabs a.active{background:#17384b;color:#6ac9ff;border-color:#228bc6;font-weight:700}
+.ezs-app-header .ezs-app-tabs .ezs-tab--profile{border-bottom:3px solid var(--ezs-item-profile,#0ea5e9)}
+.ezs-app-header .ezs-app-tabs .ezs-tab--stems{border-bottom:3px solid var(--ezs-item-stems,#3b82f6)}
+.ezs-app-header .ezs-app-tabs .ezs-tab--chords{border-bottom:3px solid var(--ezs-item-chords,#f59e0b)}
+.ezs-app-header .ezs-app-tabs .ezs-tab--lyrics{border-bottom:3px solid var(--ezs-item-lyrics,#a855f7)}
+.ezs-app-header .ezs-app-tabs .ezs-app-nav-disabled{font-size:12px;color:#9daab8;padding:8px 5px}
+.ezs-app-header .ezs-app-locale{display:flex;align-items:center;gap:7px;margin-left:auto;white-space:nowrap;font-size:12px;color:#afbfce}
+.ezs-app-header .ezs-locale-picker{position:relative;font-size:13px;font-family:Arial,Segoe UI,sans-serif}
+.ezs-app-header .ezs-locale-picker summary{list-style:none;display:flex;align-items:center;gap:8px;min-width:132px;margin:0;padding:7px 10px;border-radius:5px;border:1px solid #415164;background:#172330;color:#edf4fc;cursor:pointer;user-select:none;line-height:1.2}
+.ezs-app-header .ezs-locale-picker summary::-webkit-details-marker{display:none}
+.ezs-app-header .ezs-locale-picker summary::after{content:"";margin-left:auto;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid #aebdcb}
+.ezs-app-header .ezs-locale-picker[open] summary{border-color:#65a5d6}
+.ezs-app-header .ezs-locale-picker img{width:20px;height:14px;display:inline-block;object-fit:cover;border:1px solid rgba(255,255,255,.25);border-radius:2px;flex-shrink:0}
+.ezs-app-header .ezs-locale-options{position:absolute;z-index:1100;right:0;top:calc(100% + 4px);min-width:172px;padding:4px;background:#172330;border:1px solid #415164;border-radius:5px;box-shadow:0 10px 24px #0008}
+.ezs-app-header .ezs-locale-option{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:3px;color:#edf4fc}
+.ezs-app-header .ezs-locale-option[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.ezs-app-header .ezs-locale-picker summary:focus-visible,.ezs-app-header a:focus-visible{outline:2px solid #7ac5ff;outline-offset:2px}
+@media(max-width:900px){.ezs-app-header .ezs-app-header-inner{gap:10px;padding:8px 12px}.ezs-app-header .ezs-app-locale{margin-left:0}}
+</style>
+<header class="ezs-app-header" data-ezs-shared-header="r1a">
+  <div class="ezs-app-header-inner">
+    <a class="ezs-app-brand" href="{{ header_home }}" aria-label="{{ header_name }} — accueil">
+      <img src="/shared/favicon/favicon-ezscore.svg" alt="" width="29" height="29">
+      <span class="ezs-app-name">{{ header_name }}</span>
+      <small class="ezs-app-version">v{{ header_version }}</small>
+    </a>
+    {{ header_nav|raw }}
+    <div class="ezs-app-locale">
+      <span id="ezs-locale-label-{{ header_id }}">Langue</span>
+      <details class="ezs-locale-picker" aria-labelledby="ezs-locale-label-{{ header_id }}" title="Seule la version française est disponible">
+        <summary aria-label="Langue actuelle : français ; afficher les langues">
+          <img src="/shared/flags/fr.svg" alt="" width="20" height="14">
+          <span>Français</span>
+        </summary>
+        <div class="ezs-locale-options" role="group" aria-label="Langues disponibles">
+          <span class="ezs-locale-option" aria-current="true"><img src="/shared/flags/fr.svg" alt="" width="20" height="14"> Français <span aria-hidden="true">✓</span></span>
+          <span class="ezs-locale-option" aria-disabled="true" title="Traduction non disponible"><img src="/shared/flags/gb.svg" alt="" width="20" height="14"> English (à venir)</span>
+        </div>
+      </details>
+    </div>
+  </div>
+</header>

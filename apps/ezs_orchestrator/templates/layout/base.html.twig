@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}EZS Orchestrator{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="/shared/favicon/favicon-ezscore.svg">
     <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
     <link rel="stylesheet" href="/assets/ezs-infrastructure.css">
     <link rel="stylesheet" href="/shared/css/ezs-tokens.css">
@@ -13,18 +14,19 @@
     {% block page_scripts %}{% endblock %}
 </head>
 <body>
-    <header class="navbar navbar-dark bg-dark">
-        <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">EZS Orchestrator <small class="text-secondary">v{{ orchestrator_version }}</small></span>
-            <span class="badge text-bg-secondary">DEV · Consultation</span>
-        </div>
-    </header>
-    {% include '@shared/_gpu_monitor.html.twig' %}
-    <nav class="ezs-nav" aria-label="Navigation principale">
+    {# EZSTUDIO_HEADERS_R1 #}
+    {% set ezs_header_nav %}
+    <nav class="ezs-app-tabs" aria-label="Navigation principale">
         <a href="/" {% if active_page == 'infrastructure' %}aria-current="page"{% endif %}>Infrastructure</a>
         <a href="/jobs" {% if active_page == 'jobs' %}aria-current="page"{% endif %}>Ordonnanceur</a>
         <span>Déploiements · en migration</span>
     </nav>
+    {% endset %}
+    {% include '@shared/_app_header.html.twig' with {
+      header_id: 'orchestrator', header_name: 'EZS Orchestrator', header_version: orchestrator_version,
+      header_home: '/', header_nav: ezs_header_nav
+    } only %}
+    {% include '@shared/_gpu_monitor.html.twig' %}
     {% block content %}{% endblock %}
 {% if app.environment == 'dev' %}
 <footer class="container-fluid py-2 border-top border-secondary-subtle small text-end"><a href="/_profiler" target="_blank" rel="noopener noreferrer" class="link-secondary text-decoration-none">Symfony Profiler</a> <a href="/_profiler-export" style="margin-left:10px;color:#c9d1d9;text-decoration:none;border:1px solid #464c54;padding:2px 8px;border-radius:4px">Export Profiler</a></footer>

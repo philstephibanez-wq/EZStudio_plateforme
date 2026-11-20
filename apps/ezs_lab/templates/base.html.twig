@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}EZStudio_lab{% endblock %}</title>
+<link rel="icon" type="image/svg+xml" href="/shared/favicon/favicon-ezscore.svg">
 <link rel="stylesheet" href="/shared/css/ezs-tokens.css">
 <style>
 :root{
@@ -104,15 +105,15 @@ pre.log{background:#111820;color:#d9e0e7;padding:12px;overflow:auto;max-height:4
 </style>
 </head>
 <body>
-<header>
-<div class="header-inner">
-  <a class="brand" href="{{ path('workbench_home') }}">EZStudio_lab <small>v{{ lab_version }} · Audio Analysis Laboratory</small></a>
-  {% set route_name = app.request.attributes.get('_route') %}
+{# EZSTUDIO_HEADERS_R1 #}
+{% set route_name = app.request.attributes.get('_route') %}
 {% set current_song_id =
   (selected_song is defined and selected_song ? selected_song.id :
    (run is defined and run and run.song_id is defined ? run.song_id : app.request.query.get('song')))
 %}
-<nav class="main-nav" aria-label="Pipeline">
+
+{% set ezs_header_nav %}
+<nav class="main-nav ezs-app-tabs" aria-label="Pipeline">
   <a href="{{ path('workbench_home') }}"
      class="{{ route_name == 'workbench_home' ? 'active' : '' }}"
      {% if route_name == 'workbench_home' %}aria-current="page"{% endif %}>Catalogue</a>
@@ -132,8 +133,11 @@ pre.log{background:#111820;color:#d9e0e7;padding:12px;overflow:auto;max-height:4
      class="{{ route_name in ['workbench_runs','lab_run'] ? 'active' : '' }}"
      {% if route_name in ['workbench_runs','lab_run'] %}aria-current="page"{% endif %}>Runs</a>
 </nav>
-</div>
-</header>
+{% endset %}
+{% include '@shared/_app_header.html.twig' with {
+  header_id: 'lab', header_name: 'EZStudio_lab', header_version: lab_version,
+  header_home: path('workbench_home'), header_nav: ezs_header_nav
+} only %}
 {% include '@shared/_gpu_monitor.html.twig' %}
 <div class="wrap">{% block body %}{% endblock %}</div>
 
