@@ -295,6 +295,52 @@ def _compare_documentary(key, lab, reference):
     return "indeterminate"
 
 
+def _independent_recording_evidence(key, value, review):
+    """Alternative documentary corroboration when MusicBrainz is inconclusive.
+
+    At least two distinct source hosts must report the SAME explicit fact for the
+    SAME artist/title (eligibility is established upstream by evaluate_live_documents).
+    Candidate LLM URLs do not confer independent verification. Duration/recording
+    performance facts are deliberately excluded without exact recording identity.
+    """
+    from urllib.parse import urlsplit
+    if key not in ("tempo", "meter", "mesure", "key", "tonalite", "genre"):
+        return False
+    if not _documentary_type_ok(key, value):
+        return False
+    refs = review.get("references") or []
+    if not isinstance(refs, list):
+        return False
+    hosts = set()
+    for ref in refs:
+        if not isinstance(ref, dict) or ref.get("attribution") != "title_artist_page":
+            continue
+        url = ref.get("url")
+        if not isinstance(url, str):
+            continue
+        try:
+            parsed = urlsplit(url)
+            if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+                continue
+            host = parsed.hostname.lower().removeprefix("www.")
+            parts = host.split(".")
+            if len(parts) < 2 or any(not part for part in parts):
+                continue
+            # Collapse typical subdomains to the registrable site. Conservative
+            # for common two-level public suffixes without depending on a PSL.
+            suffix_length = 3 if len(parts) >= 3 and parts[-2] in ("co", "com", "org", "ac", "gov", "net") and parts[-1] in ("uk", "au", "jp", "nz", "za") else 2
+            host = ".".join(parts[-suffix_length:])
+        except ValueError:
+            continue
+        candidate = ref.get("reference_value")
+        # Contradictory claims make documentary agreement unprovable; never vote
+        # around contradictions or silently discard them.
+        if _compare_documentary(key, candidate, value) != "concordant":
+            return False
+        hosts.add(host)
+    return len(hosts) >= 2
+
+
 def attach_documentary_findings(verification, investigation, local_review):
     """Merge post-verification documentary observations without promoting proof.
 
@@ -332,8 +378,12 @@ def attach_documentary_findings(verification, investigation, local_review):
             proposed = None
         incompatible = value is not None and not _documentary_type_ok(key, value)
         comparison = "indeterminate" if incompatible else _compare_documentary(key, assertion.get("value"), value)
-        id_confirmed = bool((investigation.get("identity") or {}).get("recording_identity_verified"))
+        identity_certified = bool((investigation.get("identity") or {}).get("recording_identity_verified"))
+        independent_evidence = _independent_recording_evidence(key, value, review)
+        id_confirmed = identity_certified or independent_evidence
         reason_txt = review.get("reason") or candidate.get("explanation") or ("Valeur documentaire incompatible avec le type de cet item" if incompatible else "Aucune valeur documentaire exploitable")
+        if value is not None and urls and not id_confirmed:
+            reason_txt = "Référence documentaire trouvée, mais identité de l'enregistrement ou corroboration indépendante insuffisante"
         final_verdict = None
         if value is not None and urls and id_confirmed and not incompatible:
             if proposed == "bon" or comparison == "concordant":
