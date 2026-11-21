@@ -8,6 +8,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from runtime_measurements import RuntimeMeasurements
 
 FIELDS = (
     "utilization.gpu",
@@ -40,6 +41,7 @@ class ModulePerformanceProbe:
         self.audio_sha256 = audio_sha256
         self.started_at = _utc()
         self.samples: list[dict] = []
+        self.runtime_measurements = RuntimeMeasurements()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -64,6 +66,7 @@ class ModulePerformanceProbe:
             sample = self._sample_gpu()
             if sample is not None:
                 self.samples.append(sample)
+            self.runtime_measurements.sample()
             self._stop.wait(1.0)
 
     def _sample_gpu(self) -> dict | None:
@@ -140,6 +143,7 @@ class ModulePerformanceProbe:
                 "sample_count": len(self.samples),
             },
             "samples": self.samples,
+            "runtime_telemetry_v1": self.runtime_measurements.summary(),
         }
 
         safe = "".join(ch if ch.isalnum() or ch in "._-" else "-" for ch in self.module_id)

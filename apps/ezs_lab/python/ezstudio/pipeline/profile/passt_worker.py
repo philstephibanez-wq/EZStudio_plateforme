@@ -3,8 +3,37 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+
+
+
+def _l1b_mark(phase: str, *, torch_module=None) -> None:
+    """Best-effort local child-process phase telemetry; no scientific payload."""
+    try:
+        root = Path(os.getenv("EZSTUDIO_OBSERVABILITY_ROOT", str(Path(__file__).resolve().parents[4] / "var" / "logs" / "observability")))
+        session = os.getenv("EZSTUDIO_PROFILE_OBSERVABILITY_SESSION", "profile")
+        if not session.startswith("run-") or not session[4:].isdigit():
+            return
+        path = root / "profile" / "phase-events" / session / "phases.jsonl"
+        data = {"schema":"ezstudio.observability.profile-phase.v1", "module":"passt_child", "phase":phase,
+                "utc":datetime.now(timezone.utc).isoformat(), "monotonic_ns":time.perf_counter_ns(), "pid":os.getpid()}
+        if torch_module is not None and torch_module.cuda.is_available():
+            idx = torch_module.cuda.current_device()
+            data["cuda_device_index"] = int(idx)
+            data["cuda_device_name"] = str(torch_module.cuda.get_device_name(idx))
+            data["cuda_allocated_mib"] = round(torch_module.cuda.memory_allocated(idx) / (1024*1024), 2)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        line = (json.dumps(data, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+        fd = os.open(str(path), os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
+        try:
+            os.write(fd, line)
+        finally:
+            os.close(fd)
+    except Exception:
+        pass
 
 
 def _install_direct_checkpoint_resolver(checkpoint: Path) -> None:
@@ -74,6 +103,7 @@ def main() -> int:
     parser.add_argument("--torch-home", required=True)
     args = parser.parse_args()
 
+    _l1b_mark("start")
     checkpoint = Path(args.checkpoint)
     os.environ["TORCH_HOME"] = str(Path(args.torch_home).resolve())
 
@@ -82,19 +112,26 @@ def main() -> int:
     _install_direct_checkpoint_resolver(checkpoint)
     import hear21passt
     from hear21passt.base import load_model
+    _l1b_mark("imports_done")
 
+    _l1b_mark("cuda_check_start")
     if not torch.cuda.is_available():
         raise RuntimeError("passt_isolated_cuda_required")
 
+    _l1b_mark("cuda_verified", torch_module=torch)
     raw = Path(args.audio_f32).read_bytes()
     audio = torch.frombuffer(bytearray(raw), dtype=torch.float32).clone()
 
+    _l1b_mark("audio_loaded")
+    _l1b_mark("model_start")
     model = load_model(mode="logits").to("cuda")
+    _l1b_mark("model_done", torch_module=torch)
     model.eval()
 
     chunks = _chunks(audio, 32000)
     batch_size = max(1, int(os.getenv("EZSTUDIO_PASST_BATCH_SIZE", "2")))
     rows = []
+    _l1b_mark("inference_start", torch_module=torch)
     with torch.inference_mode():
         for start in range(0, len(chunks), batch_size):
             batch = torch.stack(
@@ -105,11 +142,13 @@ def main() -> int:
             probs = torch.sigmoid(logits).detach().float().cpu()
             rows.extend(list(probs.unbind(0)))
 
+    _l1b_mark("inference_done", torch_module=torch)
     if not rows:
         raise RuntimeError("passt_no_chunks")
 
     scores = torch.stack(rows, dim=0).mean(dim=0)
 
+    _l1b_mark("aggregation_done")
     result = {
         "scores": [float(value) for value in scores.tolist()],
         "per_chunk_scores": [
@@ -133,6 +172,7 @@ def main() -> int:
         encoding="utf-8",
     )
     tmp.replace(output)
+    _l1b_mark("result_written", torch_module=torch)
     return 0
 
 

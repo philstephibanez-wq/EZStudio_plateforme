@@ -379,6 +379,12 @@ def run(
         nonlocal stage_clock
         now = time.perf_counter()
         _tuning_probe(name, now - stage_clock)
+        # Observability only; preserved scientific computation and outputs.
+        try:
+            from ezstudio.runtime.profile_phase_probe import mark as _phase_mark
+            _phase_mark("tuning", name + "_done")
+        except Exception:
+            pass
         stage_clock = now
 
     p = config.parameters or {}
