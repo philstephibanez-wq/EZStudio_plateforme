@@ -190,7 +190,7 @@ final class ProfileAiRequestService
         $stmt = $this->pdo()->prepare($sql);
         $stmt->bindValue(1, $limit, \PDO::PARAM_INT);
         $stmt->execute();
-        return array_map(static function (array $row): array {
+        return array_map(function (array $row): array {
             foreach (['job_id', 'run_id', 'progress', 'song_id'] as $key) {
                 if ($row[$key] !== null) $row[$key] = (int)$row[$key];
             }
@@ -201,7 +201,11 @@ final class ProfileAiRequestService
                 foreach ($cp->fetchAll(\PDO::FETCH_ASSOC) as $c) {
                     $row['checkpoints'][] = ['event_key'=>(string)$c['event_key'],'phase'=>(string)$c['phase'],'outcome'=>(string)$c['outcome'],'detail'=>json_decode((string)$c['detail_json'],true)?:[],'created_at'=>(string)$c['created_at']];
                 }
-            } catch (\Throwable) {}
+            } catch (\Throwable $e) {
+                // Checkpoint history failures are operational errors, never silent success.
+                error_log('EZS_PROFILE_RECENT_CHECKPOINT_READ_FAILED:' . get_class($e));
+                throw new \RuntimeException('profile_recent_checkpoint_read_failed', 0, $e);
+            }
             return $row;
         }, $stmt->fetchAll(\PDO::FETCH_ASSOC));
     }
