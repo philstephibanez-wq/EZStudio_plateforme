@@ -1,0 +1,58 @@
+{% extends 'layout/base.html.twig' %}
+{% set d = 'ezs_hardware' %}
+{% block title %}{{ 'hardware.title'|trans({}, d, hw_locale) }} — EZS Orchestrator{% endblock %}
+{% block content %}
+<main class="container-fluid py-3 ezs-main" id="ezs-hardware-inventory">
+  <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+    <h1 class="h5 mb-0">{{ 'hardware.title'|trans({}, d, hw_locale) }}</h1>
+    <nav aria-label="{{ 'hardware.language'|trans({}, d, hw_locale) }}" class="d-flex gap-1">
+      <a class="btn btn-sm {{ hw_locale == 'fr' ? 'btn-primary' : 'btn-outline-secondary' }}" href="/hardware?lang=fr" {% if hw_locale == 'fr' %}aria-current="page"{% endif %} lang="fr">FR</a>
+      <a class="btn btn-sm {{ hw_locale == 'en' ? 'btn-primary' : 'btn-outline-secondary' }}" href="/hardware?lang=en" {% if hw_locale == 'en' %}aria-current="page"{% endif %} lang="en">EN</a>
+    </nav>
+  </div>
+  {% if inventory is null %}
+    <div role="status" class="small text-body-secondary">{{ 'hardware.unavailable'|trans({}, d, hw_locale) }}</div>
+  {% else %}
+    <div class="small text-body-secondary mb-2">
+      <strong class="text-body">{{ 'hardware.node'|trans({}, d, hw_locale) }} : {{ inventory.node_id }}</strong>
+      <span class="mx-2">·</span>{{ 'hardware.collected_at'|trans({}, d, hw_locale) }} : {{ inventory.collected_at_utc }}
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle mb-0" aria-label="{{ 'hardware.title'|trans({}, d, hw_locale) }}">
+        <thead><tr>
+          <th scope="col">{{ 'hardware.device'|trans({}, d, hw_locale) }}</th>
+          <th scope="col">{{ 'hardware.model'|trans({}, d, hw_locale) }}</th>
+          <th scope="col">{{ 'hardware.device_id'|trans({}, d, hw_locale) }}</th>
+          <th scope="col">{{ 'hardware.capacity'|trans({}, d, hw_locale) }}</th>
+          <th scope="col">{{ 'hardware.driver'|trans({}, d, hw_locale) }}</th>
+          <th scope="col">{{ 'hardware.backend'|trans({}, d, hw_locale) }}</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <th scope="row">CPU</th>
+            <td>{{ inventory.cpu.model|default('hardware.not_instrumented'|trans({}, d, hw_locale)) }}{% set cpu_arch = inventory.cpu.architecture|default('') %}{% if cpu_arch %} <span class="text-body-secondary">({{ cpu_arch == 'AMD64' ? 'x86-64' : cpu_arch }})</span>{% endif %}</td>
+            <td>—</td>
+            <td>—</td><td>—</td><td>{{ inventory.cpu.verified_backends|default(['CPU'])|join(', ') }}</td>
+          </tr>
+          <tr>
+            <th scope="row">RAM</th>
+            <td>—</td><td>—</td>
+            <td>{{ inventory.ram_total_mib is not null ? inventory.ram_total_mib|number_format(0, ',', ' ') ~ ' MiB' : 'hardware.not_instrumented'|trans({}, d, hw_locale) }}</td>
+            <td>—</td><td>—</td>
+          </tr>
+          {% for gpu in inventory.gpus %}
+            <tr>
+              <th scope="row">GPU {{ loop.index0 }}</th>
+              <td>{{ gpu.physical_name }}</td>
+              <td><code class="d-inline-block text-truncate align-bottom" style="max-width:170px" title="{{ gpu.device_id }}">{{ gpu.device_id }}</code></td>
+              <td>{{ gpu.vram_total_mib is not null ? gpu.vram_total_mib|number_format(0, ',', ' ') ~ ' MiB' : 'hardware.not_verified'|trans({}, d, hw_locale) }}</td>
+              <td>{{ gpu.driver_version|default('hardware.not_verified'|trans({}, d, hw_locale)) }}</td>
+              <td>{{ gpu.verified_backends|default([]) is not empty ? gpu.verified_backends|join(', ') : 'hardware.not_verified'|trans({}, d, hw_locale) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</main>
+{% endblock %}

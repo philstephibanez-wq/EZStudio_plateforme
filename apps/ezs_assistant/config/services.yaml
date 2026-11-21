@@ -10,6 +10,11 @@ parameters:
     env(ORCHESTRATOR_BASE_URL): 'http://orchestrator.ezstudio.local:8000'
     orchestrator.base_url: '%env(ORCHESTRATOR_BASE_URL)%'
 services:
+    Shared\Hardware\InventoryRestClient:
+        arguments:
+            $baseUrl: '%orchestrator.base_url%'
+            $agentId: 'assistant'
+
     _defaults:
         autowire: true
         autoconfigure: true

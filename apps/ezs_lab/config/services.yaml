@@ -20,6 +20,11 @@ services:
         exclude:
             - '../src/Kernel.php'
 
+    Shared\Hardware\InventoryRestClient:
+        arguments:
+            $baseUrl: '%orchestrator.base_url%'
+            $agentId: 'lab'
+
     EZSLab\Service\BenchmarkLauncher:
         arguments:
             $database: '@EZSLab\Service\Database'

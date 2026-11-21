@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EZStudio Static Hardware Inventory v1",
+  "type": "object",
+  "required": ["schema", "node_id", "collected_at_utc", "snapshot_type", "scope", "cpu", "ram_total_mib", "gpus", "discovery", "usage_or_availability", "resource_assignment"],
+  "properties": {
+    "schema": {"const": "ezstudio.hardware-inventory.v1"},
+    "node_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"},
+    "collected_at_utc": {"type": "string", "format": "date-time"},
+    "snapshot_type": {"const": "static_capabilities"},
+    "scope": {"const": "local_node_only"},
+    "cpu": {"type": "object"},
+    "ram_total_mib": {"type": ["integer", "null"]},
+    "gpus": {"type": "array", "items": {"type": "object", "required": ["vendor", "device_id", "physical_name", "vram_total_mib", "driver_version", "backend_support"]}},
+    "discovery": {"type": "object"},
+    "usage_or_availability": {"const": "not_measured"},
+    "resource_assignment": {"const": "not_supported"}
+  },
+  "additionalProperties": false
+}
