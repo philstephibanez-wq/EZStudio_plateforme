@@ -64,6 +64,8 @@ final class AssistantJobCheckpointService {
     }
 
     private function syncProgress(\PDO $pdo, int $jobId, string $key, string $phase): void {
+        // Start markers describe observability, never count as completed progress.
+        if (str_starts_with($key, 'engine.start.')) return;
         // Single owner: LAB receives REST checkpoints, stores local progress,
         // and publishes the resulting global percent to Orchestrator.
         $map = [

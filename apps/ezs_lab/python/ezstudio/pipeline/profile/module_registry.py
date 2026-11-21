@@ -107,15 +107,27 @@ class ModuleRegistry:
         self,
         context: ModuleContext,
         progress: Callable[[int, str], None] | None = None,
+        observation: Callable[[str, dict], None] | None = None,
     ) -> dict[str, Any]:
         entries = sorted(self._entries, key=lambda item: item[0].order)
         records: list[dict[str, Any]] = []
         total = max(1, len(entries))
+        def _observed(event: str, data: dict) -> None:
+            if observation is not None:
+                try:
+                    observation(event, data)
+                except Exception:
+                    pass  # Observability must never affect scientific results.
+        _observed("manifest", {"modules": [
+            {"id": spec.module_id, "name": spec.display_name}
+            for spec, _ in entries
+        ]})
 
         for index, (spec, fn) in enumerate(entries):
             if progress:
                 percent = 8 + int((index / total) * 84)
                 progress(percent, f"PROFILE: {spec.display_name}")
+            _observed("started", {"id": spec.module_id})
             import time as _forensic_time
             import traceback as _forensic_traceback
             from profile_forensic_probe import event as _forensic_event
@@ -127,11 +139,18 @@ class ModuleRegistry:
             try:
                 _forensic_record = run_with_probe(spec, context, fn, run_module)
             except BaseException as _forensic_error:
+                _observed("failed", {"id": spec.module_id})
                 _forensic_event("engine.exception", {"module_id": spec.module_id,
                     "error_type": type(_forensic_error).__name__,
                     "traceback": _forensic_traceback.format_exc()}, since_ns=_forensic_started)
                 raise
             records.append(_forensic_record)
+            _observed("finished", {
+                "id": spec.module_id,
+                "status": str(_forensic_record.get("status") or "error"),
+                "device": _forensic_record.get("device"),
+                "elapsed_seconds": (_forensic_record.get("timing") or {}).get("elapsed_seconds"),
+            })
             _forensic_event("engine.result", {"module_id": spec.module_id,
                 "record": _forensic_record}, since_ns=_forensic_started)
 

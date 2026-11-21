@@ -340,13 +340,40 @@ def main() -> int:
         ai_models_root=ai_root,
         profile_models_root=profile_root,
     )
+    # Per-job, atomic observability sidecar. Never enters scientific outputs.
+    _live_path = progress.with_name("modules-live.json")
+    _live = {"schema": "ezstudio.profile-modules-live.v1", "modules": []}
+    def _live_event(kind: str, data: dict) -> None:
+        if kind == "manifest":
+            _live["modules"] = [
+                {"id": m["id"], "name": m["name"], "status": "waiting",
+                 "device": None, "elapsed_seconds": None}
+                for m in data["modules"]
+            ]
+        else:
+            for m in _live["modules"]:
+                if m["id"] != data.get("id"):
+                    continue
+                if kind == "started":
+                    m["status"] = "running"
+                elif kind == "failed":
+                    m["status"] = "error"
+                elif kind == "finished":
+                    m["status"] = data.get("status")
+                    m["device"] = data.get("device")
+                    m["elapsed_seconds"] = data.get("elapsed_seconds")
+                break
+        _live["updated_at"] = time.time()
+        tmp = _live_path.with_name(_live_path.name + "." + uuid.uuid4().hex + ".tmp")
+        try:
+            tmp.write_text(json.dumps(_live, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, _live_path)
+        finally:
+            tmp.unlink(missing_ok=True)
     module_registry_result = module_registry.run(
         context,
-        progress=lambda percent, message: write_progress(
-            progress,
-            percent,
-            message,
-        ),
+        progress=lambda percent, message: write_progress(progress, percent, message),
+        observation=_live_event,
     )
     preset_manifest = module_registry.preset_manifest(
         module_registry_result.get("modules") or [],

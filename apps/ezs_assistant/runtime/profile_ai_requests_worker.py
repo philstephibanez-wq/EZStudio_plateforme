@@ -55,6 +55,22 @@ CHECKPOINT_PHASES = {
 }
 _CURRENT_STEPS = []
 
+def _report_start(job_id, step):
+    engine = str(step.get('engine') or '').strip()
+    if engine not in CHECKPOINT_PHASES:
+        return
+    # Separate event key: checkpoint storage is immutable per key.
+    try:
+        api(PATH + '/' + str(job_id) + '/checkpoints', {
+            'schema': 'ezstudio.assistant-checkpoint.v1',
+            'event_key': 'engine.start.' + engine,
+            'phase': CHECKPOINT_PHASES[engine],
+            'outcome': 'started', 'detail': {},
+        })
+    except Exception as exc:
+        # Instrumentation must not change the expertise verdict.
+        print('PROFILE_START_CHECKPOINT_ERROR=' + type(exc).__name__, flush=True)
+
 def _report_step(job_id, step):
     engine = str(step.get('engine') or '').strip()
     state = str(step.get('status') or '').strip().upper()
@@ -383,7 +399,7 @@ def once(client, target_job_id=None, target_run_id=None):
             try:
                 emit('job.claimed', {'run_id': rid, 'claim': True})
                 snap('worker.startup_provenance', STARTUP_PROVENANCE)
-                with execution_scope(rid, job_id, trace, on_step=lambda step: _report_step(job_id, step)):
+                with execution_scope(rid, job_id, trace, on_step=lambda step: _report_step(job_id, step), on_start=lambda step: _report_start(job_id, step)):
                     outcome = process(rid, client, check_cancel=lambda: assert_running(rid, job_id))
                 assert_running(rid, job_id)
                 message = 'Révision IA #' + str(outcome['revision']) + ' enregistrée'

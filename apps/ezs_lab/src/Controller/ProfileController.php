@@ -236,8 +236,36 @@ SQL);
                 }
             }
         }
+        // MODULES-LIVE-R2: job-ID scoped, allowlisted, read only.
+        $liveModules = [];
+        $livePath = dirname(__DIR__, 2).'/var/tmp/jobs/'.$jobId.'/modules-live.json';
+        if (is_file($livePath) && filesize($livePath) > 0 && filesize($livePath) <= 16384) {
+            $liveRaw = json_decode((string)file_get_contents($livePath), true);
+            if (is_array($liveRaw) && ($liveRaw['schema'] ?? '') === 'ezstudio.profile-modules-live.v1'
+                && is_array($liveRaw['modules'] ?? null) && count($liveRaw['modules']) <= 40) {
+                foreach ($liveRaw['modules'] as $module) {
+                    if (!is_array($module)) { $liveModules=[]; break; }
+                    $id=(string)($module['id'] ?? '');
+                    $name=(string)($module['name'] ?? '');
+                    $status=(string)($module['status'] ?? 'waiting');
+                    if (!preg_match('/^[a-zA-Z0-9_.:-]{1,100}$/D',$id)
+                        || $name==='' || mb_strlen($name)>100
+                        || !in_array($status,['waiting','running','ok','error','skipped'],true)) {
+                        $liveModules=[]; break;
+                    }
+                    $device = $module['device'] ?? null;
+                    $seconds = $module['elapsed_seconds'] ?? null;
+                    $liveModules[]=[
+                        'id'=>$id,'name'=>$name,'status'=>$status,
+                        'device'=>is_string($device) && preg_match('/^[a-zA-Z0-9_.:-]{1,60}$/D',$device) ? $device : null,
+                        'elapsed_seconds'=>is_numeric($seconds) && (float)$seconds>=0 && (float)$seconds<=86400 ? (float)$seconds : null,
+                    ];
+                }
+            }
+        }
         return $this->json([
             'available'=>true,
+            'modules'=>$liveModules,
             'job_id'=>$jobId,
             'run_id'=>(int)$row['run_id'],
             'state'=>$state,

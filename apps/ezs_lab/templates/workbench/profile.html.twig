@@ -84,7 +84,7 @@
         <form method="get" action="{{ path('workbench_profile') }}" style="margin:0"><input type="hidden" name="song" value="{{ selected_song.id }}"><select name="run" onchange="this.form.submit()" style="font-size:11px">{% for r in profile_runs %}<option value="{{ r.id }}" {{ selected_profile_run and r.id == selected_profile_run.id ? 'selected' : '' }}>{{ r.public_id }} · {{ r.state }}</option>{% else %}<option>Aucun run</option>{% endfor %}</select></form>
       </div>
     </div>
-    <div id="profile-step-observer" class="prof-prog-box">
+    <div id="profile-step-observer" class="prof-prog-box" data-ezs-observability="r1">
       <div class="row" style="justify-content:space-between;font-size:11px"><span id="profile-step-state" class="meta">{{ selected_profile_run ? ('Run #' ~ selected_profile_run.id ~ ' · ' ~ selected_profile_run.state) : 'Prêt' }}</span><span id="profile-step-current" class="meta"></span></div>
       <progress id="profile-step-progress" value="{{ selected_profile_run and selected_profile_run.state == 'done' ? 100 : 0 }}" max="100" style="width:100%;height:8px;margin-top:4px"></progress>
     </div>
@@ -111,14 +111,22 @@
         </tbody>
       </table>
       {% set completed_modules = selected_profile_run.diagnostics.module_registry.modules ?? [] %}
-      {% if completed_modules is not empty %}
-        <details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ completed_modules|length }} moteurs</summary>
-          <table class="prof-tbl" style="margin-top:4px"><thead><tr><th>#</th><th>Module</th><th>Device</th><th>Temps</th></tr></thead><tbody>
+      {% if completed_modules is not empty or selected_song %}
+        <details id="profile-modules-details" style="margin-top:8px"><summary id="profile-modules-summary" style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ completed_modules|length }} moteurs · run #{{ selected_profile_run.id }}</summary>
+          <table class="prof-tbl" data-ezs-observability="r2" style="margin-top:4px"><thead><tr><th>#</th><th>Module</th><th>Device</th><th>Temps</th></tr></thead><tbody id="profile-module-rows">
+            <tr id="profile-live-pipeline-row" hidden><td colspan="4" id="profile-live-pipeline" class="meta" role="status" aria-live="polite"></td></tr>
             {% for m in completed_modules %}<tr><td>{{ loop.index }}</td><td>{{ m.display_name ?? m.name ?? m.module_id ?? m.id }}</td><td class="meta">{{ m.device ?? '—' }}</td><td class="meta">{% if m.timing.elapsed_seconds is defined %}{{ m.timing.elapsed_seconds|number_format(2) }}s{% endif %}</td></tr>{% endfor %}
           </tbody></table>
         </details>
       {% endif %}
-    {% else %}<p class="meta">Aucune analyse disponible.</p>{% endif %}
+    {% else %}
+      <details id="profile-modules-details" style="margin-top:8px" open>
+        <summary id="profile-modules-summary">Logique : Pipeline PROFILE · en attente</summary>
+        <table class="prof-tbl"><thead><tr><th>#</th><th>Module</th><th>Device</th><th>Temps</th></tr></thead>
+          <tbody id="profile-module-rows"><tr><td colspan="4">En attente de l'analyse.</td></tr></tbody>
+        </table>
+      </details>
+    {% endif %}
   </section>
   <style>
 .v-badge-tip{position:relative;display:inline-block;cursor:help}
@@ -149,6 +157,7 @@
       <div id="profile-ai-request" class="prof-prog-box" data-url="{{ path('profile_ai_review_status', {id: selected_profile_run.id}) }}" data-action="{{ path('profile_ai_review_request', {id: selected_profile_run.id}) }}" data-cancel-url="{{ path('profile_ai_review_cancel', {id: selected_profile_run.id}) }}">
         <div class="row" style="justify-content:space-between;font-size:11px"><span id="profile-ai-request-state" class="meta">Prêt</span><span id="profile-ai-step-current" class="meta"></span></div>
         <progress id="profile-ai-progress" max="100" value="0" style="width:100%;height:8px;margin-top:4px"></progress>
+
       </div>
     {% endif %}
 
@@ -162,10 +171,16 @@
       {'keys':['key','tonalite'], 'label':'Tonalité', 'lab': sum.key ?? '—'},
       {'keys':['genre'], 'label':'Genre', 'lab': sum.genre ?? '—'}
     ] %}
-    {% set inst_list = sum.instruments|default([]) %}{% if inst_list is empty %}{% for a in (revs|first.comparison.final_verification.assertions ?? []) %}{% if a.key starts with "instruments:" or a.key starts with "instrument:" %}{% set inst_list = inst_list|merge([a.value ?? a.lab_value ?? ""]) %}{% endif %}{% endfor %}{% endif %}{% for inst in inst_list %}{% set idx = loop.index0 %}
-      {% set inst_obj = sum.instruments[idx] ?? null %}
-      {% set inst_name = inst_obj.name ?? inst_obj ?? null %}
-      {% set base_rows = base_rows|merge([{'keys':['instruments:' ~ idx, 'instrument:' ~ idx], 'label':'Instrument ' ~ (idx + 1), 'lab': inst_name ?? '—'}]) %}
+    {# R2.2 : mêmes instruments, même ordre, que le tableau Analyse LAB du run affiché. #}
+    {% set aligned_instruments = selected_profile_run ? (selected_profile_run.diagnostics.profile_view.instrumentation.candidates ?? []) : [] %}
+    {% for inst in aligned_instruments %}
+      {% set idx = loop.index0 %}
+      {% set base_rows = base_rows|merge([{'keys':['instruments:' ~ idx, 'instrument:' ~ idx], 'label':'Instrument ' ~ (idx + 1), 'lab': inst.label ?? '—'}]) %}
+    {% else %}
+      {# Le tableau Analyse LAB affiche également une ligne unique « Instruments » sans candidats. #}
+      {% if selected_profile_run %}
+        {% set base_rows = base_rows|merge([{'keys':['instruments'], 'label':'Instruments', 'lab':'—'}]) %}
+      {% endif %}
     {% endfor %}
     {% set base_rows = base_rows|merge([
       {'keys':['lead_vocal','voix_principale'], 'label':'Voix principale', 'lab': vox.lead.decision ?? vox.lead ?? '—'},
@@ -227,11 +242,11 @@
           </tbody>
         </table>
         {% set expertise_engine_steps = revision.comparison.engine_steps ?? [] %}
-        <details style="margin-top:8px">
-          <summary style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ expertise_engine_steps|length }} moteurs</summary>
+        <details class="expertise-pipeline-details" style="margin-top:8px">
+          <summary class="expertise-pipeline-summary" style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ expertise_engine_steps|length }} moteurs · expertise #{{ revision.id }}</summary>
           <table class="prof-tbl" style="margin-top:4px">
             <thead><tr><th>#</th><th>Module</th><th>Device</th><th>Temps</th></tr></thead>
-            <tbody>
+            <tbody class="expertise-pipeline-rows">
               {% for engine_step in expertise_engine_steps %}
                 <tr>
                   <td>{{ loop.index }}</td>
@@ -318,7 +333,6 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
   const root=document.getElementById('profile-ai-request'), btn=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), state=document.getElementById('profile-ai-request-state'), prog=document.getElementById('profile-ai-progress');
   if(!root||!btn||!state||!prog) return;
   let activeJob=0, activeLocalJob=0, wasActive=false;
-  const pipeline=document.getElementById('profile-ai-pipeline');
   const stepNames={
     'engine.identity_resolver':'Identification artiste',
     'engine.recording_duration':'Durée de référence',
@@ -332,19 +346,52 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
     'engine.ai_draft_payload_enricher':'Préparation du brouillon',
     'engine.lab_revision_submit':'Persistance de la révision'
   };
+  // Un seul tableau "Logique" par révision, identique au tableau Analyse LAB.
+  // L'historique HTML est conservé et restauré après une tentative terminée.
   function renderPipeline(item){
-    if(!pipeline) return;
-    const steps=Array.isArray(item?.checkpoints)?item.checkpoints.filter(e=>typeof e?.event_key==='string' && Object.hasOwn(stepNames,e.event_key)):[];
-    const last=steps.length?steps[steps.length-1]:null;
-    const failed=steps.find(e=>e.outcome==='failed'||e.outcome==='blocked');
-    if(failed){
-      pipeline.textContent='Pipeline : échec à l’étape « '+stepNames[failed.event_key]+' » ('+failed.outcome+').';
+    const panel=Array.from(document.querySelectorAll('.exp-rev-panel')).find(el=>el.style.display!=='none');
+    const details=panel?.querySelector('.expertise-pipeline-details');
+    const summary=details?.querySelector('.expertise-pipeline-summary');
+    const tbody=details?.querySelector('.expertise-pipeline-rows');
+    if(!details||!summary||!tbody)return;
+    if(tbody.dataset.historicalHtml===undefined){
+      // Contenu initial serveur (moteurs historiques persistés).
+      tbody.dataset.historicalHtml=tbody.innerHTML;
+      summary.dataset.historicalText=summary.textContent;
+    }
+    const status=String(item?.status||'idle');
+    const active=['queued','running','cancelling'].includes(status);
+    if(!active){
+      if(tbody.dataset.mode==='live'){
+        tbody.innerHTML=tbody.dataset.historicalHtml;
+        summary.textContent=summary.dataset.historicalText;
+        tbody.dataset.mode='history';
+      }
       return;
     }
-    const current=item?.status==='running' ? ' · traitement en cours' : '';
-    pipeline.textContent=steps.length
-      ? 'Pipeline : '+steps.length+' étapes tracées · dernière : '+stepNames[last.event_key]+' ('+last.outcome+')'+current
-      : 'Pipeline : attente du premier checkpoint réel'+current;
+    const allowed=Object.keys(stepNames);
+    const steps=Array.isArray(item?.checkpoints)?item.checkpoints.filter(e=>e&&typeof e.event_key==='string'):[];
+    const map=new Map();
+    for(const entry of steps){
+      const normalized=entry.event_key.replace('engine.start.','engine.');
+      if(allowed.includes(normalized))map.set(entry.event_key,entry);
+    }
+    const local=Number(item?.analysis_job_id||0);
+    const global=Number(item?.job_id||0);
+    summary.textContent='Logique : Pipeline des '+allowed.length+' étapes · expertise LAB #'+(local||'—')+(global?' · job #'+global:'');
+    tbody.dataset.mode='live';
+    details.open=true;
+    tbody.replaceChildren();
+    for(const [index,key] of allowed.entries()){
+      const ev=map.get(key), started=map.get(key.replace('engine.','engine.start.'));
+      const state=ev ? (ev.outcome==='ok'?'Terminé':ev.outcome==='failed'?'Erreur':ev.outcome==='blocked'?'Bloqué':String(ev.outcome||'Observé')) : started?'En cours':'En attente';
+      const tr=document.createElement('tr');
+      // Les étapes sans checkpoint terminé ne sont jamais présentées comme finies.
+      for(const value of [String(index+1),stepNames[key]+' · '+state,'—','—']){
+        const td=document.createElement('td');td.textContent=value;tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
   }
   function setFsm(s){ const busy=(s==='running'||s==='queued'||s==='cancelling'); btn.disabled=(s==='cancelling'); if(cancelBtn){cancelBtn.disabled=!busy || s==='cancelling';} }
   function render(item){
@@ -385,6 +432,39 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
   const labCur = document.getElementById('profile-step-current');
   const labCancel = document.getElementById('profile-live-cancel');
   let labJobId = 0, labWasActive = false;
+  const livePipeline = document.getElementById('profile-live-pipeline');
+  const liveModuleBody = document.getElementById('profile-module-rows');
+  const liveModuleDetails = document.getElementById('profile-modules-details');
+  const liveModuleSummary = document.getElementById('profile-modules-summary');
+  let liveModuleJob = 0;
+  function renderLiveModules(d) {
+    if (!liveModuleBody || !liveModuleDetails) return;
+    const job=Number(d.job_id||0), run=Number(d.run_id||0);
+    if (!job || !run || !Array.isArray(d.modules)) return;
+    // Ignore a delayed polling response from an earlier job.
+    if (liveModuleJob>0 && job<liveModuleJob) return;
+    if (liveModuleJob !== job) liveModuleJob=job;
+    liveModuleDetails.open=true;
+    if (liveModuleSummary) liveModuleSummary.textContent='Logique : Pipeline PROFILE · run #'+run+' · job LAB #'+job;
+    liveModuleBody.replaceChildren();
+    const modules = d.modules;
+    if (!modules.length) {
+      const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=4;
+      td.textContent='Préparation du pipeline : aucune fin de moteur attestée.';
+      tr.appendChild(td);liveModuleBody.appendChild(tr);
+      return;
+    }
+    for (const [index,m] of modules.entries()) {
+      const tr=document.createElement('tr');
+      const status = m.status==='ok'?'Terminé':m.status==='running'?'En cours':m.status==='error'?'Erreur':m.status==='skipped'?'Ignoré':'En attente';
+      const vals=[String(index+1),String(m.name||m.id||'—')+' · '+status,
+        ['ok','error','skipped'].includes(m.status)?String(m.device||'—'):'—',
+        ['ok','error','skipped'].includes(m.status)&&typeof m.elapsed_seconds==='number'?m.elapsed_seconds.toFixed(2)+'s':'—'];
+      for(const value of vals){const td=document.createElement('td');td.textContent=value;tr.appendChild(td);}
+      liveModuleBody.appendChild(tr);
+    }
+  }
+  const selectedScientificRun = {{ selected_profile_run ? selected_profile_run.id : 0 }};
 
   async function pollLab() {
     if (!labUrl || !labState || !labProg) return;
@@ -395,6 +475,17 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
       if (!d.available) return;
       labJobId = Number(d.job_id || 0);
       const active = ['queued', 'running', 'cancelling'].includes(d.job_status) && ['queued', 'running', 'created'].includes(d.state);
+      if (active) {
+        renderLiveModules(d);
+      }
+      if(livePipeline){
+        livePipeline.closest("tr").hidden=true;
+        const scientificId=Number(d.run_id||0);
+        const stage=typeof d.stage==='string' ? d.stage.slice(0,140) : '';
+        livePipeline.textContent=active
+          ? ('Observation en direct · job LAB #'+labJobId+' · run #'+scientificId+(selectedScientificRun>0 && scientificId!==selectedScientificRun?' · attention : la projection historique affichée concerne le run #'+selectedScientificRun:'')+' · '+(stage||'moteur en cours non communiqué')+' · fin individuelle des moteurs non attestée par l’API')
+          : ('Dernier job LAB #'+labJobId+' : '+String(d.job_status||d.state||'état inconnu')+' · vue historique séparée');
+      }
       if (active) labWasActive = true;
       const pct = Math.max(0, Math.min(100, Number(d.progress) || 0));
       labProg.value = active ? pct : ({{ selected_profile_run and selected_profile_run.state == 'done' ? 100 : 0 }});
@@ -407,7 +498,9 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
       }
       if (labWasActive && !active && d.job_status === 'completed' && d.state === 'done') {
         labWasActive = false;
-        window.location.reload();
+        const url=new URL(window.location.href);
+        url.searchParams.set('run',String(d.run_id));
+        window.location.assign(url.toString());
       }
     } catch (_) {}
   }

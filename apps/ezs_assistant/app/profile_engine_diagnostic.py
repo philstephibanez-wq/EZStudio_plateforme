@@ -59,6 +59,9 @@ def call_engine(engine, func, *args, **kwargs):
     event = {'engine': engine, 'status': 'RUNNING', 'at_utc': _utc(),
              'run_id': state['run_id'], 'job_id': state['job_id']}
     emit('profile.engine.start', event)
+    if callable(state.get('on_start')):
+        try: state['on_start'](dict(event))
+        except Exception: pass
     end = None
     try:
         result = func(*args, **kwargs)
@@ -138,11 +141,11 @@ def _local_summary(trace, summary, root):
 
 
 @contextmanager
-def execution_scope(run_id, job_id, trace, *, receipt_root=None, on_step=None):
+def execution_scope(run_id, job_id, trace, *, receipt_root=None, on_step=None, on_start=None):
     """One scoped, structured summary; trace snapshot precedes publish_trace()."""
     if type(run_id) is not int or run_id <= 0 or type(job_id) is not int or job_id <= 0:
         raise ValueError('invalid_execution_identity')
-    state = {'run_id': run_id, 'job_id': job_id, 'steps': [], 'items': [], 'on_step': on_step}
+    state = {'run_id': run_id, 'job_id': job_id, 'steps': [], 'items': [], 'on_step': on_step, 'on_start': on_start}
     token = _ACTIVE.set(state)
     begin_ns = time.perf_counter_ns()
     final = 'OK'
