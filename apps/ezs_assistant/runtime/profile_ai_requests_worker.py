@@ -78,6 +78,8 @@ def _report_step(job_id, step):
         'engine': engine,
         'status': step.get('status'),
         'duration_ms': step.get('duration_ms'),
+        # Only an engine-attested physical device; never infer GPU from system availability.
+        'device': step.get('device'),
     })
     if engine not in CHECKPOINT_PHASES:
         raise RuntimeError('assistant_unknown_checkpoint_engine:' + engine[:90])
@@ -88,7 +90,7 @@ def _report_step(job_id, step):
         'event_key': 'engine.' + engine,
         'phase': CHECKPOINT_PHASES[engine],
         'outcome': 'ok' if state == 'OK' else ('blocked' if state == 'BLOCKED' else 'failed'),
-        'detail': {},
+        'detail': {'device': step['device']} if isinstance(step.get('device'), str) and step.get('device') else {},
     }
     # An HTTP rejection must be observable, not silently lost.
     try:

@@ -1,4 +1,6 @@
 {% extends 'base.html.twig' %}
+{% import 'workbench/_pipeline_table.html.twig' as ezs_pipeline %}
+{% set ezs_pipeline_locale = app.request.attributes.get('_locale') ?: 'fr' %}
 {% block title %}PROFILE · EZStudio_lab{% endblock %}
 {% block body %}
 <style>
@@ -13,6 +15,31 @@
 .prof-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .prof-tbl th,.prof-tbl td{padding:5px 6px;height:30px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
 .prof-tbl th{font-size:11px;text-transform:uppercase;color:var(--muted)}
+/* Pipelines techniques : seuls les entêtes sont différenciés, jamais les résultats ni le corps. */
+.prof-ui details.ezs-tech-pipeline > summary{
+  padding:6px 8px;
+  background:rgba(78,112,159,.14);
+  border:1px solid var(--line);
+  border-radius:4px;
+}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl{
+  width:100%;
+  table-layout:fixed;
+}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl thead th{
+  background:rgba(78,112,159,.14);
+}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl :is(th,td):nth-child(1){width:5%}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl :is(th,td):nth-child(2){width:30%}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl :is(th,td):nth-child(3){width:29%}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl :is(th,td):nth-child(4){width:16%}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl :is(th,td):nth-child(5){width:11%}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl :is(th,td):nth-child(6){width:9%}
+.prof-ui details.ezs-tech-pipeline > table.prof-tbl tbody td{
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
 .icon-btn{padding:3px 8px;font-size:13px;line-height:1.2;cursor:pointer}
 </style>
 <div class="prof-ui">
@@ -112,18 +139,42 @@
       </table>
       {% set completed_modules = selected_profile_run.diagnostics.module_registry.modules ?? [] %}
       {% if completed_modules is not empty or selected_song %}
-        <details id="profile-modules-details" style="margin-top:8px"><summary id="profile-modules-summary" style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ completed_modules|length }} moteurs · run #{{ selected_profile_run.id }}</summary>
-          <table class="prof-tbl" data-ezs-observability="r2" style="margin-top:4px"><thead><tr><th>#</th><th>Module</th><th>Device</th><th>Temps</th></tr></thead><tbody id="profile-module-rows">
-            <tr id="profile-live-pipeline-row" hidden><td colspan="4" id="profile-live-pipeline" class="meta" role="status" aria-live="polite"></td></tr>
-            {% for m in completed_modules %}<tr><td>{{ loop.index }}</td><td>{{ m.display_name ?? m.name ?? m.module_id ?? m.id }}</td><td class="meta">{{ m.device ?? '—' }}</td><td class="meta">{% if m.timing.elapsed_seconds is defined %}{{ m.timing.elapsed_seconds|number_format(2) }}s{% endif %}</td></tr>{% endfor %}
+        <details class="ezs-tech-pipeline" id="profile-modules-details" style="margin-top:24px"><summary id="profile-modules-summary" style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ completed_modules|length }} moteurs · run #{{ selected_profile_run.id }}</summary>
+          <table class="prof-tbl" data-ezs-observability="r2" style="margin-top:4px">{{ ezs_pipeline.header(ezs_pipeline_locale) }}<tbody id="profile-module-rows">
+            <tr id="profile-live-pipeline-row" hidden><td colspan="6" id="profile-live-pipeline" class="meta" role="status" aria-live="polite"></td></tr>
+            {% for m in completed_modules %}
+              {% set ezs_lab_raw = m.display_name ?? m.name ?? m.module_id ?? m.id ?? '' %}
+              {% set ezs_lab_name = ezs_lab_raw|replace({'_':' '}) %}
+              {% set ezs_lab_code = ezs_lab_raw|lower %}
+              {% set ezs_lab_step_id = 'processing' %}
+              {% if 'tonal' in ezs_lab_code or 'key' in ezs_lab_code %}
+                {% set ezs_lab_step_id = 'tonality' %}
+              {% elseif 'beat' in ezs_lab_code or 'rhythm' in ezs_lab_code %}
+                {% set ezs_lab_step_id = 'rhythm' %}
+              {% elseif 'meter' in ezs_lab_code %}
+                {% set ezs_lab_step_id = 'meter' %}
+              {% elseif 'tuning' in ezs_lab_code %}
+                {% set ezs_lab_step_id = 'tuning' %}
+              {% elseif 'clap' in ezs_lab_code or 'passt' in ezs_lab_code or 'panns' in ezs_lab_code %}
+                {% set ezs_lab_step_id = 'semantic' %}
+              {% elseif 'mert' in ezs_lab_code or 'embedding' in ezs_lab_code %}
+                {% set ezs_lab_step_id = 'embedding' %}
+              {% elseif 'descriptor' in ezs_lab_code %}
+                {% set ezs_lab_step_id = 'descriptors' %}
+              {% endif %}
+              {% set ezs_lab_step_name = ('ezs.profile.step.' ~ ezs_lab_step_id)|trans({}, 'ezs_profile', ezs_pipeline_locale) %}
+              {% set ezs_lab_status = (m.status ?? '')|lower %}
+              {% set ezs_lab_status_key = ezs_lab_status in ['ok','completed','degraded','error','failed','skipped','running','pending','blocked'] ? 'ezs.profile.status.' ~ ezs_lab_status : 'ezs.profile.status.unknown' %}
+              {{ ezs_pipeline.row(loop.index, (m.step_label ?? m.phase_label ?? ezs_lab_step_name), ezs_lab_name, m.device ?? null, ezs_lab_status_key|trans({}, 'ezs_profile', ezs_pipeline_locale), m.timing.elapsed_seconds ?? null, ezs_lab_raw) }}
+            {% endfor %}
           </tbody></table>
         </details>
       {% endif %}
     {% else %}
-      <details id="profile-modules-details" style="margin-top:8px" open>
+      <details class="ezs-tech-pipeline" id="profile-modules-details" style="margin-top:24px" open>
         <summary id="profile-modules-summary">Logique : Pipeline PROFILE · en attente</summary>
-        <table class="prof-tbl"><thead><tr><th>#</th><th>Module</th><th>Device</th><th>Temps</th></tr></thead>
-          <tbody id="profile-module-rows"><tr><td colspan="4">En attente de l'analyse.</td></tr></tbody>
+        <table class="prof-tbl">{{ ezs_pipeline.header(ezs_pipeline_locale) }}
+          <tbody id="profile-module-rows"><tr><td colspan="6">{{ 'ezs.profile.table.lab_pending'|trans({}, 'ezs_profile', ezs_pipeline_locale) }}</td></tr></tbody>
         </table>
       </details>
     {% endif %}
@@ -242,20 +293,36 @@
           </tbody>
         </table>
         {% set expertise_engine_steps = revision.comparison.engine_steps ?? [] %}
-        <details class="expertise-pipeline-details" style="margin-top:8px">
-          <summary class="expertise-pipeline-summary" style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ expertise_engine_steps|length }} moteurs · expertise #{{ revision.id }}</summary>
+        {% set ezs_expertise_locale = app.request.attributes.get('_locale') ?: 'fr' %}
+        {% set ezs_expertise_engine_keys = {
+          'identity_resolver': 'ezs.profile.engine.identity_resolver',
+          'recording_duration': 'ezs.profile.engine.recording_duration',
+          'public_source_research': 'ezs.profile.engine.public_source_research',
+          'review_payload_builder': 'ezs.profile.engine.review_payload_builder',
+          'independent_verifier': 'ezs.profile.engine.independent_verifier',
+          'assertion_web_investigator': 'ezs.profile.engine.assertion_web_investigator',
+          'local_ai_document_review': 'ezs.profile.engine.local_ai_document_review',
+          'documentary_verdict_merger': 'ezs.profile.engine.documentary_verdict_merger',
+          'documentary_payload_enricher': 'ezs.profile.engine.documentary_payload_enricher',
+          'ai_draft_payload_enricher': 'ezs.profile.engine.ai_draft_payload_enricher',
+          'lab_revision_submit': 'ezs.profile.engine.lab_revision_submit'
+        } %}
+        <details class="expertise-pipeline-details ezs-tech-pipeline" style="margin-top:24px">
+          <summary class="expertise-pipeline-summary" style="cursor:pointer;font-size:11px;font-weight:600">{{ 'ezs.profile.pipeline.history'|trans({'%count%': expertise_engine_steps|length, '%id%': revision.id}, 'ezs_profile', ezs_expertise_locale) }}</summary>
           <table class="prof-tbl" style="margin-top:4px">
-            <thead><tr><th>#</th><th>Module</th><th>Device</th><th>Temps</th></tr></thead>
+            {{ ezs_pipeline.header(ezs_pipeline_locale) }}
             <tbody class="expertise-pipeline-rows">
               {% for engine_step in expertise_engine_steps %}
-                <tr>
-                  <td>{{ loop.index }}</td>
-                  <td>{{ engine_step.engine ?? '—' }}</td>
-                  <td class="meta">{{ engine_step.status ?? '—' }}</td>
-                  <td class="meta">{% if engine_step.duration_ms is defined and engine_step.duration_ms is not null %}{{ (engine_step.duration_ms / 1000)|number_format(2) }}s{% else %}—{% endif %}</td>
-                </tr>
+                  {% set ezs_engine_id = engine_step.engine ?? '' %}
+                  {% set ezs_engine_key = ezs_expertise_engine_keys[ezs_engine_id] ?? null %}
+                  {# The persisted device is accepted only from explicit engine execution evidence. #}
+                  {% set ezs_device = engine_step.device ?? null %}
+                  {% set ezs_device = ezs_device not in ['OK','DEGRADED','ERROR','FAILED','RUNNING'] ? ezs_device : null %}
+                  {% set ezs_status = (engine_step.status ?? '')|lower %}
+                  {% set ezs_status_key = ezs_status in ['ok','completed','degraded','error','failed','skipped','running','pending','blocked'] ? 'ezs.profile.status.' ~ ezs_status : 'ezs.profile.status.unknown' %}
+                  {{ ezs_pipeline.row(loop.index, ezs_engine_key ? ezs_engine_key|trans({}, 'ezs_profile', ezs_expertise_locale) : (ezs_engine_id ? ezs_engine_id|replace({'_':' '})|capitalize : '—'), ezs_engine_id ? ezs_engine_id|replace({'_':' '})|title : '—', ezs_device, ezs_status_key|trans({}, 'ezs_profile', ezs_expertise_locale), engine_step.duration_ms is defined and engine_step.duration_ms is not null ? engine_step.duration_ms / 1000 : null, ezs_engine_id) }}
               {% else %}
-                <tr><td colspan="4" class="meta">Détail des moteurs indisponible pour cette révision.</td></tr>
+                <tr><td colspan="6" class="meta">{{ 'ezs.profile.table.no_details'|trans({}, 'ezs_profile', ezs_expertise_locale) }}</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -333,20 +400,65 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
   const root=document.getElementById('profile-ai-request'), btn=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), state=document.getElementById('profile-ai-request-state'), prog=document.getElementById('profile-ai-progress');
   if(!root||!btn||!state||!prog) return;
   let activeJob=0, activeLocalJob=0, wasActive=false;
+  const ezsExpertiseLocale = {{ (app.request.attributes.get('_locale') ?: 'fr')|json_encode|raw }};
   const stepNames={
-    'engine.identity_resolver':'Identification artiste',
-    'engine.recording_duration':'Durée de référence',
-    'engine.public_source_research':'Recherche de sources publiques',
-    'engine.review_payload_builder':'Préparation des observations',
-    'engine.independent_verifier':'Vérification indépendante',
-    'engine.assertion_web_investigator':'Recherche Web par dimension',
-    'engine.local_ai_document_review':'Analyse IA des documents',
-    'engine.documentary_verdict_merger':'Confrontation des preuves',
-    'engine.documentary_payload_enricher':'Assemblage documentaire',
-    'engine.ai_draft_payload_enricher':'Préparation du brouillon',
-    'engine.lab_revision_submit':'Persistance de la révision'
+    'engine.identity_resolver': {{ ('ezs.profile.engine.identity_resolver'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.recording_duration': {{ ('ezs.profile.engine.recording_duration'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.public_source_research': {{ ('ezs.profile.engine.public_source_research'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.review_payload_builder': {{ ('ezs.profile.engine.review_payload_builder'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.independent_verifier': {{ ('ezs.profile.engine.independent_verifier'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.assertion_web_investigator': {{ ('ezs.profile.engine.assertion_web_investigator'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.local_ai_document_review': {{ ('ezs.profile.engine.local_ai_document_review'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.documentary_verdict_merger': {{ ('ezs.profile.engine.documentary_verdict_merger'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.documentary_payload_enricher': {{ ('ezs.profile.engine.documentary_payload_enricher'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.ai_draft_payload_enricher': {{ ('ezs.profile.engine.ai_draft_payload_enricher'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    'engine.lab_revision_submit': {{ ('ezs.profile.engine.lab_revision_submit'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
   };
-  // Un seul tableau "Logique" par révision, identique au tableau Analyse LAB.
+  const ezsLiveStates = {
+    completed: {{ ('ezs.profile.live.completed'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    failed: {{ ('ezs.profile.live.failed'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    blocked: {{ ('ezs.profile.live.blocked'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    observed: {{ ('ezs.profile.live.observed'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    running: {{ ('ezs.profile.live.running'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+    pending: {{ ('ezs.profile.live.pending'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
+  };
+  const ezsLiveSummaryTemplate = {{ ('ezs.profile.pipeline.live'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }};
+  const ezsPipelineStatus = {
+    ok: {{ ('ezs.profile.status.ok'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    completed: {{ ('ezs.profile.status.completed'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    degraded: {{ ('ezs.profile.status.degraded'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    error: {{ ('ezs.profile.status.error'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    failed: {{ ('ezs.profile.status.failed'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    blocked: {{ ('ezs.profile.status.blocked'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    skipped: {{ ('ezs.profile.status.skipped'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    running: {{ ('ezs.profile.status.running'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    pending: {{ ('ezs.profile.status.pending'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+    unknown: {{ ('ezs.profile.status.unknown'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }}
+  };
+  function ezsPipelineLabel(value){ return String(value || '—').replace(/_/g,' ').replace(/\s+/g,' ').trim(); }
+  function ezsPipelineAppendRow(tbody, index, stepName, moduleName, device, status, seconds){
+    const row=document.createElement('tr');
+    const values=[String(index),ezsPipelineLabel(stepName),ezsPipelineLabel(moduleName),String(device||'—'),String(status||ezsPipelineStatus.unknown),
+      Number.isFinite(seconds)?seconds.toFixed(2)+'s':'—'];
+    for(const value of values){const td=document.createElement('td');td.textContent=value;row.appendChild(td);}
+    tbody.appendChild(row);
+  }
+  const ezsLabStepLabels = {
+      tonality: {{ ('ezs.profile.step.tonality'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+      rhythm: {{ ('ezs.profile.step.rhythm'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+      meter: {{ ('ezs.profile.step.meter'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+      tuning: {{ ('ezs.profile.step.tuning'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+      semantic: {{ ('ezs.profile.step.semantic'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+      embedding: {{ ('ezs.profile.step.embedding'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+      descriptors: {{ ('ezs.profile.step.descriptors'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
+      processing: {{ ('ezs.profile.step.processing'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }}
+    };
+    function ezsLabStepName(m){
+      const n=String(m?.display_name||m?.name||m?.module_id||m?.id||'').toLowerCase();
+      const key=/tonal|key/.test(n)?'tonality':/beat|rhythm/.test(n)?'rhythm':/meter/.test(n)?'meter':/tuning/.test(n)?'tuning':/clap|passt|panns/.test(n)?'semantic':/mert|embedding/.test(n)?'embedding':/descriptor/.test(n)?'descriptors':'processing';
+      return ezsLabStepLabels[key];
+    }
+  // Un seul contrat de colonnes pour Analyse et Expertise (historique + direct).
   // L'historique HTML est conservé et restauré après une tentative terminée.
   function renderPipeline(item){
     const panel=Array.from(document.querySelectorAll('.exp-rev-panel')).find(el=>el.style.display!=='none');
@@ -378,19 +490,16 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
     }
     const local=Number(item?.analysis_job_id||0);
     const global=Number(item?.job_id||0);
-    summary.textContent='Logique : Pipeline des '+allowed.length+' étapes · expertise LAB #'+(local||'—')+(global?' · job #'+global:'');
+    summary.textContent=ezsLiveSummaryTemplate.replace('%count%',String(allowed.length)).replace('%id%',String(local||'—')).replace('%job%',global?String(global):'—');
     tbody.dataset.mode='live';
     details.open=true;
     tbody.replaceChildren();
     for(const [index,key] of allowed.entries()){
       const ev=map.get(key), started=map.get(key.replace('engine.','engine.start.'));
-      const state=ev ? (ev.outcome==='ok'?'Terminé':ev.outcome==='failed'?'Erreur':ev.outcome==='blocked'?'Bloqué':String(ev.outcome||'Observé')) : started?'En cours':'En attente';
-      const tr=document.createElement('tr');
+      const state=ev ? (ev.outcome==='ok'?ezsLiveStates.completed:ev.outcome==='failed'?ezsLiveStates.failed:ev.outcome==='blocked'?ezsLiveStates.blocked:ezsLiveStates.observed) : started?ezsLiveStates.running:ezsLiveStates.pending;
       // Les étapes sans checkpoint terminé ne sont jamais présentées comme finies.
-      for(const value of [String(index+1),stepNames[key]+' · '+state,'—','—']){
-        const td=document.createElement('td');td.textContent=value;tr.appendChild(td);
-      }
-      tbody.appendChild(tr);
+      const observedDevice = ev?.detail?.device ?? started?.detail?.device ?? null;
+      ezsPipelineAppendRow(tbody,index+1,stepNames[key],key.replace('engine.','').replace(/_/g,' ').replace(/(^| )([a-z])/g,(m,a,b)=>a+b.toUpperCase()),observedDevice,state,null);
     }
   }
   function setFsm(s){ const busy=(s==='running'||s==='queued'||s==='cancelling'); btn.disabled=(s==='cancelling'); if(cancelBtn){cancelBtn.disabled=!busy || s==='cancelling';} }
@@ -449,19 +558,16 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
     liveModuleBody.replaceChildren();
     const modules = d.modules;
     if (!modules.length) {
-      const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=4;
+      const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=6;
       td.textContent='Préparation du pipeline : aucune fin de moteur attestée.';
       tr.appendChild(td);liveModuleBody.appendChild(tr);
       return;
     }
     for (const [index,m] of modules.entries()) {
-      const tr=document.createElement('tr');
-      const status = m.status==='ok'?'Terminé':m.status==='running'?'En cours':m.status==='error'?'Erreur':m.status==='skipped'?'Ignoré':'En attente';
-      const vals=[String(index+1),String(m.name||m.id||'—')+' · '+status,
-        ['ok','error','skipped'].includes(m.status)?String(m.device||'—'):'—',
-        ['ok','error','skipped'].includes(m.status)&&typeof m.elapsed_seconds==='number'?m.elapsed_seconds.toFixed(2)+'s':'—'];
-      for(const value of vals){const td=document.createElement('td');td.textContent=value;tr.appendChild(td);}
-      liveModuleBody.appendChild(tr);
+      const status=ezsPipelineStatus[String(m.status||'').toLowerCase()]||ezsPipelineStatus.unknown;
+      const observed=['ok','completed','error','failed','skipped'].includes(m.status);
+      ezsPipelineAppendRow(liveModuleBody,index+1,m.step_label||m.phase_label||ezsLabStepName(m),m.name||m.module_id||m.id,
+        observed?m.device:null,status,observed&&typeof m.elapsed_seconds==='number'?m.elapsed_seconds:null);
     }
   }
   const selectedScientificRun = {{ selected_profile_run ? selected_profile_run.id : 0 }};

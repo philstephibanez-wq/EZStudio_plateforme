@@ -27,12 +27,17 @@ final class AssistantJobCheckpointService {
             throw new \InvalidArgumentException('invalid_checkpoint_state');
         }
         $detail=$payload['detail']??null;
-        if (!is_array($detail) || array_diff(array_keys($detail),['discovered_count','read_count','assertion_count','reason_code'])) {
+        if (!is_array($detail) || array_diff(array_keys($detail),['discovered_count','read_count','assertion_count','reason_code','device'])) {
             throw new \InvalidArgumentException('invalid_checkpoint_detail');
         }
         foreach ($detail as $field=>$value) {
             if ($field==='reason_code') {
                 if (!is_string($value) || !preg_match('/^[a-z0-9_:-]{1,80}$/D',$value)) throw new \InvalidArgumentException('invalid_reason');
+            } elseif ($field==='device') {
+                if (!is_string($value) || !preg_match('/^[A-Za-z0-9._: -]{1,100}$/D',$value) ||
+                    in_array(strtoupper($value), ['OK','ERROR','FAILED','DEGRADED','RUNNING','PENDING'], true)) {
+                    throw new \InvalidArgumentException('invalid_device');
+                }
             } elseif (!is_int($value) || $value<0 || $value>100000) {
                 throw new \InvalidArgumentException('invalid_count');
             }

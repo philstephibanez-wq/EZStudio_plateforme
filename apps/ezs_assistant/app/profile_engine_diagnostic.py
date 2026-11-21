@@ -48,6 +48,24 @@ def _status(value):
     return 'OK', reason
 
 
+def _observed_device(result):
+    """Transport only explicit execution metadata supplied by the owning engine.
+
+    Never infer device from CUDA availability, host VRAM, or model configuration.
+    """
+    if not isinstance(result, dict):
+        return None
+    observation = result.get('execution')
+    if not isinstance(observation, dict) or observation.get('device_observed') is not True:
+        return None
+    device = observation.get('device')
+    if not isinstance(device, str) or not re.fullmatch(r'[A-Za-z0-9._: -]{1,100}', device):
+        return None
+    if device.upper() in ('OK','FAILED','DEGRADED','ERROR','RUNNING','PENDING'):
+        return None
+    return device
+
+
 def call_engine(engine, func, *args, **kwargs):
     """Execute once, log timings/status, never swallow or alter errors/results."""
     if not isinstance(engine, str) or not _CODE.fullmatch(engine):
@@ -67,7 +85,7 @@ def call_engine(engine, func, *args, **kwargs):
         result = func(*args, **kwargs)
         status, reason = _status(result)
         end = {'engine': engine, 'status': status, 'reason_code': reason,
-               'exception_type': None}
+               'exception_type': None, 'device': _observed_device(result)}
         return result
     except BaseException as exc:
         # Class name only; never exception message or traceback in archive.

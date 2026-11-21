@@ -1,0 +1,6 @@
+{% macro header(locale) %}
+<thead><tr><th>#</th><th>{{ 'ezs.profile.table.step'|trans({}, 'ezs_profile', locale) }}</th><th>{{ 'ezs.profile.table.engine'|trans({}, 'ezs_profile', locale) }}</th><th>{{ 'ezs.profile.table.device'|trans({}, 'ezs_profile', locale) }}</th><th>{{ 'ezs.profile.table.status'|trans({}, 'ezs_profile', locale) }}</th><th>{{ 'ezs.profile.table.time'|trans({}, 'ezs_profile', locale) }}</th></tr></thead>
+{% endmacro %}
+{% macro row(index, step, name, device, status, seconds, raw_name) %}
+<tr><td>{{ index }}</td><td>{{ step }}</td><td{% if raw_name %} title="{{ raw_name }}"{% endif %}>{{ name }}</td><td class="meta">{{ device ?: '—' }}</td><td class="meta">{{ status }}</td><td class="meta">{% if seconds is not null %}{{ seconds|number_format(2) }}s{% else %}—{% endif %}</td></tr>
+{% endmacro %}
