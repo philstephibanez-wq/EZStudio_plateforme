@@ -110,8 +110,9 @@ if($Action -eq 'start') {
     $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'
     $stdout=Join-Path $logDir "llama-$stamp.out.log"
     $stderr=Join-Path $logDir "llama-$stamp.err.log"
+    $nativeLog=Join-Path $logDir "llama-native-$stamp.log"
     $nvidiaDevice=Resolve-NvidiaVulkanDevice
-    $argsLine='-m "'+$model+'" --host 127.0.0.1 --port 8720 --ctx-size 4096 --parallel 1 -dev '+$nvidiaDevice+' -ngl 99'
+    $argsLine='-m "'+$model+'" --host 127.0.0.1 --port 8720 --ctx-size 4096 --parallel 1 -dev '+$nvidiaDevice+' -ngl 99 --log-file "'+$nativeLog+'"'
     $child=Start-Process -FilePath $exe -ArgumentList $argsLine -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
     $p=$null
     $owner=$null
@@ -120,7 +121,7 @@ if($Action -eq 'start') {
         $p=Proc ([int]$child.Id)
         if($null -eq $p){Fail 'SPAWN_EXITED_BEFORE_IDENTITY_CAPTURE'}
         if(-not $p.CreationDate){continue}
-        $candidate=[ordered]@{pid=[int]$p.ProcessId; creation=[string]$p.CreationDate; exe=$exe; model=$model; port=8720}
+        $candidate=[ordered]@{pid=[int]$p.ProcessId; creation=[string]$p.CreationDate; exe=$exe; model=$model; port=8720; native_log=$nativeLog}
         if(Matches $p ([pscustomobject]$candidate)){
             $owner=$candidate
             break
