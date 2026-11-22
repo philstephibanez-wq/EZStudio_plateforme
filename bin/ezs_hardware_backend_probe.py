@@ -185,7 +185,12 @@ def _opencl_pci_proofs(loader):
                     proofs = [p for p in proofs if (p['pci_vendor_id'], p['pci_device_id']) != key]
                     continue
                 seen.add(key)
-                proofs.append({'pci_vendor_id': 0x8086, 'pci_device_id': pci_device, 'backends': ['OpenCL']})
+                unified = info_uint(device, 0x1035)  # CL_DEVICE_HOST_UNIFIED_MEMORY
+                proof = {'pci_vendor_id': 0x8086, 'pci_device_id': pci_device,
+                         'backends': ['OpenCL']}
+                if unified in (0, 1):
+                    proof['host_unified_memory'] = (unified == 1)
+                proofs.append(proof)
             except Exception:
                 continue
     return proofs

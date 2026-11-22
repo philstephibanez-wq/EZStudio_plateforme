@@ -64,6 +64,7 @@ final class Inventory
             }
         }
         $proofCounts = [];
+        $unifiedProof = [];
         foreach (($backend['opencl'] ?? []) as $entry) {
             if (!is_array($entry) || !in_array('OpenCL', $entry['backends'] ?? [], true)) continue;
             $vendor = $entry['pci_vendor_id'] ?? null;
@@ -71,6 +72,8 @@ final class Inventory
             if (!is_int($vendor) || $vendor !== 0x8086 || !is_int($device) || $device <= 0 || $device > 0xFFFF) continue;
             $key = sprintf('8086:%04X', $device);
             $proofCounts[$key] = ($proofCounts[$key] ?? 0) + 1;
+            // OpenCL memory property; valid only with a unique PCI match and execution proof.
+            $unifiedProof[$key] = ($entry['host_unified_memory'] ?? null) === true;
         }
         foreach ($cards as &$card) {
             $id = $card['nvidia_uuid'] ?? $card['device_id'] ?? '';
@@ -79,6 +82,9 @@ final class Inventory
             $pci = self::intelPciPair($card);
             if ($pci !== null && ($pciCounts[$pci] ?? 0) === 1 && ($proofCounts[$pci] ?? 0) === 1) {
                 $card['verified_backends'][] = 'OpenCL';
+                if (($unifiedProof[$pci] ?? false) === true) {
+                    $card['memory_architecture'] = 'host_unified';
+                }
             }
         }
         unset($card);

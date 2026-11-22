@@ -45,7 +45,7 @@
               <th scope="row">GPU {{ loop.index0 }}</th>
               <td>{{ gpu.physical_name }}</td>
               <td><code class="d-inline-block text-truncate align-bottom" style="max-width:170px" title="{{ gpu.device_id }}">{{ gpu.device_id }}</code></td>
-              <td>{{ gpu.vram_total_mib is not null ? gpu.vram_total_mib|number_format(0, ',', ' ') ~ ' MiB' : 'hardware.not_verified'|trans({}, d, hw_locale) }}</td>
+              <td>{% if gpu.vram_total_mib is not null %}{{ gpu.vram_total_mib|number_format(0, ',', ' ') }} MiB{% elseif gpu.memory_architecture|default('') == 'host_unified' %}{{ 'hardware.shared_memory'|trans({}, d, hw_locale) }}{% else %}{{ 'hardware.capacity_unmeasured'|trans({}, d, hw_locale) }}{% endif %}</td>
               <td>{{ gpu.driver_version|default('hardware.not_verified'|trans({}, d, hw_locale)) }}</td>
               <td>{{ gpu.verified_backends|default([]) is not empty ? gpu.verified_backends|join(', ') : 'hardware.not_verified'|trans({}, d, hw_locale) }}</td>
             </tr>

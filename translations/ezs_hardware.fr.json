@@ -29,5 +29,7 @@
   "hardware.driver": "Pilote",
   "hardware.disclaimer": "Inventaire ponctuel uniquement. Ni charge en temps réel, ni réservation GPU/VRAM, ni décision d’exécution.",
   "hardware.device": "Périphérique",
-  "hardware.capacity": "Capacité"
+  "hardware.capacity": "Capacité",
+  "hardware.shared_memory": "Mémoire système partagée",
+  "hardware.capacity_unmeasured": "Capacité non mesurée"
 }

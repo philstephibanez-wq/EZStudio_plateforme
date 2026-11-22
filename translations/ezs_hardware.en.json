@@ -29,5 +29,7 @@
   "hardware.driver": "Driver",
   "hardware.disclaimer": "One-time inventory only. No live utilization, GPU/VRAM reservation, or execution decision.",
   "hardware.device": "Device",
-  "hardware.capacity": "Capacity"
+  "hardware.capacity": "Capacity",
+  "hardware.shared_memory": "Shared system memory",
+  "hardware.capacity_unmeasured": "Capacity not measured"
 }
