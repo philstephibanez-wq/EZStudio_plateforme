@@ -170,12 +170,25 @@ def step5_and_6_confront_and_judge(assertion: dict, facts_bundle: dict, sets: di
     ev_map = facts.get("evidence") if isinstance(facts.get("evidence"), dict) else {}
     trusted_urls = [d["url"] for d in (sets.get("E_enc", []) + sets.get("E_tech", []) + sets.get("E_gen", [])) if d.get("url")]
 
+    # R1: exact provenance attestation. Never attribute a model fact to the
+    # first trusted URL or accept a quotation absent from the source document.
+    from profile_evidence_sets import qualified_reference
+
     def _srcs(f_key: str) -> list[dict]:
-        item_ev = ev_map.get(f_key) if isinstance(ev_map.get(f_key), dict) else {}
-        u = str(item_ev.get("url") or "").strip()
-        if u and u in trusted_urls:
-            return [{"url": u, "quote": str(item_ev.get("quote") or "")[:220]}]
-        return [{"url": trusted_urls[0]}] if trusted_urls else []
+        return qualified_reference(f_key, ev_map, sets)
+
+    proof_key = ({'tempo': 'tempo_bpm', 'duration': 'duration_sec',
+                  'duree': 'duration_sec', 'meter': 'meter', 'mesure': 'meter',
+                  'key': 'key', 'tonalite': 'key', 'genre': 'genres',
+                  'lead_vocal': 'lead_vocal', 'voix_principale': 'lead_vocal',
+                  'backing_vocals': 'backing_vocals', 'voix_accompagnement': 'backing_vocals',
+                  'vocal_harmonies': 'vocal_harmonies', 'harmonies_vocales': 'vocal_harmonies',
+                  'choir': 'choir', 'choeurs': 'choir'}).get(key)
+    if key.startswith(('instrument:', 'instruments:')):
+        proof_key = 'instruments'
+    # No admissible citation for this exact fact => abstain, not BON/FAUX.
+    if not proof_key or not _srcs(proof_key):
+        return None
 
     if key in ("tempo",):
         ext_bpm = facts.get("tempo_bpm")

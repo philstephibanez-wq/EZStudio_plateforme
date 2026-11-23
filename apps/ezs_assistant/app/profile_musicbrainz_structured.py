@@ -13,6 +13,22 @@ from profile_recording_disambiguation import choose_candidate
 def _lucene_term(value):
     return '"' + re.sub(r'["\\]', ' ', str(value or "").strip())[:140] + '"'
 
+def _musicbrainz_json_with_retry(request_or_url, *, timeout=14):
+    """Retry only transient transport failures; never change identity evidence."""
+    import urllib.error
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request_or_url, timeout=timeout) as response:
+                return json.loads(response.read(400_000))
+        except urllib.error.HTTPError as exc:
+            # Respect API rate limits and transient upstream failures only.
+            if exc.code not in (429, 500, 502, 503, 504) or attempt == 2:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == 2:
+                raise
+        time.sleep(1.1 * (attempt + 1))
+
 def discover_recordings(title, artist, *, duration_ms=None, transport=None, limit=20):
     if not str(title or "").strip() or not str(artist or "").strip():
         return {"status": "identity_incomplete", "verified": False, "certified_recording": None, "candidates": []}
@@ -26,8 +42,7 @@ def discover_recordings(title, artist, *, duration_ms=None, transport=None, limi
     })
     try:
         if transport is None:
-            with urllib.request.urlopen(request, timeout=14) as response:
-                data = json.loads(response.read(400_000))
+            data = _musicbrainz_json_with_retry(request, timeout=14)
         else:
             data = transport(request)
         if not isinstance(data, dict) or not isinstance(data.get("recordings"), list):
@@ -116,8 +131,7 @@ def _fetch_json(url, timeout=14):
         "Accept": "application/json",
         "User-Agent": "EZStudioLabAssistant/1.7 (documentary-candidate-research)"
     })
-    with urllib.request.urlopen(req, timeout=timeout) as res:
-        return json.loads(res.read(400_000))
+    return _musicbrainz_json_with_retry(req, timeout=timeout)
 
 def fetch_certified_recording_details(mbid, *, transport=None):
     if not isinstance(mbid, str) or len(mbid) != 36:
