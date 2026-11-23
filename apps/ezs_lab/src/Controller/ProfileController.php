@@ -31,7 +31,6 @@ final class ProfileController extends AbstractController
         ProfileFrenchSummary $summary,
         ProfileValidationService $validation,
         ProfileExternalReviewService $externalReview,
-        ?\EZSLab\Service\ProfileReportPublication $reportPublication = null,
     ): Response {
         $song = $catalog->selectedSong($this->songId($request));
         $runs = [];
@@ -88,7 +87,6 @@ final class ProfileController extends AbstractController
             'songs' => $catalog->songs(),
             'selected_song' => $song,
             'profile_runs' => $runs,
-            'profile_report_publication_enabled' => ($reportPublication ?? new \EZSLab\Service\ProfileReportPublication())->enabled(),
             'selected_profile_run' => $selected,
             'profile_job' => $selected ? $execution->jobForRun((int)$selected['id']) : null,
             'profile_summary' => $selected ? $summary->build($selected) : null,
