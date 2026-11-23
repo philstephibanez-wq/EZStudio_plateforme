@@ -369,7 +369,7 @@ SQL);
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
-        ($this->reports ?? new ProfileReportPublication())->publish($runId, 'assistant', (int) $revision['id']);
+        ($this->reports ?? new ProfileReportPublication())->publish($runId, 'assistant', (int) $revision['id'], $this->db->path());
         return $revision;
     }
 

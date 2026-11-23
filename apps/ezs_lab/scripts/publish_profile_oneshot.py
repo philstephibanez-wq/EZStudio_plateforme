@@ -137,11 +137,12 @@ def main():
     parser.add_argument('--run-id', type=int, required=True)
     parser.add_argument('--producer', choices=['lab', 'assistant'], required=True)
     parser.add_argument('--revision-id', type=int)
+    parser.add_argument('--db', type=Path, required=True, help='Explicit LAB SQLite path supplied by LAB')
     args = parser.parse_args()
     if not enabled():
         return 0
     try:
-        outcome = publish_once(args.run_id, args.producer, args.revision_id)
+        outcome = publish_once(args.run_id, args.producer, args.revision_id, db_path=args.db)
         if outcome == 'not_persisted':
             raise ValueError('profile_result_not_persisted')
         return 0

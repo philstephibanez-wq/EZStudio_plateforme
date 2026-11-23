@@ -33,7 +33,7 @@ final class ProfileReportPublication
         }
     }
 
-    public function publish(int $runId, string $producer, ?int $revisionId = null): void
+    public function publish(int $runId, string $producer, ?int $revisionId = null, ?string $databasePath = null): void
     {
         if (!$this->enabled()) {
             return; // No report, no publication log, no process and no Git access.
@@ -51,6 +51,9 @@ final class ProfileReportPublication
             '--run-id', (string) $runId, '--producer', $producer];
         if ($revisionId !== null && $revisionId > 0) {
             array_push($command, '--revision-id', (string) $revisionId);
+        }
+        if ($databasePath !== null && $databasePath !== '') {
+            array_push($command, '--db', $databasePath);
         }
         try {
             // pythonw.exe has no console: never create a focus-stealing window.
