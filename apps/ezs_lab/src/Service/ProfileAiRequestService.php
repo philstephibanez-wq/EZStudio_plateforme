@@ -13,7 +13,6 @@ final class ProfileAiRequestService
     public function __construct(
         private readonly Database $db,
         private readonly ?LocalProfileQueue $localQueue = null,
-        private readonly ?ProfileReportPublication $reports = null,
         private readonly ?OrchestratorQueueClient $orchestratorQueue = null,
     ) {}
 
@@ -369,7 +368,6 @@ SQL);
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $e;
         }
-        ($this->reports ?? new ProfileReportPublication())->publish($runId, 'assistant', (int) $revision['id'], $this->db->path());
         return $revision;
     }
 

@@ -28,7 +28,6 @@ final class ProfileOnceCommand extends Command
         private readonly AnalysisRunRegistry $runs,
         private readonly ProfileExecutionService $profile,
         private readonly OrchestratorQueueClient $orchestratorQueue,
-        private readonly ?\EZSLab\Service\ProfileReportPublication $reports = null,
     ) {
         parent::__construct();
     }
@@ -232,7 +231,6 @@ final class ProfileOnceCommand extends Command
             // Exact historic output registration and preset capture service.
             $this->profile->completeFromJob($jobId);
             $this->database->completeAnalysisJob($jobId);
-            ($this->reports ?? new \EZSLab\Service\ProfileReportPublication())->publish((int) $run['id'], 'lab', null, $this->database->path());
             EzsFifoTrace::log('E2E_PROFILE_COMPLETED',['global_job_id'=>$traceGlobal,'local_job_id'=>$jobId,'run_id'=>(int)$run['id']]);
             $output->writeln('PROFILE_ONCE_COMPLETED job='.$jobId.' run='.(int)$run['id']);
             return Command::SUCCESS;
@@ -243,7 +241,6 @@ final class ProfileOnceCommand extends Command
                 try {
                     $this->profile->failFromJob($jobId, $error->getMessage());
                     $this->database->failAnalysisJob($jobId, $error->getMessage());
-                    ($this->reports ?? new \EZSLab\Service\ProfileReportPublication())->publish((int) ($queuedJob['scientific_run_id'] ?? 0), 'lab', null, $this->database->path());
                 } catch (\Throwable) {
                     // Preserve the original exception; operator inspects the stored run.
                 }

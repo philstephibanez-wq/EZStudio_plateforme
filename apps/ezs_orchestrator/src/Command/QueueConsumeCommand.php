@@ -97,7 +97,6 @@ info>[Job #%d]
                         throw new \RuntimeException('queue_worker_already_failed');
                     }
                     EzsFifoTrace::log('E2E_GLOBAL_TERMINAL',['global_job_id'=>$id,'source'=>$source,'result'=>'completed']);
-                    $this->publishReports($source, $platformRoot, $output);
                     $output->writeln(sprintf('
 <
 info>[Job #%d]
@@ -201,16 +200,6 @@ error>[Job #%d] ended (KO): %s
         }
 
         throw new \RuntimeException(sprintf('unsupported_actor_dispatch:%s', $source));
-    }
-
-    private function publishReports(string $source, string $platformRoot, OutputInterface $output): void
-    {
-        $python = is_file('H:/Python/pythoncore-3.14-64/python.exe') ? 'H:/Python/pythoncore-3.14-64/python.exe' : 'python';
-        $script = $platformRoot . '/apps/ezs_lab/scripts/publish_run_reports.py';
-        if (!is_file($script)) { return; }
-        $proc = new Process([$python, $script, '--producer', $source, '--limit', '5', '--state-dir', 'H:/EZStudio_Run_Reports_state'], $platformRoot . '/apps/ezs_lab');
-        $proc->setTimeout(60);
-        try { $proc->run(); $output->write($proc->getOutput()); } catch (\Throwable) {}
     }
 
     /** @param list

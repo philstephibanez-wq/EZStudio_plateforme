@@ -62,12 +62,6 @@
         <span class="meta">#{{ selected_song.id }}{% if selected_profile_run and selected_profile_run.metrics.duration_seconds is defined %} · {{ selected_profile_run.metrics.duration_seconds|number_format(1) }} s{% endif %}</span>
       {% else %}<h1>PROFILE</h1>{% endif %}
     </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <label for="profile-report-publication-enabled" style="font-size:11px;cursor:pointer">
-        <input type="checkbox" id="profile-report-publication-enabled" {% if profile_report_publication_enabled %}checked{% endif %}> Auto-GitHub
-      </label>
-      <span id="profile-report-publication-status" class="meta" style="font-size:11px"></span>
-    </div>
   </div>
 </section>
 <script>
@@ -94,10 +88,6 @@
     pen?.addEventListener('click',()=>setEdit(true)); btnCancel?.addEventListener('click',cancelEdit); btnSave?.addEventListener('click',saveEdit);
     [tEl,aEl].forEach(el=>el.addEventListener('keydown',(e)=>{if(el.readOnly)return;if(e.key==='Enter'){e.preventDefault();saveEdit();}else if(e.key==='Escape'){e.preventDefault();cancelEdit();}}));
   }
-  document.getElementById('profile-report-publication-enabled')?.addEventListener('change',async function(){
-    const cb=this,st=document.getElementById('profile-report-publication-status'),w=cb.checked;cb.disabled=true;st.textContent='…';
-    try{const b=new FormData();b.append('enabled',w?'1':'0');const r=await fetch({{ path('profile_report_publication')|json_encode|raw }},{method:'POST',credentials:'same-origin',headers:{'X-EZS-Reports-Settings':'save'},body:b});const d=await r.json();if(!r.ok||d.ok!==true)throw new Error();st.textContent=w?'ON':'OFF';}catch(_){cb.checked=!w;st.textContent='Err';}finally{cb.disabled=false;}
-  });
 })();
 </script>
 {% if selected_song %}
