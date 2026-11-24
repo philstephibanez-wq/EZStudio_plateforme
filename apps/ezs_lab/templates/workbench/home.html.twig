@@ -36,9 +36,15 @@
     <button type="submit" class="secondary">Tout analyser</button>
   </form>
   <form method="post" action="{{ path('profile_expertise_all') }}" class="catalog-profile-all-form" data-confirm="Lancer une expertise IA sur toutes les chansons analysées du catalogue ? Les expertises déjà actives seront ignorées." style="display:inline"><button type="submit" class="secondary">Tout expertiser</button></form>
-  <a class="button secondary"
-     href="{{ path('profile_export_all_zip') }}"
-     title="Exporter tous les résultats PROFILE disponibles">ZIP ALL</a>
+  <form method="post" action="{{ path('profile_corpus_export') }}" class="catalog-profile-export-form" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <label for="profile-export-count" class="meta">Expertises/chanson</label>
+    <select id="profile-export-count" name="revisions" aria-label="Nombre d'expertises par chanson" title="Nombre de révisions d'expertise par chanson">
+      <option value="2">2 dernières</option>
+      <option value="5" selected>5 dernières</option>
+      <option value="all">Toutes</option>
+    </select>
+    <button type="submit" class="secondary" title="Exporter les dernières expertises et les analyses PROFILE associées">Exporter tous les PROFILE</button>
+  </form>
 </div>
 
 <div class="card" id="catalog-live-phase">
@@ -66,25 +72,13 @@
     {% set s = attribute(song, key) %}
     <td>
       {% if s.state == 'done' %}
-        <span class="badge ok">Prêt{% if s.version %} · <span class="catalog-version">{{ s.version|replace({'PROFILE.':'','STEMS.':'','CHORDS.':'','LYRICS.':''}) }}</span>{% endif %}</span>
-        {% if key == 'profile' %}
-          {% if song.profile_ai_reviewed ?? false %}
-            <div>
-              <span class="badge ok" title="Avis IA documentaire déjà enregistré ; sans validation scientifique">Révisé par l’IA</span>
-              <a href="{{ path('workbench_profile', {song: song.id, run: song.profile.run_id}) }}#profile-ai-revision-{{ song.profile_ai_revision_id }}">
-                <span class="meta">Voir la révision #{{ song.profile_ai_revision_id }}</span>
-              </a>
-            </div>
-          {% endif %}
-        {% endif %}
+        <span class="badge ok">{{ key == 'profile' ? 'Analyse : prête' : 'Prêt' }}{% if s.version %} · <span class="catalog-version">{{ s.version|replace({'PROFILE.':'','STEMS.':'','CHORDS.':'','LYRICS.':''}) }}</span>{% endif %}</span>
       {% elseif key == 'profile' and s.state == 'legacy_fifo' %}
         <span class="badge">Ancienne tentative FIFO (historique)</span>
       {% elseif s.state == 'queued' %}
-        <span class="badge" data-analysis-active="1">En attente{% if s.progress is not null %} · {{ s.progress }}%{% endif %}</span>
-        {% if s.job_id %}<button type="button" class="secondary catalog-job-cancel" data-job-cancel-url="{{ path('analysis_job_cancel',{id:s.job_id}) }}" data-job-id="{{ s.job_id }}" title="Annuler le job #{{ s.job_id }}">■</button>{% endif %}
+        <span class="badge" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : en attente' : 'En attente' }}</span>
       {% elseif s.state == 'running' or s.job_status == 'cancelling' %}
-        <span class="badge warn" data-analysis-active="1">{{ s.job_status == 'cancelling' ? 'Annulation…' : 'En cours' }}{% if s.progress is not null %} · {{ s.progress }}%{% endif %}</span>
-        {% if s.job_id %}<button type="button" class="secondary catalog-job-cancel" data-job-cancel-url="{{ path('analysis_job_cancel',{id:s.job_id}) }}" data-job-id="{{ s.job_id }}" title="Annuler le job #{{ s.job_id }}">■</button>{% endif %}
+        <span class="badge warn" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : en cours' : 'En cours' }}</span>
       {% elseif s.state == 'cancelled' or s.job_status == 'cancelled' %}
         <span class="badge">Annulé</span>
       {% elseif s.state == 'error' %}
@@ -96,48 +90,16 @@
       {% endif %}
       {% if key == 'profile' %}
           {% set expertise = expertise_by_song[song.id] ?? {active: [], latest: null} %}
-          {% for job in expertise.active %}
+          {% if expertise.active is not empty %}
+            {% set activeExpertise = expertise.active|filter(j => j.status in ['running', 'cancelling']) %}
             <div class="meta" data-analysis-active="1">
-              EXPERTISE IA · Job #{{ job.job_id }} · Position {{ job.position }}
-              · {{ job.status == 'queued' ? 'En attente' : (job.status == 'cancelling' ? 'Annulation demandée' : 'En cours') }}
-              · {{ job.progress }} %
-              {% if job.status in ['queued', 'running'] %}
-                <button type="button" class="secondary catalog-job-cancel"
-                        data-job-cancel-url="{{ path('analysis_job_cancel', {id: job.job_id}) }}"
-                        data-job-id="{{ job.job_id }}"
-                        title="Annuler l’expertise #{{ job.job_id }}"
-                        aria-label="Annuler l’expertise #{{ job.job_id }}">■ Annuler</button>
-              {% endif %}
+              <span class="badge {{ activeExpertise is not empty ? 'warn' : '' }}">Expertise : {{ activeExpertise is not empty ? 'en cours' : 'en attente' }}</span>
             </div>
-          {% else %}
-            {% if expertise.latest is not null %}
-              <div class="meta">
-                Dernière expertise · Job #{{ expertise.latest.job_id }}
-                · {% if expertise.latest.status == 'cancelled' %}Annulée{% elseif expertise.latest.status == 'completed' %}Terminée{% elseif expertise.latest.status == 'error' %}Erreur{% else %}{{ expertise.latest.status }}{% endif %}
-              </div>
-            {% elseif not (song.profile_ai_reviewed ?? false) %}
-              <div class="meta">Aucune expertise demandée</div>
-            {% endif %}
-          {% endfor %}
-      {% endif %}
-      {% if key == 'profile' and s.state == 'done' and s.run_id %}
-        <div class="meta"><a href="{{ path('workbench_profile',{song:song.id,run:s.run_id}) }}">Résultat scientifique #{{ s.run_id }}</a></div>
-      {% endif %}
-      {% if key == 'profile' and s.latest_attempt is defined and s.latest_attempt is not null %}
-        {% set attempt = s.latest_attempt %}
-        {% if attempt.state == 'error' %}
-          <div class="catalog-attempt"><span class="badge error">Dernier essai : erreur</span></div>
-        {% elseif attempt.state == 'cancelled' %}
-          <div class="catalog-attempt"><span class="badge">Dernier essai : annulé</span></div>
-        {% elseif attempt.state == 'legacy_fifo' %}
-          <div class="catalog-attempt"><span class="badge">Ancienne tentative FIFO (historique)</span></div>
-        {% elseif attempt.state == 'queued' %}
-          <div class="catalog-attempt"><span class="badge" data-analysis-active="1">Dernier essai : en attente</span>
-          {% if attempt.job_id %}<button type="button" class="secondary catalog-job-cancel" data-job-cancel-url="{{ path('analysis_job_cancel',{id:attempt.job_id}) }}" data-job-id="{{ attempt.job_id }}" title="Annuler le job #{{ attempt.job_id }}">■</button>{% endif %}</div>
-        {% elseif attempt.state == 'running' %}
-          <div class="catalog-attempt"><span class="badge warn" data-analysis-active="1">Dernier essai : en cours</span>
-          {% if attempt.job_id %}<button type="button" class="secondary catalog-job-cancel" data-job-cancel-url="{{ path('analysis_job_cancel',{id:attempt.job_id}) }}" data-job-id="{{ attempt.job_id }}" title="Annuler le job #{{ attempt.job_id }}">■</button>{% endif %}</div>
-        {% endif %}
+          {% elseif expertise.latest is not null %}
+            <div class="meta"><span class="badge {{ expertise.latest.status == 'error' ? 'error' : (expertise.latest.status == 'completed' ? 'ok' : '') }}">Expertise : {{ expertise.latest.status == 'completed' ? 'terminée' : (expertise.latest.status == 'error' ? 'erreur' : (expertise.latest.status == 'cancelled' ? 'annulée' : 'en attente')) }}</span></div>
+          {% elseif not (song.profile_ai_reviewed ?? false) %}
+            <div class="meta">Expertise : non demandée</div>
+          {% endif %}
       {% endif %}
     </td>
   {% endfor %}
@@ -208,4 +170,23 @@
 </table>
 </div>
 
+<script>
+/* EZS_R1H_CATALOGUE_LIVE — read-only refresh, no server-side job mutations. */
+(function () {
+  let pending = false;
+  window.setInterval(async function () {
+    if (pending || document.visibilityState !== 'visible') return;
+    pending = true;
+    try {
+      const response = await fetch(window.location.href, {cache:'no-store', credentials:'same-origin'});
+      if (!response.ok) return;
+      const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const old = document.getElementById('catalog-live-phase');
+      const next = page.getElementById('catalog-live-phase');
+      if (old && next) old.replaceWith(document.importNode(next, true));
+    } catch (_) { /* Keep last known state; never invent job progress. */ }
+    finally { pending = false; }
+  }, 4000);
+}());
+</script>
 {% endblock %}

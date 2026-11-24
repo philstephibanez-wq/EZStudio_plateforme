@@ -25,9 +25,10 @@ def event(name, data=None, *, since_ns=None):
     if not enabled(): return False
     target=os.getenv('EZS_PROFILE_FORENSIC_DIR','')
     if not target: return False
-    from profile_forensic_archive import clean
-    audit=[]
+    # EZS_PROFILE_FORENSIC_IMPORT_ISOLATION_R1: observer failures cannot abort the scientific worker.
     try:
+        from profile_forensic_archive import clean
+        audit=[]
         payload=clean(data or {},audit)
         entry={'schema':'ezs.profile-engine-step.v1','event':name,
                'at_utc':dt.datetime.now(dt.timezone.utc).isoformat(),

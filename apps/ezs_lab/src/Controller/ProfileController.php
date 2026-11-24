@@ -31,6 +31,7 @@ final class ProfileController extends AbstractController
         ProfileFrenchSummary $summary,
         ProfileValidationService $validation,
         ProfileExternalReviewService $externalReview,
+        \EZSLab\Service\Database $db,
     ): Response {
         $song = $catalog->selectedSong($this->songId($request));
         $runs = [];
@@ -68,6 +69,29 @@ final class ProfileController extends AbstractController
             }
         }
         usort($songRevisions, static fn(array $a, array $b): int => (int)$b['id'] <=> (int)$a['id']);
+
+        // EZS_R1H_ACTIVE_RUN: select the run of the currently executing expertise,
+        // but never override a historical run explicitly requested by the user.
+        if (!$request->query->has('run') && $selected === null && $song && $runs !== []) {
+            $songIds = array_values(array_unique(array_filter(array_map('intval',
+                $song['song_ids'] ?? [(int)$song['id']]), static fn(int $id): bool => $id > 0)));
+            if ($songIds !== []) {
+                $marks = implode(',', array_fill(0, count($songIds), '?'));
+                $stmt = $db->pdo()->prepare("SELECT scientific_run_id FROM analysis_jobs
+                    WHERE song_id IN ($marks) AND kind='assistant.profile.review'
+                    AND dispatch_owner='lab' AND status IN ('running','cancelling','queued')
+                    ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'cancelling' THEN 1 ELSE 2 END,
+                             id ASC LIMIT 1");
+                $stmt->execute($songIds);
+                $activeRunId = (int)($stmt->fetchColumn() ?: 0);
+                foreach ($runs as $candidate) {
+                    if ($activeRunId > 0 && (int)$candidate['id'] === $activeRunId) {
+                        $selected = $candidate;
+                        break;
+                    }
+                }
+            }
+        }
 
         // Without an explicit run selection, open the run owning the latest
         // expertise of this song. Never hide historical expertise just because

@@ -451,6 +451,12 @@ def attach_documentary_findings(verification, investigation, local_review):
         has_valid_url = any(isinstance(s, str) and s.startswith("https://") for s in (urls or []))
         if final_verdict in ("bon", "faux") and (not has_valid_url or not bool((investigation or {}).get("available", True))):
             final_verdict = "non_trouve"; comparison = "unverified"; reason_txt = "Traçabilité documentaire insuffisante (URL source ou validation externe absente)."
+        # Never upgrade an advisory textual candidate to a certified verdict,
+        # even when an independent identity signal or comparison is positive.
+        if review.get('advisory_only') is True:
+            final_verdict = 'non_trouve'
+            comparison = review.get('advisory_decision') or comparison
+            reason_txt = review.get('reason') or reason_txt
         assertion["verdict"] = final_verdict if final_verdict in ("bon", "faux") else "non_trouve"
         if value is not None:
             assertion["reference_value"] = (str(value).strip() + gap_note)[:160]
@@ -466,6 +472,13 @@ def attach_documentary_findings(verification, investigation, local_review):
             "citations": urls[:12],
             "recording_identity_confirmed": id_confirmed,
             "scientific_validation": False,
+            "advisory_only": review.get('advisory_only') is True,
+            "advisory_decision": review.get('advisory_decision') if review.get('advisory_only') is True else None,
+            "evidence_confidence_index": review.get('evidence_confidence_index') if review.get('evidence_confidence_index') in (90, 100) else None,
+            "evidence_confidence_basis": review.get('evidence_confidence_basis'),
+            "evidence_supporting_sets": review.get('evidence_supporting_sets') or [],
+            "evidence_intersection": review.get('evidence_intersection') is True,
+            "item_documentary_consensus": review.get('item_documentary_consensus') if isinstance(review.get('item_documentary_consensus'), dict) else None,
             "reason": reason_txt,
         }
     merged["web_investigation"] = investigation

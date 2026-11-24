@@ -124,6 +124,36 @@ def _startup_code_provenance():
 
 STARTUP_PROVENANCE = _startup_code_provenance()
 
+
+def _expertise_engine_provenance():
+    """Version from loaded Python bytecode plus non-authoritative disk digests.
+
+    This is not a scientific accuracy claim, nor a historical version inference.
+    It fingerprints the executable entry points used by this worker process.
+    """
+    import marshal
+    functions = {
+        'final_verifier': verify_final_values,
+        'documentary_verdict_merger': attach_documentary_findings,
+        'public_source_research': research_public_sources,
+        'review_payload_builder': build_review_payload,
+        'documentary_payload_enricher': enrich_review_payload_with_documentary,
+        'ai_draft_payload_enricher': enrich_review_payload_with_ai,
+        'item_research': research_each_assertion,
+        'local_ai_document_review': review_web_items,
+    }
+    loaded = {name: hashlib.sha256(marshal.dumps(fn.__code__)).hexdigest()
+              for name, fn in sorted(functions.items())}
+    fingerprint = hashlib.sha256(json.dumps(loaded, sort_keys=True, separators=(',', ':')).encode('ascii')).hexdigest()
+    return {
+        'schema': 'ezs.profile.expertise-engine-provenance.v1',
+        'engine_id': 'independent-evidence-verifier',
+        'engine_version': 'code-sha256:' + fingerprint,
+        'loaded_entrypoint_sha256': loaded,
+        'worker_startup': STARTUP_PROVENANCE,
+        'capture_semantics': 'loaded_entrypoint_bytecode; dependencies/config not fully attested',
+    }
+
 BASE = os.environ.get('EZSTUDIOLAB_ASSISTANT_BASE_URL', 'http://127.0.0.1:8701').rstrip('/')
 
 def _load_lab_token():
@@ -207,6 +237,10 @@ def assert_running(run_id, job_id):
 def process(run_id, client, check_cancel=None):
     print('E2E_ASSISTANT_PROCESS_R2', 'global_job_id=' + str(os.environ.get('ORCHESTRATOR_JOB_ID', 'missing')), 'run_id=' + str(run_id), flush=True)
     _CURRENT_STEPS.clear()
+    # Distinct execution identity survives in the revision key; retries cannot
+    # silently overwrite the previous expertise's comparison_json.
+    import uuid
+    execution_id = uuid.uuid4().hex
     check_cancel = check_cancel or (lambda: None)
     check_cancel()
     row = api('/internal/analysis/desktop/profile/reviews/run/' + str(run_id))['item']
@@ -290,6 +324,10 @@ def process(run_id, client, check_cancel=None):
     payload = call_engine("ai_draft_payload_enricher", enrich_review_payload_with_ai, payload, ai)
     payload.setdefault('comparison', {})['final_verification'] = verification
     payload['comparison']['engine_steps'] = list(_CURRENT_STEPS)
+    # Provenance of the *loaded* decision functions, not a guessed semantic version.
+    provenance = _expertise_engine_provenance()
+    payload['comparison']['expertise_engine_provenance'] = provenance
+    payload['comparison']['profile_scientific_engine'] = row.get('engine')
     payload.setdefault('consensus', {})['final_verification_summary'] = {
         'bon': sum(x['verdict']=='bon' for x in verification['assertions']),
         'faux': sum(x['verdict']=='faux' for x in verification['assertions']),
@@ -318,9 +356,11 @@ def process(run_id, client, check_cancel=None):
     digest = hashlib.sha256(json.dumps(
         {'ai': ai, 'verification': verification,
          'documentary': payload.get('comparison', {}).get('documentary_catalogue_suggestions'),
-         'run_id': run_id}, sort_keys=True, ensure_ascii=True
+         'run_id': run_id, 'expertise_provenance': provenance,
+         'execution_id': execution_id}, sort_keys=True, ensure_ascii=True
     ).encode('utf-8')).hexdigest()[:20]
-    payload['revision_key'] = 'profile-ui-qwen-' + str(run_id) + '-' + digest
+    # A new expertise execution must never UPSERT an earlier historical revision.
+    payload['revision_key'] = 'profile-provenance-' + str(run_id) + '-' + digest
     snap('lab.submit.request', payload)
     started = time.perf_counter_ns()
     try:

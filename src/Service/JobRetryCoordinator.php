@@ -32,6 +32,15 @@ final class JobRetryCoordinator
             $this->entityManager->clear();
             $job=$this->entityManager->find(JobQueue::class,$queueJobId);
             if (!$job instanceof JobQueue) return ['ok'=>false,'reason'=>'tache_introuvable','job'=>null];
+            // EZS_FIFO_ACTIVE_RETRY_R1B: retry is reserved to the ONE job
+            // currently blocking the queue; historical failures cannot re-enter.
+            $pauseFile = dirname(__DIR__, 2) . '/var/orchestrator_queue_paused_on_error.json';
+            $pauseRaw = is_file($pauseFile) ? @file_get_contents($pauseFile) : false;
+            $pause = is_string($pauseRaw) ? json_decode($pauseRaw, true) : null;
+            if (!is_array($pause) || ($pause['schema'] ?? null) !== 'ezs.queue.pause_on_ko.v1'
+                || ($pause['global_job_id'] ?? null) !== $queueJobId) {
+                return ['ok'=>false,'reason'=>'job_non_bloquant_de_la_fifo','job'=>$job];
+            }
             if ($job->getStatus()!==JobQueue::STATUS_ENDED || !$job->hasError()) return ['ok'=>false,'reason'=>'tache_non_en_erreur','job'=>$job];
             if ($job->getWorkerPid()!==null && $this->queueManager->isProcessAlive($job->getWorkerPid())) return ['ok'=>false,'reason'=>'processus_encore_actif','job'=>$job];
             $source=$job->getSource();$payload=$job->getPayload();

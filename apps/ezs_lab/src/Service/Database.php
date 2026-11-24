@@ -23,6 +23,9 @@ final class Database
         $pdo = new PDO('sqlite:'.$this->databasePath);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        // R1F: concurrent HTTP admissions must wait for transient SQLite writers.
+        $pdo->setAttribute(PDO::ATTR_TIMEOUT, 15);
+        $pdo->exec('PRAGMA busy_timeout = 15000');
         $pdo->exec('PRAGMA foreign_keys = ON');
         $pdo->exec('PRAGMA journal_mode = WAL');
 

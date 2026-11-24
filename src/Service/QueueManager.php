@@ -113,12 +113,30 @@ SQL, ['job_id' => (int) $jobId]);
 
     public function claimNextWaiting(): ?JobQueue
     {
+        // EZS_QUEUE_STOP_ON_KO_R1: persistent pause is authoritative for GO.
+        // This is checked before each claim, including after an EZS restart.
+        // The global consumer lock prevents a concurrent pause/claim on MAIN.
+        $pausePath = dirname(__DIR__, 2) . '/var/orchestrator_queue_paused_on_error.json';
+        // EZS_FIFO_ACTIVE_RETRY_R1B: while blocked, ONLY the exact failed job
+        // may be re-executed after its explicit manual retry has set waiting.
+        $blockedId = null;
+        if (is_file($pausePath)) {
+            $rawPause = @file_get_contents($pausePath);
+            $pause = is_string($rawPause) ? json_decode($rawPause, true) : null;
+            if (!is_array($pause) || ($pause['schema'] ?? null) !== 'ezs.queue.pause_on_ko.v1'
+                || !is_int($pause['global_job_id'] ?? null) || $pause['global_job_id'] <= 0) {
+                return null; // unreadable barrier: fail closed
+            }
+            $blockedId = $pause['global_job_id'];
+        }
         $conn = $this->entityManager->getConnection();
         $conn->beginTransaction();
         try {
             $activeCount = (int) $conn->fetchOne("SELECT COUNT(*) FROM job_queue WHERE status IN ('progressing', 'cancelling')");
             if ($activeCount > 0) { $conn->commit(); return null; }
-            $id = $conn->fetchOne("SELECT id FROM job_queue WHERE status = 'waiting' ORDER BY created_at ASC, id ASC LIMIT 1");
+            $id = $blockedId !== null
+                ? $conn->fetchOne("SELECT id FROM job_queue WHERE id = :id AND status = 'waiting' LIMIT 1", ['id' => $blockedId])
+                : $conn->fetchOne("SELECT id FROM job_queue WHERE status = 'waiting' ORDER BY created_at ASC, id ASC LIMIT 1");
             if ($id === false || $id === null) { $conn->commit(); return null; }
             $this->entityManager->clear();
             $job = $this->entityManager->find(JobQueue::class, (int) $id);

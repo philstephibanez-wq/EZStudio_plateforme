@@ -118,6 +118,14 @@ final class ProfileAiRequestService
             // A user-triggered request is NEW: never recycle an older LAB job.
             // An Orchestrator retry uses a separate endpoint, retaining its global ID.
             EzsFifoTrace::log('EXPERTISE_NEW_REQUEST',['run_id'=>$runId,'previous_local_job_id'=>(int)($current['job_id']??0),'previous_global_job_id'=>(int)($current['queue_id']??0)]);
+            // R1I: a still-active request must not be duplicated during an interrupted ACK.
+            // The verified global receipt guard owns recovery of unlinked historical requests.
+            $activeReq = $pdo->prepare("SELECT id,request_json FROM analysis_jobs WHERE scientific_run_id=? AND kind=? AND dispatch_owner='lab' AND status IN ('queued','running','cancelling') ORDER BY id DESC LIMIT 2");
+            $activeReq->execute([$runId,self::KIND]);
+            $activeRows = $activeReq->fetchAll(\PDO::FETCH_ASSOC);
+            if ($activeRows !== []) {
+                throw new \RuntimeException('expertise_active_request_exists_reconcile_before_new_admission');
+            }
             $now=gmdate('c');
             // Each explicit NEW expertise request owns a fresh local job identity.
             // Do not reset a completed/failed historical job: Orchestrator dedupes
@@ -127,8 +135,14 @@ final class ProfileAiRequestService
             $req=json_encode(['phase'=>'profile','scientific_run_id'=>$runId,'processor'=>'qwen','schema'=>'ezs.assistant.profile.job.v1'],JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
             $pdo->prepare('INSERT INTO analysis_jobs(run_id,scientific_run_id,song_id,kind,status,progress,request_json,error,created_at,updated_at) VALUES(NULL,?,?,?,\'queued\',0,?,NULL,?,?)')
                 ->execute([$runId,(int)$run['song_id'],self::KIND,$req,$now,$now]);
+            $createdJobId = (int)$pdo->lastInsertId();
+            if ($createdJobId <= 0) { throw new \RuntimeException('expertise_local_insert_identity_missing'); }
             $pdo->commit();
+            // R1I: never adopt another concurrent request for this run.
             $created = $this->latest($runId) ?? throw new \RuntimeException('ai_job_insert_failed');
+            if ((int)($created['job_id'] ?? 0) !== $createdJobId) {
+                throw new \RuntimeException('expertise_local_insert_identity_race');
+            }
             $songTitle = trim((string) ($run['title'] ?? ''));
             try {
                 EzsFifoTrace::log('EXPERTISE_DISPATCH',['run_id'=>$runId,'local_job_id'=>(int)$created['job_id'],'source'=>'assistant']);
@@ -153,11 +167,38 @@ final class ProfileAiRequestService
                     'processor'=>'qwen', 'schema'=>'ezs.assistant.profile.job.v1',
                     'orchestrator_queue_id'=>$orchQueueId,
                 ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
-                $patch = $pdo->prepare('UPDATE analysis_jobs SET request_json=? WHERE id=? AND status=?');
-                $patch->execute([$reqPatch, (int)$created['job_id'], 'queued']);
+                // R1F: dispatch has already been ACKed; never re-dispatch on SQLITE_BUSY.
+                // Retry only the local receipt persistence, with identical job identity.
+                for ($admissionTry = 1; $admissionTry <= 3; ++$admissionTry) {
+                    try {
+                        $patch = $pdo->prepare('UPDATE analysis_jobs SET request_json=? WHERE id=? AND status=? AND dispatch_owner=?');
+                        $patch->execute([$reqPatch, (int)$created['job_id'], 'queued', 'lab']);
+                        break;
+                    } catch (\PDOException $writeError) {
+                        $busy = str_contains(strtolower($writeError->getMessage()), 'database is locked')
+                            || str_contains(strtolower($writeError->getMessage()), 'database is busy');
+                        if (!$busy || $admissionTry === 3) { throw $writeError; }
+                        EzsFifoTrace::log('EXPERTISE_RECEIPT_BUSY_RETRY', [
+                            'run_id' => $runId, 'local_job_id' => (int)$created['job_id'],
+                            'global_job_id' => $orchQueueId, 'attempt' => $admissionTry,
+                        ]);
+                        usleep(150000 * $admissionTry);
+                    }
+                }
                 EzsFifoTrace::log('EXPERTISE_PERSIST',['run_id'=>$runId,'local_job_id'=>(int)$created['job_id'],'global_job_id'=>$orchQueueId,'result'=>$patch->rowCount()===1?'ok':'failed']);
                 if ($patch->rowCount() !== 1) {
                     throw new \RuntimeException('expertise_admission_identity_lost');
+                }
+                // R1I: commit the receipt and read it back before acknowledging admission.
+                $verifyReceipt = $pdo->prepare('SELECT scientific_run_id,kind,status,dispatch_owner,request_json FROM analysis_jobs WHERE id=?');
+                $verifyReceipt->execute([(int)$created['job_id']]);
+                $confirmed = $verifyReceipt->fetch(\PDO::FETCH_ASSOC);
+                $confirmedRequest = is_array($confirmed) ? json_decode((string)($confirmed['request_json'] ?? ''), true) : null;
+                if (!is_array($confirmed) || (int)$confirmed['scientific_run_id'] !== $runId
+                    || (string)$confirmed['kind'] !== self::KIND || (string)$confirmed['status'] !== 'queued'
+                    || (string)$confirmed['dispatch_owner'] !== 'lab' || !is_array($confirmedRequest)
+                    || (int)($confirmedRequest['orchestrator_queue_id'] ?? 0) !== $orchQueueId) {
+                    throw new \RuntimeException('expertise_receipt_readback_failed');
                 }
             } catch (\Throwable $admissionError) {
                 EzsFifoTrace::log('EXPERTISE_DISPATCH_ERROR',['run_id'=>$runId,'local_job_id'=>(int)$created['job_id'],'exception'=>get_class($admissionError),'reason'=>$admissionError->getMessage()]);

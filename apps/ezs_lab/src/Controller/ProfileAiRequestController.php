@@ -28,6 +28,55 @@ final class ProfileAiRequestController extends AbstractController
             $item['status'] = 'admission_error';
             $item['message'] = 'expertise_non_admise_dans_orchestrator';
         }
+        // EZS_R1H_GLOBAL_PROGRESS: overlay only the exact global job receipt.
+        // The global queue owns the percentage; LAB owns the detailed checkpoints.
+        if ($globalId > 0 && $localId > 0) {
+            try {
+                $dbPath = dirname(__DIR__, 4) . '/data/databases/EZS_Orchestrator.sqlite';
+                if (is_file($dbPath)) {
+                    $uri = 'file:' . str_replace(['%', '?', '#'], ['%25', '%3F', '%23'], str_replace('\\', '/', $dbPath)) . '?mode=ro';
+                    $pdo = new \PDO('sqlite:' . $uri, null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_TIMEOUT => 2]);
+                    $stmt = $pdo->prepare('SELECT status, progress, has_error, payload FROM job_queue WHERE id=?');
+                    $stmt->execute([$globalId]);
+                    $global = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if (is_array($global)) {
+                        $payload = json_decode((string)($global['payload'] ?? ''), true);
+                        if (is_array($payload) && ($payload['job'] ?? '') === 'profile.review'
+                            && (int)($payload['job_id'] ?? 0) === $localId
+                            && (int)($payload['run_id'] ?? 0) === (int)($item['run_id'] ?? 0)) {
+                            $globalState = (string)$global['status'];
+                            $localState = (string)($item['status'] ?? '');
+                            if (in_array($localState, ['queued', 'running', 'cancelling'], true)) {
+                                if ($globalState === 'progressing') $item['status'] = 'running';
+                                if ($globalState === 'waiting') $item['status'] = 'queued';
+                                if ($globalState === 'ended' && (int)$global['has_error'] === 1) $item['status'] = 'error';
+                                $item['progress'] = max(0, min(100, (int)$global['progress']));
+                            }
+                        }
+                    }
+                    $stmt = null;
+                    $pdo = null;
+                }
+            } catch (\Throwable $e) {
+                // Preserve genuine LAB state if global read is temporarily unavailable.
+                error_log('EZS_R1H_GLOBAL_PROGRESS_READ_UNAVAILABLE:'.get_class($e));
+            }
+        }
+        // A stage is active only if its start has no matching completion checkpoint.
+        $open = [];
+        foreach (($item['checkpoints'] ?? []) as $event) {
+            $key = (string)($event['event_key'] ?? '');
+            if (str_starts_with($key, 'engine.start.')) {
+                $open[substr($key, strlen('engine.start.'))] = (string)($event['created_at'] ?? '');
+            } elseif (str_starts_with($key, 'engine.')) {
+                unset($open[substr($key, strlen('engine.'))]);
+            }
+        }
+        if (in_array((string)($item['status'] ?? ''), ['running','cancelling'], true) && $open !== []) {
+            $name = array_key_last($open);
+            $item['current_stage'] = 'engine.' . $name;
+            $item['step_started_at'] = $open[$name];
+        }
         return $item;
     }
 

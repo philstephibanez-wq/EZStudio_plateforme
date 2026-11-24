@@ -62,6 +62,11 @@
         <span class="meta">#{{ selected_song.id }}{% if selected_profile_run and selected_profile_run.metrics.duration_seconds is defined %} · {{ selected_profile_run.metrics.duration_seconds|number_format(1) }} s{% endif %}</span>
       {% else %}<h1>PROFILE</h1>{% endif %}
     </div>
+    {% if selected_profile_run %}
+      <form method="post" action="{{ path('profile_scientific_export', {id: selected_profile_run.id}) }}" style="margin:0">
+        <button type="submit" class="secondary" title="Télécharger les résultats PROFILE et les expertises enregistrées">Exporter analyse + expertise</button>
+      </form>
+    {% endif %}
   </div>
 </section>
 <script>
@@ -496,7 +501,13 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
   function render(item){
     activeJob=Number(item?.job_id||0); activeLocalJob=Number(item?.analysis_job_id||0); const s=item?.status||'idle'; if(s==='running'||s==='queued') wasActive=true; setFsm(s);
     const pct=s==='completed'?100:(Number.isFinite(Number(item?.progress))?Math.round(Number(item.progress)):0);
-    prog.value=pct; renderPipeline(item); state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='cancelling'?'Annulation en cours':s==='cancelled'?'Annulée':s==='error'?'Erreur':'Prêt')+(item?.queue_id?' · #'+item.queue_id : item?.job_id?' · LAB #'+item.job_id:'')+(item?.message?' · '+item.message:'');
+    prog.value=pct; renderPipeline(item);
+    const stepLabel = item?.current_stage ? (stepNames[item.current_stage] || item.current_stage.replace(/^engine\./, '').replace(/_/g,' ')) : '';
+    const started = item?.step_started_at ? Date.parse(item.step_started_at) : NaN;
+    const elapsed = Number.isFinite(started) && started <= Date.now() ? ' · '+Math.floor((Date.now()-started)/1000)+' s' : '';
+    const currentStep = document.getElementById('profile-ai-step-current');
+    if (currentStep) currentStep.textContent = stepLabel ? stepLabel + elapsed : '';
+    state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='cancelling'?'Annulation en cours':s==='cancelled'?'Annulée':s==='error'?'Erreur':'Prêt')+(item?.queue_id?' · #'+item.queue_id : item?.job_id?' · LAB #'+item.job_id:'')+(item?.message?' · '+item.message:'');
     if(wasActive && s==='completed'){ wasActive=false; window.location.reload(); }
   }
   async function poll(){ try{ const r=await fetch(root.dataset.url,{credentials:'same-origin',cache:'no-store'}); if(r.ok){const j=await r.json(); render(j.request);} }catch(_){} }

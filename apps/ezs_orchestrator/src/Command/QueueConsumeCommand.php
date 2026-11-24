@@ -96,6 +96,20 @@ info>[Job #%d]
                         // Never overwrite or announce that failure as a success.
                         throw new \RuntimeException('queue_worker_already_failed');
                     }
+                    // EZS_FIFO_ACTIVE_RETRY_R1B: a successful retry releases the
+                    // exact blocker. The next normal claim remains FIFO ordered.
+                    $pausePath = $platformRoot . '/var/orchestrator_queue_paused_on_error.json';
+                    if (is_file($pausePath)) {
+                        $pauseRaw = @file_get_contents($pausePath);
+                        $pause = is_string($pauseRaw) ? json_decode($pauseRaw, true) : null;
+                        if (!is_array($pause) || ($pause['schema'] ?? null) !== 'ezs.queue.pause_on_ko.v1'
+                            || !is_int($pause['global_job_id'] ?? null)) {
+                            throw new \RuntimeException('queue_pause_invalid_after_retry');
+                        }
+                        if ($pause['global_job_id'] === $id && !@unlink($pausePath)) {
+                            throw new \RuntimeException('queue_pause_release_failed');
+                        }
+                    }
                     EzsFifoTrace::log('E2E_GLOBAL_TERMINAL',['global_job_id'=>$id,'source'=>$source,'result'=>'completed']);
                     $output->writeln(sprintf('
 <
@@ -105,6 +119,20 @@ info>[Job #%d]
                 } catch (\Throwable $e) {
                     $code = preg_match('/^[A-Za-z0-9_.:-]{1,95}$/D',$e->getMessage()) ? $e->getMessage() : 'exception_message_redacted';
                     EzsFifoTrace::log('E2E_GLOBAL_FAILED',['global_job_id'=>$id,'source'=>$source,'reason'=>$code,'exception'=>get_class($e)]);
+                    // EZS_QUEUE_STOP_ON_KO_R1: persist a fail-closed barrier BEFORE
+                    // freeing the global active slot. Never terminate the active
+                    // worker; runSubprocess() has already waited for its exit.
+                    $pausePath = $platformRoot . '/var/orchestrator_queue_paused_on_error.json';
+                    $pauseRecord = json_encode(['schema'=>'ezs.queue.pause_on_ko.v1',
+                        'global_job_id'=>$id, 'reason'=>$code,
+                        'at_utc'=>gmdate('c')], JSON_THROW_ON_ERROR);
+                    if (!is_file($pausePath)) {
+                        $tempPause = $pausePath . '.' . getmypid() . '.tmp';
+                        if (file_put_contents($tempPause, $pauseRecord . "\n", LOCK_EX) === false
+                            || !rename($tempPause, $pausePath)) {
+                            throw new \RuntimeException('queue_ko_pause_persist_failed', 0, $e);
+                        }
+                    }
                     $terminal = $this->queueManager->markEnded($id, true, $e->getMessage());
                     if (!$terminal instanceof JobQueue || !$terminal->isTerminal()) {
                         // Fail closed: never claim another job while this one might
@@ -119,6 +147,11 @@ info>[Job #%d]
 error>[Job #%d] ended (KO): %s
 <
 /error>', $id, $e->getMessage()));
+                    // EZS_QUEUE_CONSUMER_STAY_ALIVE_ON_KO_R1C: the persistent
+                    // --loop consumer must remain alive while the queue is paused.
+                    // QueueManager denies all claims except an explicitly retried
+                    // blocked job. A one-shot --drain exits on KO as before.
+                    if (!$loop) { return Command::FAILURE; }
                 }
             } while ($loop || $drain);
         } finally {
@@ -163,7 +196,23 @@ error>[Job #%d] ended (KO): %s
                         }
                     }
                 }
-                $this->runSubprocess($id, [$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZSTUDIOLAB_ASSISTANT_BASE_URL' => (string) ($_ENV['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? getenv('EZSTUDIOLAB_ASSISTANT_BASE_URL') ?: 'http://lab.ezstudio.local:8000'), 'EZSTUDIOLAB_ASSISTANT_TOKEN' => $labTok, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 1800, $output);
+                // R1G: required MAIN-owned declarative preset. No implicit fallback.
+                $reviewPresetPath = $platformRoot . '/apps/ezs_lab/presets/assistant/profile-baseline-1.json';
+                if (!is_file($reviewPresetPath) || !is_readable($reviewPresetPath)) {
+                    throw new \RuntimeException('review_main_preset_unavailable');
+                }
+                // R1I: verify or reconcile an exact global/LAB receipt before GO.
+                // Global and LAB SQLite are read separately; only a proven missing LAB
+                // receipt is recoverable. All other mismatches fail closed.
+                $receiptGuard = $platformRoot . '/scripts/ezs_expertise_receipt_guard_r1i.py';
+                if (!is_file($receiptGuard)) {
+                    throw new \RuntimeException('expertise_receipt_guard_missing');
+                }
+                $guardBackup = rtrim(sys_get_temp_dir(), '/\\') . '/EZS_EXPERTISE_RECEIPT_GUARD_R1I';
+                $this->runSubprocess($id, [$python, '-B', $receiptGuard,
+                    '--root', $platformRoot, '--backup-dir', $guardBackup,
+                    '--ensure', (string)$id], $platformRoot, [], 90, $output);
+                $this->runSubprocess($id, [$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['EZSTUDIOLAB_REVIEW_PRESET_PATH' => $reviewPresetPath, 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZSTUDIOLAB_ASSISTANT_BASE_URL' => (string) ($_ENV['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? getenv('EZSTUDIOLAB_ASSISTANT_BASE_URL') ?: 'http://lab.ezstudio.local:8000'), 'EZSTUDIOLAB_ASSISTANT_TOKEN' => $labTok, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 1800, $output);
                 return;
             }
             if ($type === 'profile.direct_research') {
@@ -215,8 +264,21 @@ string,string> $env */
         $pid = $process->getPid();
         EzsFifoTrace::log('E2E_CHILD_SPAWN',['global_job_id'=>$queueJobId,'result'=>'spawned']);
         if (is_int($pid) && $pid > 0) { $this->queueManager->attachWorkerPid($queueJobId, $pid); }
-        $process->wait(static function (string $type, string $buffer) use ($output,$queueJobId): void {
+        // EZS_QUEUE_ASSISTANT_DIAGNOSTIC_R1D: keep only sanitized QUEUE_ERROR
+        // fragments; the worker's raw stdout/stderr is never stored in the queue.
+        $queueErrorLine = null;
+        $queueLineBuffer = ['out' => '', 'err' => ''];
+        $process->wait(static function (string $type, string $buffer) use ($output,$queueJobId,&$queueErrorLine,&$queueLineBuffer): void {
             $output->write($buffer);
+            $channel = $type === Process::ERR ? 'err' : 'out';
+            $complete = preg_split('/\r?\n/', $queueLineBuffer[$channel] . $buffer);
+            $queueLineBuffer[$channel] = (string) array_pop($complete);
+            // Bound the incomplete line even if a misbehaving child never emits LF.
+            if (strlen($queueLineBuffer[$channel]) > 2048) { $queueLineBuffer[$channel] = ''; }
+            foreach ($complete as $completeLine) {
+                $safe = self::safeQueueErrorDiagnostic($completeLine);
+                if ($safe !== null) { $queueErrorLine = $safe; }
+            }
             foreach (preg_split('/\r?\n/', $buffer) as $line) {
                 // Only stable diagnostic markers, never raw argv, paths, exception bodies or tokens.
                 if (preg_match('/\b(PROFILE_[A-Z0-9_]{4,90}|(?:[A-Z]+_){1,}[A-Z0-9_]{3,90})\b/', $line, $match)) {
@@ -224,7 +286,43 @@ string,string> $env */
                 }
             }
         });
-        EzsFifoTrace::log('E2E_CHILD_EXIT',['global_job_id'=>$queueJobId,'exit_code'=>(int)($process->getExitCode() ?? -1)]);
-        if (!$process->isSuccessful()) { throw new \RuntimeException(sprintf('subprocess_exit_%d', $process->getExitCode() ?? -1)); }
+        // The last output fragment may not end in a newline.
+        foreach ($queueLineBuffer as $lastLine) {
+            $safe = self::safeQueueErrorDiagnostic($lastLine);
+            if ($safe !== null) { $queueErrorLine = $safe; }
+        }
+        $exitCode = (int) ($process->getExitCode() ?? -1);
+        EzsFifoTrace::log('E2E_CHILD_EXIT',['global_job_id'=>$queueJobId,'exit_code'=>$exitCode]);
+        if (!$process->isSuccessful()) {
+            // Keep the canonical subprocess exit code; append only a sanitized
+            // reason if the Assistant explicitly emitted a QUEUE_ERROR line.
+            $reason = sprintf('subprocess_exit_%d', $exitCode);
+            if ($queueErrorLine !== null) {
+                EzsFifoTrace::log('E2E_CHILD_SAFE_QUEUE_ERROR', [
+                    'global_job_id' => $queueJobId,
+                    'exit_code' => $exitCode,
+                    'diagnostic' => $queueErrorLine,
+                ]);
+                $reason .= ' | ' . $queueErrorLine;
+            }
+            throw new \RuntimeException($reason);
+        }
+    }
+
+    /** Strict allowlist: diagnostic identity without raw HTTP bodies, URLs or secrets. */
+    private static function safeQueueErrorDiagnostic(string $line): ?string
+    {
+        $line = trim($line);
+        if (!preg_match('/\AQUEUE_ERROR ([A-Za-z][A-Za-z0-9_]{0,63}):[ ]*(.*)\z/D', $line, $match)) {
+            return null;
+        }
+        $type = $match[1];
+        $detail = trim($match[2]);
+        // Stable worker codes; never copy arbitrary free-form exception text.
+        $knownCode = preg_match('/\A(?:orchestrator_|one_shot_|lab_|queue_|assistant_|expertise_|profile_|invalid_|missing_)[a-z0-9_]{1,90}\z/D', $detail) === 1;
+        $httpStatus = preg_match('/\AHTTP Error [1-5][0-9]{2}(?:: [A-Za-z ]{1,40})?\z/D', $detail) === 1;
+        $safeDetail = ($knownCode || $httpStatus) && !preg_match('/[A-Za-z0-9]{24,}/', $detail)
+            ? $detail : 'detail_redacted';
+        return 'QUEUE_ERROR ' . $type . ': ' . $safeDetail;
     }
 }

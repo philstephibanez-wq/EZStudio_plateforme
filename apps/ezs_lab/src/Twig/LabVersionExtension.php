@@ -22,7 +22,7 @@ final class LabVersionExtension extends AbstractExtension implements GlobalsInte
         $version = trim($raw);
         // EZS version: release + letter(s) + optional numeric fix, without parentheses.
         // Example: 1.5a0, 1.5a1, 1.5a; pre-existing release names remain accepted.
-        if (!preg_match('/^\d+\.\d+(?:[a-z]+\d*)?$/D', $version)) {
+        if (!preg_match('/^(?:\d+\.\d+(?:[a-z]+\d*)?|\d+\.\d+\.\d+\.[OLAE]\d*(?:(?:a|rc)\d+)?)$/D', $version)) {
             throw new \RuntimeException('lab_version_invalid');
         }
 

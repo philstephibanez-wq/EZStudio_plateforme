@@ -15,9 +15,7 @@ import re
 import sqlite3
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
-import publish_run_reports as summary
-import publish_profile_oneshot as oneshot
-import report_git_transport as git_transport
+# EZS_PROFILE_FORENSIC_IMPORT_ISOLATION_R1: optional publisher imports belong only in their actual call paths.
 
 ROOT = Path(os.getenv('EZS_LAB_ROOT', r'H:\EZStudio_plateforme\apps\ezs_lab'))
 SEGMENT_BYTES = 128 * 1024
@@ -110,6 +108,8 @@ def _install_artifact(repo: Path, prefix: str, logical: str, value, audit: list)
 
 
 def archive_document_set(producer: str, run_id: int, trace_id: str, revision_id, docs, *, missing=(), job_id=None):
+    import publish_profile_oneshot as oneshot
+    import report_git_transport as git_transport
     """Immutable segments + manifest, committed atomically in one Git transaction."""
     if not oneshot.enabled():
         return []
@@ -182,6 +182,7 @@ def _profile_job(db, run_id: int):
 
 
 def archive_lab(run_id: int, db_path):
+    import publish_profile_oneshot as oneshot
     if not oneshot.enabled(): return []
     with closing(sqlite3.connect('file:'+Path(db_path).resolve().as_posix()+'?mode=ro',uri=True)) as db:
         job_id, output_path = _profile_job(db, run_id)
@@ -228,6 +229,9 @@ def archive_lab(run_id: int, db_path):
 
 
 def publish_assistant_trace(trace, outcome):
+    import publish_run_reports as summary
+    import publish_profile_oneshot as oneshot
+    import report_git_transport as git_transport
     """MAIN transport for the existing assistant-main raw archive package.
 
     The Assistant's canonical package() and validate_manifest() remain the

@@ -51,6 +51,15 @@ final class JobsPageController
             'active_page' => 'jobs',
             'history' => $history,
             'global_queue' => $globalQueue,
+            // EZS_FIFO_ACTIVE_RETRY_R1B: show the only actionable failed job.
+            'queue_paused_on_error' => is_file(dirname(__DIR__, 6) . '/var/orchestrator_queue_paused_on_error.json'),
+            'queue_blocked_job_id' => (static function (): int {
+                $file = dirname(__DIR__, 6) . '/var/orchestrator_queue_paused_on_error.json';
+                $raw = is_file($file) ? @file_get_contents($file) : false;
+                $pause = is_string($raw) ? json_decode($raw, true) : null;
+                return is_array($pause) && ($pause['schema'] ?? null) === 'ezs.queue.pause_on_ko.v1'
+                    && is_int($pause['global_job_id'] ?? null) ? $pause['global_job_id'] : 0;
+            })(),
             'lab_queue' => $labQueue->status(),
             'retry_tokens' => $retryTokens,
             'delete_tokens' => $deleteTokens,
