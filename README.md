@@ -53,3 +53,7 @@ h:\symfony\symfony.exe server:start --no-tls
 # Exécuter une commande Symfony ciblée sur un noyau précis
 \$env:APP_ID="ezs_lab"; php bin/console debug:router
 ```
+## Sources documentaires musicales
+
+Musical tempo and key data provided by
+[GetSongBPM](https://getsongbpm.com/).
