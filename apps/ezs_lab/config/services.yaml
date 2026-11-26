@@ -19,6 +19,7 @@ services:
         resource: '../src/'
         exclude:
             - '../src/Kernel.php'
+            - '../src/Entity/'
 
     Shared\Hardware\InventoryRestClient:
         arguments:

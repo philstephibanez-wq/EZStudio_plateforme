@@ -1,6 +1,7 @@
 doctrine:
     dbal:
-        url: '%env(resolve:DATABASE_URL)%'
+        driver: pdo_sqlite
+        path: '%app.database_path%'
 
         # IMPORTANT: You MUST configure your server version,
         # either here or in the DATABASE_URL env var (see .env file)
@@ -16,22 +17,16 @@ doctrine:
         naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
-        auto_mapping: true
+        auto_mapping: false
         mappings:
-            App:
+            EZSLab:
                 type: attribute
                 is_bundle: false
-                dir: '%kernel.project_dir%/src/Entity'
-                prefix: 'App\Entity'
-                alias: App
+                dir: '%ezs_lab.app_dir%/src/Entity'
+                prefix: 'EZSLab\Entity'
+                alias: EZSLab
         controller_resolver:
             auto_mapping: false
-
-when@test:
-    doctrine:
-        dbal:
-            # "TEST_TOKEN" is typically set by ParaTest
-            dbname_suffix: '_test%env(default::TEST_TOKEN)%'
 
 when@prod:
     doctrine:

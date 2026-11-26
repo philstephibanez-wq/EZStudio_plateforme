@@ -459,3 +459,17 @@ BEGIN
     INSERT INTO global_queue_admission_outbox(job_id,state,updated_at)
     VALUES(NEW.id,'pending',NEW.created_at);
 END;
+
+CREATE TABLE profile_expertise_prompt_revision (
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    content TEXT NOT NULL CHECK(length(trim(content)) > 0),
+    sha256 VARCHAR(64) NOT NULL CHECK(length(sha256) = 64),
+    created_at VARCHAR(40) NOT NULL
+);
+CREATE TABLE profile_expertise_prompt_active (
+    id INTEGER PRIMARY KEY NOT NULL CHECK(id = 1),
+    revision_id INTEGER NOT NULL REFERENCES profile_expertise_prompt_revision(id) ON DELETE RESTRICT
+);
+CREATE TRIGGER profile_expertise_prompt_immutable_update BEFORE UPDATE ON profile_expertise_prompt_revision BEGIN SELECT RAISE(ABORT, 'prompt_revision_immutable'); END;
+CREATE TRIGGER profile_expertise_prompt_immutable_delete BEFORE DELETE ON profile_expertise_prompt_revision BEGIN SELECT RAISE(ABORT, 'prompt_revision_immutable'); END;
+CREATE TABLE ezs_lab_migration_versions (version VARCHAR(191) NOT NULL, executed_at DATETIME DEFAULT NULL, execution_time INTEGER DEFAULT NULL, PRIMARY KEY(version));
