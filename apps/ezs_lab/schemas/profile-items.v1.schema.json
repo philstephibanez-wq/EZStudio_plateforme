@@ -1,0 +1,785 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ezstudio.profile.items.v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "ezstudio.profile.items.v1"
+    },
+    "status": {
+      "const": "contract_candidate_not_runtime_active"
+    },
+    "source_baseline": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "items": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "1"
+                },
+                "key": {
+                  "const": "identity"
+                },
+                "importance": {
+                  "const": "identification"
+                },
+                "domain": {
+                  "const": "documentary"
+                },
+                "logical_type": {
+                  "const": "recording_identity"
+                },
+                "comparison": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "rules_pending"
+                    },
+                    "tolerance": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "tolerance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "1a"
+                },
+                "key": {
+                  "const": "lyricists"
+                },
+                "importance": {
+                  "const": "non_determining"
+                },
+                "domain": {
+                  "const": "documentary"
+                },
+                "logical_type": {
+                  "const": "list"
+                },
+                "comparison": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "rules_pending"
+                    },
+                    "tolerance": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "tolerance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "1b"
+                },
+                "key": {
+                  "const": "composers"
+                },
+                "importance": {
+                  "const": "non_determining"
+                },
+                "domain": {
+                  "const": "documentary"
+                },
+                "logical_type": {
+                  "const": "list"
+                },
+                "comparison": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "rules_pending"
+                    },
+                    "tolerance": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "tolerance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "1c"
+                },
+                "key": {
+                  "const": "arrangers"
+                },
+                "importance": {
+                  "const": "non_determining"
+                },
+                "domain": {
+                  "const": "documentary"
+                },
+                "logical_type": {
+                  "const": "list"
+                },
+                "comparison": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "rules_pending"
+                    },
+                    "tolerance": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "tolerance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "2"
+                },
+                "key": {
+                  "const": "duration"
+                },
+                "importance": {
+                  "const": "determining"
+                },
+                "domain": {
+                  "const": "scientific"
+                },
+                "logical_type": {
+                  "const": "seconds"
+                },
+                "comparison": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "numeric_tolerance_pending"
+                        },
+                        "tolerance": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "tolerance"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "absolute_seconds"
+                        },
+                        "tolerance": {
+                          "type": "object",
+                          "properties": {
+                            "seconds": {
+                              "type": "number",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "seconds"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "tolerance"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "3"
+                },
+                "key": {
+                  "const": "meter"
+                },
+                "importance": {
+                  "const": "determining"
+                },
+                "domain": {
+                  "const": "scientific"
+                },
+                "logical_type": {
+                  "const": "meter"
+                },
+                "comparison": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "rules_pending"
+                    },
+                    "tolerance": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "tolerance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "4"
+                },
+                "key": {
+                  "const": "tempo"
+                },
+                "importance": {
+                  "const": "determining"
+                },
+                "domain": {
+                  "const": "scientific"
+                },
+                "logical_type": {
+                  "const": "bpm_and_beat_unit"
+                },
+                "comparison": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "same_beat_unit_tolerance_pending"
+                        },
+                        "tolerance": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "tolerance"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "same_beat_unit_relative_percent"
+                        },
+                        "tolerance": {
+                          "type": "object",
+                          "properties": {
+                            "percent": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100
+                            }
+                          },
+                          "required": [
+                            "percent"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "tolerance"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "5"
+                },
+                "key": {
+                  "const": "key"
+                },
+                "importance": {
+                  "const": "determining"
+                },
+                "domain": {
+                  "const": "scientific"
+                },
+                "logical_type": {
+                  "const": "tonic_mode"
+                },
+                "comparison": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "rules_pending"
+                    },
+                    "tolerance": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "tolerance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "6"
+                },
+                "key": {
+                  "const": "genre"
+                },
+                "importance": {
+                  "const": "useful_non_determining"
+                },
+                "domain": {
+                  "const": "scientific"
+                },
+                "logical_type": {
+                  "const": "hierarchical_list"
+                },
+                "comparison": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "rules_pending"
+                    },
+                    "tolerance": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "tolerance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "7"
+                },
+                "key": {
+                  "const": "lead_vocals"
+                },
+                "importance": {
+                  "const": "determining"
+                },
+                "domain": {
+                  "const": "scientific"
+                },
+                "logical_type": {
+                  "const": "vocal_parts"
+                },
+                "comparison": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "const": "rules_pending"
+                    },
+                    "tolerance": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "tolerance"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "8"
+                },
+                "key": {
+                  "const": "other_voices"
+                },
+                "importance": {
+                  "const": "determining"
+                },
+                "domain": {
+                  "const": "scientific"
+                },
+                "logical_type": {
+                  "const": "vocal_parts"
+                },
+                "comparison": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "list_tolerance_pending"
+                        },
+                        "tolerance": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "tolerance"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "list_precision_recall"
+                        },
+                        "tolerance": {
+                          "type": "object",
+                          "properties": {
+                            "minimum_precision": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "minimum_recall": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "minimum_precision",
+                            "minimum_recall"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "tolerance"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/item"
+            },
+            {
+              "properties": {
+                "id": {
+                  "const": "9"
+                },
+                "key": {
+                  "const": "instruments"
+                },
+                "importance": {
+                  "const": "determining"
+                },
+                "domain": {
+                  "const": "scientific"
+                },
+                "logical_type": {
+                  "const": "hierarchical_list"
+                },
+                "comparison": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "hierarchical_list_tolerance_pending"
+                        },
+                        "tolerance": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "tolerance"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": {
+                          "const": "hierarchical_list_precision_recall"
+                        },
+                        "tolerance": {
+                          "type": "object",
+                          "properties": {
+                            "minimum_precision": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            "minimum_recall": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            }
+                          },
+                          "required": [
+                            "minimum_precision",
+                            "minimum_recall"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "mode",
+                        "tolerance"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "automatic_application": {
+      "const": false
+    }
+  },
+  "required": [
+    "schema",
+    "status",
+    "source_baseline",
+    "items",
+    "automatic_application"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "importance": {
+          "enum": [
+            "identification",
+            "non_determining",
+            "determining",
+            "useful_non_determining"
+          ]
+        },
+        "domain": {
+          "enum": [
+            "documentary",
+            "scientific"
+          ]
+        },
+        "existing_source": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "logical_type": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "comparison": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "tolerance": {}
+          },
+          "required": [
+            "mode",
+            "tolerance"
+          ],
+          "additionalProperties": false
+        },
+        "potential_consumers": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "stems",
+              "chords",
+              "lyrics"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "producer_module_candidates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
+        },
+        "producer_status": {
+          "enum": [
+            "existing_evidence_only",
+            "non_module_source_or_unavailable",
+            "candidate_not_qualified"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "key",
+        "label",
+        "importance",
+        "domain",
+        "existing_source",
+        "logical_type",
+        "comparison",
+        "potential_consumers",
+        "producer_module_candidates",
+        "producer_status"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "ezstudio.profile.documentary.v1",
+  "recording_version": {
+    "state": "unknown",
+    "value": null,
+    "provenance": []
+  },
+  "lyricists": {
+    "state": "unknown",
+    "value": null,
+    "provenance": []
+  },
+  "composers": {
+    "state": "unknown",
+    "value": null,
+    "provenance": []
+  },
+  "arrangers": {
+    "state": "unknown",
+    "value": null,
+    "provenance": []
+  }
+}

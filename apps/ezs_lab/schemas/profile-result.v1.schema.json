@@ -1,0 +1,1242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ezstudio.profile.result.v1",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "ezstudio.profile.result.v1"
+    },
+    "run_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "song_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "audio_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "items": {
+      "type": "object",
+      "properties": {
+        "1": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_1"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "catalogue",
+                          "documentary",
+                          "human",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "confidence": {
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "not_calculated",
+                        "uncalibrated"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "1a": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_1a"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "catalogue",
+                          "documentary",
+                          "human",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "confidence": {
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "not_calculated",
+                        "uncalibrated"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "1b": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_1b"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "catalogue",
+                          "documentary",
+                          "human",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "confidence": {
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "not_calculated",
+                        "uncalibrated"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "1c": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_1c"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "catalogue",
+                          "documentary",
+                          "human",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "confidence": {
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "not_calculated",
+                        "uncalibrated"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "2": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_2"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "scientific_module",
+                          "scientific_projection",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "3": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_3"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "scientific_module",
+                          "scientific_projection",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "4": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_4"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "scientific_module",
+                          "scientific_projection",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "5": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_5"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "scientific_module",
+                          "scientific_projection",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "6": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_6"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "scientific_module",
+                          "scientific_projection",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "7": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_7"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "scientific_module",
+                          "scientific_projection",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "8": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_8"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "scientific_module",
+                          "scientific_projection",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "9": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/entry"
+            },
+            {
+              "properties": {
+                "value": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/value_9"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provenance": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "scientific_module",
+                          "scientific_projection",
+                          "legacy"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "1",
+        "1a",
+        "1b",
+        "1c",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema",
+    "run_id",
+    "song_id",
+    "audio_sha256",
+    "items"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "confidence": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "not_calculated",
+            "uncalibrated",
+            "calibrated"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "calibrated"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "catalogue",
+            "scientific_module",
+            "scientific_projection",
+            "documentary",
+            "human",
+            "legacy"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "interval": {
+      "type": "object",
+      "properties": {
+        "start_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "start_seconds",
+        "end_seconds"
+      ],
+      "additionalProperties": false
+    },
+    "lead": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "role": {
+          "enum": [
+            "lead",
+            "duet_lead"
+          ]
+        },
+        "delivery": {
+          "enum": [
+            "sung",
+            "spoken",
+            "mixed",
+            "unknown"
+          ]
+        },
+        "articulation": {
+          "enum": [
+            "words",
+            "syllables",
+            "both",
+            "unknown"
+          ]
+        },
+        "languages": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "presence": {
+          "enum": [
+            "present",
+            "possible",
+            "inconclusive"
+          ]
+        },
+        "intervals": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/interval"
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "delivery",
+        "articulation",
+        "languages",
+        "presence",
+        "intervals"
+      ],
+      "additionalProperties": false
+    },
+    "other": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "role": {
+          "enum": [
+            "backing",
+            "harmony",
+            "choir",
+            "countermelody",
+            "response",
+            "narration",
+            "interjection",
+            "other"
+          ]
+        },
+        "delivery": {
+          "enum": [
+            "sung",
+            "spoken",
+            "mixed",
+            "unknown"
+          ]
+        },
+        "articulation": {
+          "enum": [
+            "words",
+            "syllables",
+            "both",
+            "unknown"
+          ]
+        },
+        "languages": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "presence": {
+          "enum": [
+            "present",
+            "possible",
+            "inconclusive"
+          ]
+        },
+        "intervals": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/interval"
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "delivery",
+        "articulation",
+        "languages",
+        "presence",
+        "intervals"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "presence": {
+                "const": "present"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "articulation": {
+                "enum": [
+                  "words",
+                  "syllables",
+                  "both"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "instrument": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "family": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "instrument": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "presence": {
+          "enum": [
+            "present",
+            "possible",
+            "inconclusive"
+          ]
+        },
+        "intervals": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/interval"
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "family",
+        "instrument",
+        "presence",
+        "intervals"
+      ],
+      "additionalProperties": false
+    },
+    "entry": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "known",
+            "unknown",
+            "not_analyzed",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "value": {},
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "state",
+        "value",
+        "confidence",
+        "provenance"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "known"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "provenance": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "confidence": {
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "not_calculated",
+                      "uncalibrated"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "value_1": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "artists": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
+        },
+        "recording_version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "artists",
+        "recording_version"
+      ],
+      "additionalProperties": false
+    },
+    "value_1a": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "value_1b": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "value_1c": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "value_2": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "value_3": {
+      "type": "object",
+      "properties": {
+        "numerator": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "denominator": {
+          "enum": [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32,
+            64
+          ]
+        }
+      },
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "additionalProperties": false
+    },
+    "value_4": {
+      "type": "object",
+      "properties": {
+        "tracker_bpm": {
+          "anyOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "primary_bpm": {
+          "anyOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "beat_unit": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "tracker_bpm",
+        "primary_bpm",
+        "beat_unit"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "primary_bpm": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "beat_unit": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "beat_unit": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "tracker_bpm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            },
+            {
+              "properties": {
+                "primary_bpm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "value_5": {
+      "type": "object",
+      "properties": {
+        "tonic": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "mode": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "tonic",
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "value_6": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subgenre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "family",
+          "genre",
+          "subgenre"
+        ],
+        "additionalProperties": false
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "value_7": {
+      "type": "object",
+      "properties": {
+        "coverage": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/lead"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "coverage",
+        "entries"
+      ],
+      "additionalProperties": false
+    },
+    "value_8": {
+      "type": "object",
+      "properties": {
+        "coverage": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/other"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "coverage",
+        "entries"
+      ],
+      "additionalProperties": false
+    },
+    "value_9": {
+      "type": "object",
+      "properties": {
+        "coverage": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/instrument"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "coverage",
+        "entries"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

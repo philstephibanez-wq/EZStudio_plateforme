@@ -1,0 +1,255 @@
+{
+  "schema": "ezstudio.profile.items.v1",
+  "status": "contract_candidate_not_runtime_active",
+  "source_baseline": "10f74352e35296355e784a3bf7990baf87b6c742",
+  "items": [
+    {
+      "id": "1",
+      "key": "identity",
+      "label": "Titre / Artiste",
+      "importance": "identification",
+      "domain": "documentary",
+      "existing_source": "songs.title, songs.artist, songs.audio_sha256",
+      "logical_type": "recording_identity",
+      "comparison": {
+        "mode": "rules_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "lyrics"
+      ],
+      "producer_module_candidates": [],
+      "producer_status": "non_module_source_or_unavailable"
+    },
+    {
+      "id": "1a",
+      "key": "lyricists",
+      "label": "Parolier",
+      "importance": "non_determining",
+      "domain": "documentary",
+      "existing_source": null,
+      "logical_type": "list",
+      "comparison": {
+        "mode": "rules_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "lyrics"
+      ],
+      "producer_module_candidates": [],
+      "producer_status": "non_module_source_or_unavailable"
+    },
+    {
+      "id": "1b",
+      "key": "composers",
+      "label": "Compositeur",
+      "importance": "non_determining",
+      "domain": "documentary",
+      "existing_source": null,
+      "logical_type": "list",
+      "comparison": {
+        "mode": "rules_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [],
+      "producer_module_candidates": [],
+      "producer_status": "non_module_source_or_unavailable"
+    },
+    {
+      "id": "1c",
+      "key": "arrangers",
+      "label": "Arrangeur",
+      "importance": "non_determining",
+      "domain": "documentary",
+      "existing_source": null,
+      "logical_type": "list",
+      "comparison": {
+        "mode": "rules_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [],
+      "producer_module_candidates": [],
+      "producer_status": "non_module_source_or_unavailable"
+    },
+    {
+      "id": "2",
+      "key": "duration",
+      "label": "Durée",
+      "importance": "determining",
+      "domain": "scientific",
+      "existing_source": "metrics_json.duration_seconds",
+      "logical_type": "seconds",
+      "comparison": {
+        "mode": "numeric_tolerance_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "stems",
+        "chords",
+        "lyrics"
+      ],
+      "producer_module_candidates": [],
+      "producer_status": "non_module_source_or_unavailable"
+    },
+    {
+      "id": "3",
+      "key": "meter",
+      "label": "Mesure",
+      "importance": "determining",
+      "domain": "scientific",
+      "existing_source": "metrics_json.time_signature",
+      "logical_type": "meter",
+      "comparison": {
+        "mode": "rules_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "chords",
+        "lyrics"
+      ],
+      "producer_module_candidates": [
+        "meter.chords-shared-r9"
+      ],
+      "producer_status": "existing_evidence_only"
+    },
+    {
+      "id": "4",
+      "key": "tempo",
+      "label": "Tempo",
+      "importance": "determining",
+      "domain": "scientific",
+      "existing_source": "metrics_json.tempo; metrics_json.tempo.metric_level; diagnostics_json.profile_view.tempo_metric (projection historique)",
+      "logical_type": "bpm_and_beat_unit",
+      "comparison": {
+        "mode": "same_beat_unit_tolerance_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "chords",
+        "lyrics"
+      ],
+      "producer_module_candidates": [
+        "rhythm.librosa-beat",
+        "meter.chords-shared-r9"
+      ],
+      "producer_status": "existing_evidence_only"
+    },
+    {
+      "id": "5",
+      "key": "key",
+      "label": "Tonalité",
+      "importance": "determining",
+      "domain": "scientific",
+      "existing_source": "metrics_json.key",
+      "logical_type": "tonic_mode",
+      "comparison": {
+        "mode": "rules_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "chords"
+      ],
+      "producer_module_candidates": [
+        "tonal.krumhansl-schmuckler",
+        "tonal.madmom-key-cnn-2017",
+        "tonal.madmom-key-cnn-2018"
+      ],
+      "producer_status": "existing_evidence_only"
+    },
+    {
+      "id": "6",
+      "key": "genre",
+      "label": "Genre",
+      "importance": "useful_non_determining",
+      "domain": "scientific",
+      "existing_source": "diagnostics_json.profile_view.genre_hierarchy",
+      "logical_type": "hierarchical_list",
+      "comparison": {
+        "mode": "rules_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "stems",
+        "chords",
+        "lyrics"
+      ],
+      "producer_module_candidates": [
+        "semantic.clap-open-vocabulary"
+      ],
+      "producer_status": "existing_evidence_only"
+    },
+    {
+      "id": "7",
+      "key": "lead_vocals",
+      "label": "Voix principale",
+      "importance": "determining",
+      "domain": "scientific",
+      "existing_source": "diagnostics_json.profile_view.vocal_profile.dimensions.lead_vocal",
+      "logical_type": "vocal_parts",
+      "comparison": {
+        "mode": "rules_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "stems",
+        "chords",
+        "lyrics"
+      ],
+      "producer_module_candidates": [
+        "semantic.clap-open-vocabulary",
+        "semantic.panns-cnn14",
+        "semantic.passt-audioset"
+      ],
+      "producer_status": "existing_evidence_only"
+    },
+    {
+      "id": "8",
+      "key": "other_voices",
+      "label": "Autres voix avec paroles ou syllabes prononcées, narration comprise",
+      "importance": "determining",
+      "domain": "scientific",
+      "existing_source": "diagnostics_json.profile_view.vocal_profile.dimensions",
+      "logical_type": "vocal_parts",
+      "comparison": {
+        "mode": "list_tolerance_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "stems",
+        "chords",
+        "lyrics"
+      ],
+      "producer_module_candidates": [
+        "semantic.clap-open-vocabulary",
+        "semantic.panns-cnn14",
+        "semantic.passt-audioset"
+      ],
+      "producer_status": "existing_evidence_only"
+    },
+    {
+      "id": "9",
+      "key": "instruments",
+      "label": "Instruments",
+      "importance": "determining",
+      "domain": "scientific",
+      "existing_source": "diagnostics_json.profile_view.instrumentation",
+      "logical_type": "hierarchical_list",
+      "comparison": {
+        "mode": "hierarchical_list_tolerance_pending",
+        "tolerance": null
+      },
+      "potential_consumers": [
+        "stems",
+        "chords",
+        "lyrics"
+      ],
+      "producer_module_candidates": [
+        "semantic.clap-open-vocabulary",
+        "semantic.panns-cnn14",
+        "semantic.passt-audioset"
+      ],
+      "producer_status": "existing_evidence_only"
+    }
+  ],
+  "automatic_application": false
+}

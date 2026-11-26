@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS songs (
     artist TEXT NOT NULL DEFAULT '',
     source_filename TEXT NOT NULL,
     audio_sha256 TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    profile_documentary_json TEXT DEFAULT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_songs_sha ON songs(audio_sha256);
 

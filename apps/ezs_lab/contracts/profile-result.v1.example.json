@@ -1,0 +1,121 @@
+{
+  "schema": "ezstudio.profile.result.v1",
+  "run_id": 1,
+  "song_id": 1,
+  "audio_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "items": {
+    "1": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "1a": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "1b": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "1c": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "2": {
+      "state": "known",
+      "value": 123.4,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": [
+        {
+          "kind": "scientific_projection",
+          "ref": "synthetic:duration"
+        }
+      ]
+    },
+    "3": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "4": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "5": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "6": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "7": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "8": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    },
+    "9": {
+      "state": "not_analyzed",
+      "value": null,
+      "confidence": {
+        "kind": "not_calculated",
+        "value": null
+      },
+      "provenance": []
+    }
+  }
+}
