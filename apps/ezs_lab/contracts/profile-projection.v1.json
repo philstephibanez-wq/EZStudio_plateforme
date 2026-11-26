@@ -63,5 +63,10 @@
       "speech",
       "narration, monologue"
     ]
+  },
+  "excluded_vocal_evidence": {
+    "backing_vocals": [
+      "background music"
+    ]
   }
 }

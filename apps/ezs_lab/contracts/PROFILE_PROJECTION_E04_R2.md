@@ -1,0 +1,7 @@
+# PROFILE E04 R2 — lecture contractuelle et correction de preuve vocale
+
+Base 90ce1be9ec98698b87a2611f925a6b129e829866 ; E04 R1 validé MAIN. La projection canonique exclut désormais `background music` comme preuve de voix d'accompagnement. Aucun changement du consensus historique, des scores, des modèles ou du preset acoustique ; l'empreinte de la politique déclarative change. La parole reste d'attribution inconnue. La normalisation instrumentale R1 est conservée.
+
+`result_projection.read_result` assemble les 12 ITEMS depuis un run PROFILE terminé et le catalogue courant, via une seule requête locale en lecture seule. L'identité documentaire est celle du catalogue au moment de la lecture, non un instantané historique. Les données scientifiques sont les ITEMS persistés par le runner R1/R2. Les runs précédents sans projection ne sont pas reclassés ni complétés par des heuristiques : leurs ITEMS scientifiques sont `not_analyzed` dans le contrat. Les crédits non renseignés sont `unknown`. Une projection invalide ou un document invalide provoque un échec explicite. Aucune écriture ni export automatique. Le script `scripts/read-profile-result.py --database <chemin> --run-id <id>` permet la recette ponctuelle.
+
+Qualification acoustique et identification des voix secondaires articulées : encore non démontrées ; gate downstream fermé. E05/E06 devront consommer l'interface de lecture, sans accès BDD inter-applications. Aucun changement des templates, CSS/JS, FIFO, ni version.

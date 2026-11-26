@@ -45,6 +45,8 @@ def load_policy(contract_dir):
         raise ValueError("profile_projection_taxonomy_overlap")
     if set(policy["vocal_roles"]) != {"backing_vocals", "vocal_harmonies", "choir"} or set(policy["vocal_roles"].values()) != {"backing", "harmony", "choir"}:
         raise ValueError("profile_projection_vocal_roles")
+    if policy.get("excluded_vocal_evidence") != {"backing_vocals": ["background music"]}:
+        raise ValueError("profile_projection_excluded_vocal_evidence")
     policy["provenance"] = {"items_sha256": items_hash, "policy_sha256": policy_hash}
     return policy
 
@@ -89,6 +91,14 @@ def project_scientific_items(characteristics, view, consensus, policy):
     others = []
     for name, role in policy["vocal_roles"].items():
         dim = obj(dims.get(name))
+        excluded = policy["excluded_vocal_evidence"].get(name, [])
+        evidence = rows(dim.get("evidence"))
+        if name in policy["excluded_vocal_evidence"]:
+            # A generic background-music tag is not evidence of a second voice.
+            direct = [r for r in evidence if r.get("role") == "direct"
+                      and (txt(r.get("label")) or "").casefold() not in excluded]
+            if not direct:
+                continue
         if dim.get("decision") in {"present", "possible"}:
             # Existing output cannot establish articulated words/syllables.
             others.append(vocal_part(role, "possible"))
