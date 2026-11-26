@@ -65,7 +65,7 @@
 <tr>
 <td><a class="run-link" href="{{ path('lab_stems_job',{id:j.job_id}) }}">#{{ j.job_id }}</a></td>
 <td>{% if d %}<code>{{ d.public_id }}</code>{% else %}—{% endif %}</td>
-<td><span class="badge {{ j.state == 'done' ? 'ok' : (j.state == 'error' ? 'warn' : '') }}">{{ j.state }}</span></td>
+<td>{% import '@shared/macros/ezs_ui.html.twig' as ezs_shared %}<span class="ezs-badge ezs-badge--state-{{ ezs_shared.job_state_class(j.state) }}">{{ j.state }}</span></td>
 <td>{{ j.progress ?? 0 }}%</td>
 <td>{{ j.request.engine_profile ?? 'canonical_roformer' }}</td>
 <td>{{ d ? d.artifacts|length : 0 }}</td>

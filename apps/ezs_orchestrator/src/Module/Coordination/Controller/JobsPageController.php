@@ -23,7 +23,7 @@ final class JobsPageController
         $root = dirname(__DIR__, 4);
         $versionFile = $root . DIRECTORY_SEPARATOR . 'VERSION';
         $version = is_file($versionFile) ? trim((string) file_get_contents($versionFile)) : 'inconnue';
-        $history = (new LegacyJobHistoryReader($root))->recent();
+        $history = \App\Service\QueueBarrierPaths::isTest() ? [] : (new LegacyJobHistoryReader($root))->recent();
         $filters = [
             'state' => (string) $request->query->get('state', 'all'),
             'actor' => (string) $request->query->get('actor', 'all'),
@@ -52,15 +52,15 @@ final class JobsPageController
             'history' => $history,
             'global_queue' => $globalQueue,
             // EZS_FIFO_ACTIVE_RETRY_R1B: show the only actionable failed job.
-            'queue_paused_on_error' => is_file(dirname(__DIR__, 6) . '/var/orchestrator_queue_paused_on_error.json'),
+            'queue_paused_on_error' => is_file(\App\Service\QueueBarrierPaths::pause(dirname(__DIR__, 6))),
             'queue_blocked_job_id' => (static function (): int {
-                $file = dirname(__DIR__, 6) . '/var/orchestrator_queue_paused_on_error.json';
+                $file = \App\Service\QueueBarrierPaths::pause(dirname(__DIR__, 6));
                 $raw = is_file($file) ? @file_get_contents($file) : false;
                 $pause = is_string($raw) ? json_decode($raw, true) : null;
                 return is_array($pause) && ($pause['schema'] ?? null) === 'ezs.queue.pause_on_ko.v1'
                     && is_int($pause['global_job_id'] ?? null) ? $pause['global_job_id'] : 0;
             })(),
-            'lab_queue' => $labQueue->status(),
+            'lab_queue' => \App\Service\QueueBarrierPaths::isTest() ? ['connected'=>false,'reason'=>'test_isolation','jobs'=>[],'source'=>'lab_queue_live'] : $labQueue->status(),
             'retry_tokens' => $retryTokens,
             'delete_tokens' => $deleteTokens,
             'flash_error' => $flashError,
@@ -109,7 +109,14 @@ final class JobsPageController
         if (!$csrf->isValid($request, 'delete_job_' . $id, $provided)) {
             return new Response('Jeton CSRF invalide ou manquant.', 403);
         }
-        $queueManager->delete($id);
+        $job = $queueManager->findForStoppedCancellation($id);
+        if ($job !== null && $job->getStatus() === 'waiting') {
+            if (!$queueManager->reserveWaitingCancellation($id)) {
+                $request->getSession()->set('_ezs_jobs_flash_error', 'Annulation refusée : identité ou état modifié.');
+            }
+        } elseif (!$queueManager->delete($id)) {
+            $request->getSession()->set('_ezs_jobs_flash_error', 'Suppression refusée : annulation non acquittée ou état actif.');
+        }
         return $this->redirectBack($request);
     }
 

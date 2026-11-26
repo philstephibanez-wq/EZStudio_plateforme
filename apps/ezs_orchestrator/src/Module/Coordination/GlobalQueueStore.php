@@ -73,6 +73,14 @@ final class GlobalQueueStore
         if (!in_array($resourceClass, ['cpu','gpu'], true) || $priority < 0 || $priority > 100) {
             throw new \InvalidArgumentException('invalid_queue_capability');
         }
+        if (\App\Service\ProfileExpertiseAdmission::blocksKind($kind)) {
+            $row = $this->byKey($key);
+            if ($row === null) \App\Service\ProfileExpertiseAdmission::assertOpen();
+            if ($row['producer']!==$producer || $row['external_id']!==$externalId || $row['kind']!==$kind || $row['resource_class']!==$resourceClass || (int)$row['priority']!==$priority) {
+                throw new \DomainException('queue_identity_collision');
+            }
+            return $row;
+        }
         return $this->transaction(function () use ($producer,$externalId,$key,$kind,$resourceClass,$priority): array {
             $now = time();
             $stmt = $this->db->prepare("INSERT OR IGNORE INTO global_queue_jobs (producer,external_id,idempotency_key,kind,resource_class,priority,state,created_at,updated_at) VALUES (?,?,?,?,?,?,'queued',?,?)");

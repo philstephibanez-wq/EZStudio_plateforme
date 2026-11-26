@@ -35,7 +35,7 @@
         style="display:inline">
     <button type="submit" class="secondary">Tout analyser</button>
   </form>
-  <form method="post" action="{{ path('profile_expertise_all') }}" class="catalog-profile-all-form" data-confirm="Lancer une expertise IA sur toutes les chansons analysées du catalogue ? Les expertises déjà actives seront ignorées." style="display:inline"><button type="submit" class="secondary">Tout expertiser</button></form>
+  <button type="button" class="secondary" disabled title="Nouvelles expertises IA locales suspendues">Tout expertiser (suspendu)</button>
   <form method="post" action="{{ path('profile_corpus_export') }}" class="catalog-profile-export-form" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">
     <label for="profile-export-count" class="meta">Expertises/chanson</label>
     <select id="profile-export-count" name="revisions" aria-label="Nombre d'expertises par chanson" title="Nombre de révisions d'expertise par chanson">
@@ -71,18 +71,20 @@
   {% for key in ['profile','stems','chords','lyrics'] %}
     {% set s = attribute(song, key) %}
     <td>
-      {% if s.state == 'done' %}
-        <span class="badge ok">{{ key == 'profile' ? 'Analyse : prête' : 'Prêt' }}{% if s.version %} · <span class="catalog-version">{{ s.version|replace({'PROFILE.':'','STEMS.':'','CHORDS.':'','LYRICS.':''}) }}</span>{% endif %}</span>
+      {% if s.job_status == 'cancelling' or s.state == 'cancelling' %}
+        <span class="ezs-badge ezs-badge--state-cancelling" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : annulation en cours' : 'Annulation en cours' }}</span>
+      {% elseif s.state == 'done' %}
+        <span class="ezs-badge ezs-badge--state-ok">{{ key == 'profile' ? 'Analyse : prête' : 'Prêt' }}{% if s.version %} · <span class="catalog-version">{{ s.version|replace({'PROFILE.':'','STEMS.':'','CHORDS.':'','LYRICS.':''}) }}</span>{% endif %}</span>
       {% elseif key == 'profile' and s.state == 'legacy_fifo' %}
         <span class="badge">Ancienne tentative FIFO (historique)</span>
       {% elseif s.state == 'queued' %}
-        <span class="badge" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : en attente' : 'En attente' }}</span>
-      {% elseif s.state == 'running' or s.job_status == 'cancelling' %}
-        <span class="badge warn" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : en cours' : 'En cours' }}</span>
+        <span class="ezs-badge ezs-badge--state-waiting" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : en attente' : 'En attente' }}</span>
+      {% elseif s.state == 'running' %}
+        <span class="ezs-badge ezs-badge--state-progressing" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : en cours' : 'En cours' }}</span>
       {% elseif s.state == 'cancelled' or s.job_status == 'cancelled' %}
-        <span class="badge">Annulé</span>
+        <span class="ezs-badge ezs-badge--state-cancelled">{{ key == 'profile' ? 'Analyse : annulée' : 'Annulé' }}</span>
       {% elseif s.state == 'error' %}
-        <span class="badge error">Erreur</span>
+        <span class="ezs-badge ezs-badge--state-ko">Erreur</span>
       {% elseif s.state == 'configured' %}
         <span class="badge">Configuré</span>
       {% else %}
@@ -91,12 +93,14 @@
       {% if key == 'profile' %}
           {% set expertise = expertise_by_song[song.id] ?? {active: [], latest: null} %}
           {% if expertise.active is not empty %}
-            {% set activeExpertise = expertise.active|filter(j => j.status in ['running', 'cancelling']) %}
+            {% set cancellingExpertise = expertise.active|filter(j => j.status == 'cancelling') %}
+            {% set activeExpertise = expertise.active|filter(j => j.status == 'running') %}
+            {% set expertiseState = cancellingExpertise is not empty ? 'cancelling' : (activeExpertise is not empty ? 'progressing' : 'waiting') %}
             <div class="meta" data-analysis-active="1">
-              <span class="badge {{ activeExpertise is not empty ? 'warn' : '' }}">Expertise : {{ activeExpertise is not empty ? 'en cours' : 'en attente' }}</span>
+              <span class="ezs-badge ezs-badge--state-{{ expertiseState }}">Expertise : {{ expertiseState == 'cancelling' ? 'annulation en cours' : (expertiseState == 'progressing' ? 'en cours' : 'en attente') }}</span>
             </div>
           {% elseif expertise.latest is not null %}
-            <div class="meta"><span class="badge {{ expertise.latest.status == 'error' ? 'error' : (expertise.latest.status == 'completed' ? 'ok' : '') }}">Expertise : {{ expertise.latest.status == 'completed' ? 'terminée' : (expertise.latest.status == 'error' ? 'erreur' : (expertise.latest.status == 'cancelled' ? 'annulée' : 'en attente')) }}</span></div>
+            <div class="meta"><span class="ezs-badge ezs-badge--state-{{ expertise.latest.status == 'error' ? 'ko' : (expertise.latest.status == 'completed' ? 'ok' : (expertise.latest.status == 'cancelled' ? 'cancelled' : 'waiting')) }}">Expertise : {{ expertise.latest.status == 'completed' ? 'terminée' : (expertise.latest.status == 'error' ? 'erreur' : (expertise.latest.status == 'cancelled' ? 'annulée' : 'en attente')) }}</span></div>
           {% elseif not (song.profile_ai_reviewed ?? false) %}
             <div class="meta">Expertise : non demandée</div>
           {% endif %}

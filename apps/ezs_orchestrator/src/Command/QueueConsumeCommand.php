@@ -22,6 +22,8 @@ final class QueueConsumeCommand extends Command
 {
     public function __construct(
         private readonly QueueManager $queueManager,
+        private readonly \App\Service\QueueCancellationRecovery $cancellationRecovery,
+        private readonly \App\Service\QueueWaitingCancellation $waitingCancellation,
     ) {
         parent::__construct();
     }
@@ -29,12 +31,16 @@ final class QueueConsumeCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('drain', null, InputOption::VALUE_NONE, 'DÃƒÂ©pile tous les jobs waiting puis quitte')
+            ->addOption('drain', null, InputOption::VALUE_NONE, 'Dépile tous les jobs en attente puis quitte')
             ->addOption('loop', null, InputOption::VALUE_NONE, 'Reste actif en boucle de scrutation');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        if ($this->getApplication()?->getKernel()?->getEnvironment() === 'test' || \App\Service\QueueBarrierPaths::isTest()) {
+            $output->writeln('TEST_CONSUMER_DISABLED: use isolated service tests');
+            return Command::FAILURE;
+        }
         $platformRoot = dirname(__DIR__, 4);
         $lockFile = $platformRoot . '/var/orchestrator_queue_consumer' . (($this->getApplication()?->getKernel()?->getEnvironment() === 'test') ? '_test' : '') . '.lock';
         if (!is_dir(dirname($lockFile))) {
@@ -55,10 +61,19 @@ comment>Consumer already running.
         $drain = (bool) $input->getOption('drain');
 
         try {
-            // EZS_FIFO_NO_AUTORETRY_R1: no implicit recovery/retry at consumer startup.
-            // Failed or interrupted jobs require explicit operator action.
-
+            // Explicitly stopped cancellations are reconciled under the unique consumer lock.
+            // No interrupted job is automatically retried.
             do {
+                if (!$this->cancellationRecovery->reconcile($platformRoot)) {
+                    if (!$loop) return Command::FAILURE;
+                    usleep(2_000_000);
+                    continue;
+                }
+                if (!$this->waitingCancellation->reconcile()) {
+                    if (!$loop) return Command::FAILURE;
+                    usleep(2_000_000);
+                    continue;
+                }
                 $job = $this->queueManager->claimNextWaiting();
                 if ($job === null) {
                     if ($loop) {
@@ -98,7 +113,7 @@ info>[Job #%d]
                     }
                     // EZS_FIFO_ACTIVE_RETRY_R1B: a successful retry releases the
                     // exact blocker. The next normal claim remains FIFO ordered.
-                    $pausePath = $platformRoot . '/var/orchestrator_queue_paused_on_error.json';
+                    $pausePath = \App\Service\QueueBarrierPaths::pause($platformRoot);
                     if (is_file($pausePath)) {
                         $pauseRaw = @file_get_contents($pausePath);
                         $pause = is_string($pauseRaw) ? json_decode($pauseRaw, true) : null;
@@ -122,7 +137,7 @@ info>[Job #%d]
                     // EZS_QUEUE_STOP_ON_KO_R1: persist a fail-closed barrier BEFORE
                     // freeing the global active slot. Never terminate the active
                     // worker; runSubprocess() has already waited for its exit.
-                    $pausePath = $platformRoot . '/var/orchestrator_queue_paused_on_error.json';
+                    $pausePath = \App\Service\QueueBarrierPaths::pause($platformRoot);
                     $pauseRecord = json_encode(['schema'=>'ezs.queue.pause_on_ko.v1',
                         'global_job_id'=>$id, 'reason'=>$code,
                         'at_utc'=>gmdate('c')], JSON_THROW_ON_ERROR);

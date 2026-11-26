@@ -1,4 +1,4 @@
-{# EZSTUDIO_HEADERS_R1 : composant commun, LAB et Orchestrator uniquement. #}
+{# En-tête commun : LAB, Assistant et Orchestrator. #}
 <style id="ezs-app-header-style">
 .ezs-app-header{box-sizing:border-box;min-height:56px;background:#0d141b;color:#eff4fa;border-bottom:1px solid #293745;position:relative;z-index:901;font-family:Arial,Segoe UI,sans-serif}
 .ezs-app-header *, .ezs-app-header *::before,.ezs-app-header *::after{box-sizing:border-box}
@@ -34,7 +34,8 @@
     <a class="ezs-app-brand" href="{{ header_home }}" aria-label="{{ header_name }} — accueil">
       <img src="/shared/favicon/favicon-ezscore.svg" alt="" width="29" height="29">
       <span class="ezs-app-name">{{ header_name }}</span>
-      <small class="ezs-app-version">v{{ header_version }}</small>
+      {% set displayed_version = header_version|default('')|trim %}
+      <small class="ezs-app-version">{% if displayed_version in ['', '?', '—', 'inconnue'] %}Version inconnue{% elseif displayed_version starts with 'v' %}{{ displayed_version }}{% else %}v{{ displayed_version }}{% endif %}</small>
     </a>
     {{ header_nav|raw }}
     <div class="ezs-app-locale">

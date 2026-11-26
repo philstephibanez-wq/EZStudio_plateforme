@@ -39,9 +39,19 @@ final class QueueDispatchController extends AbstractController
         }
         \App\Service\EzsFifoTrace::log('E2E_DISPATCH_VALIDATED_R2',['source'=>$source,'local_job_id'=>(int)($payload['job_id']??$payload['analysis_job_id']??0),'run_id'=>(int)($payload['run_id']??0)]);
         try {
-            $duplicate = $queueManager->findActiveDuplicate($source, $payload);
-            $job = $duplicate ?? $queueManager->dispatch($source, $payload);
+            if (\App\Service\ProfileExpertiseAdmission::blocksKind($payload['job'] ?? $payload['type'] ?? $payload['phase'] ?? null)) {
+                // A successful suspended dispatch is necessarily an exact existing PROFILE receipt.
+                $job = $queueManager->dispatch($source, $payload);
+                $duplicate = $job;
+            } else {
+                $duplicate = $queueManager->findActiveDuplicate($source, $payload);
+                $job = $duplicate ?? $queueManager->dispatch($source, $payload);
+            }
         } catch (\Throwable $e) {
+            if ($e instanceof \DomainException && $e->getMessage() === \App\Service\ProfileExpertiseAdmission::ERROR) {
+                \App\Service\EzsFifoTrace::log('E2E_DISPATCH_REJECT_R2',['source'=>$source,'reason'=>$e->getMessage()]);
+                return $this->json(['ok'=>false,'error'=>$e->getMessage()],409);
+            }
             \App\Service\EzsFifoTrace::log('E2E_DISPATCH_EXCEPTION_R2',['source'=>$source,'exception'=>get_class($e)]);
             throw $e;
         }
@@ -75,6 +85,12 @@ final class QueueDispatchController extends AbstractController
             'queue_id'=>$job->getId(), 'source'=>$job->getSource(),
             'status'=>$job->getStatus(), 'job'=>(string)($payload['job']??''),
             'analysis_job_id'=>(int)($payload['analysis_job_id']??0),
+            'job_id'=>(int)($payload['job_id']??0),
+            'run_id'=>(int)($payload['run_id']??0),
+            'attempts'=>$job->getAttempts(),
+            'waiting_cancel_authorized'=>$job->getStatus() === JobQueue::STATUS_CANCELLED && $job->getAttempts() === 0 && $job->getWorkerPid() === null && $job->getErrorMessage() === \App\Service\QueueWaitingCancellation::PENDING,
+            'recovery_authorized'=>$job->getStatus() === JobQueue::STATUS_CANCELLING
+                && \App\Service\QueueCancellationRecovery::authorizedForJob(dirname(__DIR__, 6), $job),
             'scientific_run_id'=>(int)($payload['scientific_run_id']??0),
             'song_id'=>(int)($payload['song_id']??0),
         ];

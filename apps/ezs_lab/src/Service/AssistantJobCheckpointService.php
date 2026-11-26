@@ -79,6 +79,12 @@ final class AssistantJobCheckpointService {
             'independent_verifier'=>70, 'assertion_web_investigator'=>82,
             'local_ai_document_review'=>94, 'documentary_verdict_merger'=>98,
             'documentary_payload_enricher'=>98, 'ai_draft_payload_enricher'=>99,
+            'r8_structured_sources'=>8,
+            'r8_item_tempo'=>15, 'r8_item_duration'=>22, 'r8_item_meter'=>29,
+            'r8_item_key'=>36, 'r8_item_genre'=>43, 'r8_item_instrument'=>50,
+            'r8_item_lead_vocal'=>57, 'r8_item_backing_vocals'=>64,
+            'r8_item_vocal_harmonies'=>71, 'r8_item_choir'=>78, 'r8_item_year'=>85,
+            'r8_archive'=>95,
             'lab_revision_submit'=>99,
         ];
         $percent = 0;

@@ -100,6 +100,9 @@ final class ProfileAiRequestService
 
     public function enqueue(int $runId): array
     {
+        if (\App\Service\ProfileExpertiseAdmission::SUSPENDED) {
+            throw new \RuntimeException(\App\Service\ProfileExpertiseAdmission::ERROR);
+        }
         EzsFifoTrace::log('EXPERTISE_ENQUEUE',['run_id'=>$runId]);
         // Fail closed: absence of the queue client must never produce a local-only expertise.
         if ($this->orchestratorQueue === null) {
@@ -491,6 +494,8 @@ SQL);
         if (!$exists) return ['legacy'=>0,'migrated'=>0];
         $rows=$pdo->query("SELECT run_id,status FROM profile_ai_requests WHERE status IN ('pending','running','error')")->fetchAll(\PDO::FETCH_ASSOC);
         $migrated=0;
+        // N3/N4: read legacy requests, but never admit a new job while suspended.
+        if (\App\Service\ProfileExpertiseAdmission::SUSPENDED) return ['legacy'=>count($rows),'migrated'=>0];
         foreach ($rows as $row) {
             // Retain terminal records and do not mutate the old table. Rows are idempotently imported.
             $runId=(int)$row['run_id'];

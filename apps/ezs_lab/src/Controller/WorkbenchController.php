@@ -92,6 +92,9 @@ final class WorkbenchController extends AbstractController
             || ($site === '' && $origin === '' && !str_starts_with($referer,$base.'/'))) {
             return new Response('Origine du formulaire refusée.',403);
         }
+        if (\App\Service\ProfileExpertiseAdmission::SUSPENDED) {
+            return new Response('Nouvelles expertises IA locales suspendues.',409);
+        }
         $queued = 0; $skippedActive = 0; $skippedMissing = 0;
         foreach ($catalog->songs() as $song) {
             $runId = (int)($song['profile']['run_id'] ?? $song['latest_run_id'] ?? 0);

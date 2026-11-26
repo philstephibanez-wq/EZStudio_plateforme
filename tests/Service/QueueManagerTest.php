@@ -55,6 +55,30 @@ class QueueManagerTest extends KernelTestCase
             $first = $queueManager->dispatch('test_unit_lifecycle', ['step' => 1]);
             $second = $queueManager->dispatch('test_unit_lifecycle', ['step' => 2]);
 
+            // Both durable barriers must fail closed, without touching production receipts.
+            $root = dirname(__DIR__, 2);
+            $this->assertTrue(\App\Service\QueueBarrierPaths::isTest());
+            $barriers = [
+                \App\Service\QueueBarrierPaths::stoppedCancellation($root) => '{}',
+                \App\Service\QueueBarrierPaths::pause($root) => '{invalid',
+            ];
+            foreach ($barriers as $path=>$content) {
+                $this->assertStringEndsWith('_test.json', $path);
+                $this->assertFileDoesNotExist($path);
+                $handle=fopen($path, 'xb');
+                $this->assertIsResource($handle);
+                try {
+                    $this->assertSame(strlen($content), fwrite($handle, $content));
+                    fclose($handle);
+                    clearstatcache(true, $path);
+                    $this->assertNull($queueManager->claimNextWaiting());
+                } finally {
+                    if (is_resource($handle)) fclose($handle);
+                    unlink($path);
+                    clearstatcache(true, $path);
+                }
+            }
+
             $claimed1 = $queueManager->claimNextWaiting();
             $this->assertNotNull($claimed1);
             $this->assertEquals($first->getId(), $claimed1->getId());

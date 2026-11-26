@@ -19,26 +19,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'app'))
 import main as assistant_main
 from profile_review import normalize_track_identity
-from profile_auto_review import (
-    NetworkBudget, research_public_sources, build_review_payload,
-    _run_ai_profile_review, enrich_review_payload_with_ai,
-    enrich_review_payload_with_documentary,
-)
-from ai_provider import build_ai_provider_from_env
 from profile_trace import Trace, activate, enabled, emit, snap
 from profile_report import publish_trace
 from profile_publication_receipt import publish_with_receipt
 from profile_engine_diagnostic import call_engine, execution_scope, record_items
-from profile_lab_observations import attach_lab_observations
-from profile_identity import resolve_missing_artist
-from profile_sequential_review import examine_modules
-from profile_module_qwen import infer_module
-from profile_final_verifier import verify_final_values, attach_documentary_findings
-from profile_expertise_registry import record_verified_assertions
-from profile_recording_disambiguation import duration_from_catalog
-from profile_web_investigator import research_each_assertion
-from profile_web_local_review import review_web_items
-
+from documentary_engine_r9 import QUERIES as R8_ITEMS
 # Domain steps are owned by LAB; no foreign SQLite access or direct Orchestrator call.
 CHECKPOINT_PHASES = {
     'identity_resolver': 'identity',
@@ -53,6 +38,7 @@ CHECKPOINT_PHASES = {
     'ai_draft_payload_enricher': 'persistence',
     'lab_revision_submit': 'persistence',
 }
+CHECKPOINT_PHASES.update({'r8_structured_sources':'discovery', 'r8_archive':'persistence', **{'r8_item_'+k:'evidence' for k in R8_ITEMS}})
 _CURRENT_STEPS = []
 
 def _report_start(job_id, step):
@@ -104,7 +90,9 @@ WORKER_START_PID = os.getpid()
 def _startup_code_provenance():
     root = Path(__file__).resolve().parents[1]
     sources = [root / 'runtime' / 'profile_ai_requests_worker.py',
-               root / 'app' / 'profile_auto_review.py',
+               root / 'app' / 'documentary_engine_r9.py',
+               root / 'app' / 'documentary_profile.py',
+               root / 'app' / 'rules.json',
                root / 'app' / 'profile_report.py']
     digests = {}
     for file in sources:
@@ -132,22 +120,14 @@ def _expertise_engine_provenance():
     It fingerprints the executable entry points used by this worker process.
     """
     import marshal
-    functions = {
-        'final_verifier': verify_final_values,
-        'documentary_verdict_merger': attach_documentary_findings,
-        'public_source_research': research_public_sources,
-        'review_payload_builder': build_review_payload,
-        'documentary_payload_enricher': enrich_review_payload_with_documentary,
-        'ai_draft_payload_enricher': enrich_review_payload_with_ai,
-        'item_research': research_each_assertion,
-        'local_ai_document_review': review_web_items,
-    }
+    from documentary_engine_r9 import run, discover, structured, text_facts, summarize, draft
+    functions = {'r8_run':run,'r8_discover':discover,'r8_structured':structured,'r8_text_facts':text_facts,'r8_summarize':summarize,'r8_draft':draft}
     loaded = {name: hashlib.sha256(marshal.dumps(fn.__code__)).hexdigest()
               for name, fn in sorted(functions.items())}
     fingerprint = hashlib.sha256(json.dumps(loaded, sort_keys=True, separators=(',', ':')).encode('ascii')).hexdigest()
     return {
         'schema': 'ezs.profile.expertise-engine-provenance.v1',
-        'engine_id': 'independent-evidence-verifier',
+        'engine_id': 'documentary-r9',
         'engine_version': 'code-sha256:' + fingerprint,
         'loaded_entrypoint_sha256': loaded,
         'worker_startup': STARTUP_PROVENANCE,
@@ -203,22 +183,6 @@ def api(path, data=None):
         emit('lab.http.error', {'type': type(exc).__name__, 'message': str(exc), 'url': BASE + path}, start_ns=begin)
         raise
 
-def require_completed_ai_review(ai):
-    """Accept evidence-based abstentions as draft; reject invalid or failed inferences."""
-    if not isinstance(ai, dict) or ai.get('status') != 'completed':
-        status = ai.get('status') if isinstance(ai, dict) else 'invalid'
-        reason = ai.get('reason') if isinstance(ai, dict) else None
-        raise RuntimeError('inference_IA_' + str(status) + ':' + str(reason)[:200])
-    dimensions = ai.get('dimensions')
-    if not isinstance(dimensions, dict) or not dimensions:
-        raise RuntimeError('IA_dimensions_absentes')
-    if any(not isinstance(value, dict) or value.get('decision') not in
-           ('match', 'mismatch', 'uncertain', 'not_scored') for value in dimensions.values()):
-        raise RuntimeError('IA_dimensions_invalides')
-    # Zero match/mismatch is a valid abstention, not a transport/model failure.
-    # The persisted review remains a draft, never a scientific validation.
-    return dimensions
-
 class ExpertiseCancelled(Exception):
     """LAB has recorded cancellation for this exact Assistant attempt."""
 
@@ -235,169 +199,33 @@ def assert_running(run_id, job_id):
 
 
 def process(run_id, client, check_cancel=None):
-    print('E2E_ASSISTANT_PROCESS_R2', 'global_job_id=' + str(os.environ.get('ORCHESTRATOR_JOB_ID', 'missing')), 'run_id=' + str(run_id), flush=True)
-    _CURRENT_STEPS.clear()
-    # Distinct execution identity survives in the revision key; retries cannot
-    # silently overwrite the previous expertise's comparison_json.
     import uuid
+    from documentary_engine_r9 import run, draft, identity_only
+    _CURRENT_STEPS.clear()
     execution_id = uuid.uuid4().hex
     check_cancel = check_cancel or (lambda: None)
     check_cancel()
     row = api('/internal/analysis/desktop/profile/reviews/run/' + str(run_id))['item']
-    inventory = api('/internal/analysis/desktop/profile/reviews/run/' + str(run_id) + '/final-assertions')
-    if inventory.get('schema') != 'ezstudio.profile-final-assertions.v1' or not isinstance(inventory.get('assertions'), list):
-        raise RuntimeError('profile_final_assertions_schema_invalid')
-    if inventory.get('run_id') != run_id or inventory.get('count') != len(inventory['assertions']):
-        raise RuntimeError('profile_final_assertions_count_mismatch')
-    row = {**row, '_public_final_assertions': inventory['assertions']}
-    emit('profile.final_assertions.loaded', {'count': inventory['count']})
-    snap('lab.profile.row', row)
-    ident = row.get('normalized_identity') or normalize_track_identity(row)
+    ident = identity_only(row.get('normalized_identity') or normalize_track_identity(row))
+    del row
     if not ident.get('title'):
         raise RuntimeError('titre_musical_absent')
-    if not ident.get('artist'):
-        candidate = call_engine("identity_resolver", resolve_missing_artist, ident['title'], build_ai_provider_from_env())
-        emit('identity.resolution', {'status': candidate['status'], 'candidate_count': candidate['candidate_count']})
-        if candidate['status'] == 'resolved':
-            ident = {**ident, 'artist': candidate['artist'], 'method': 'assistant_mb_title_artist_match',
-                     'requires_verification': True, 'confidence': None}
-            row = {**row, 'artist': candidate['artist'], 'normalized_identity': ident}
-        else:
-            # Do not invent a performer: public research returns an abstention.
-            row = {**row, 'normalized_identity': ident}
-    ident = {**ident, 'catalog_duration_ms': call_engine("recording_duration", duration_from_catalog, row)}
-    started = time.perf_counter_ns()
-    emit('research.begin', {'identity': ident})
-    try:
-        check_cancel()
-        research = call_engine("public_source_research", research_public_sources, ident, NetworkBudget())
-    finally:
-        emit('research.duration', start_ns=started)
-    snap('research.result', research)
-    started = time.perf_counter_ns()
+    result = run(ident, ROOT, run_id, execution_id, check_cancel, execute=call_engine)
+    for key, item in result['profile']['provisional']['items'].items():
+        record_items('r8_item_'+key,[{'key':key,'status':item['status']}])
+    snap('profile.r9.documentary', result)
     check_cancel()
-    payload = call_engine("review_payload_builder", build_review_payload, row, research, min_confidence=.75)
-    emit('review.base_payload.duration', start_ns=started)
-    snap('review.base_payload', payload)
-    started = time.perf_counter_ns()
-    # Independent evidence verification. No module results/presets in verifier inputs.
-    check_cancel()
-    verification = call_engine("independent_verifier", verify_final_values, row, ident, research)
-    record_items('independent_verifier', verification.get('assertions') or [])
-    snap('profile.final_verification', verification)
-    # Research is an integral part of PROFILE, never a hidden opt-in.
-    # Missing provider credentials are reported to LAB, never silently skipped.
-    check_cancel()
-    investigation = call_engine("assertion_web_investigator", research_each_assertion, row, ident, source_research=research)
-    snap('profile.web_investigation', investigation)
-    emit('web.investigation.summary', {
-        'status': investigation.get('status'),
-        'reason': investigation.get('reason'),
-        'searched': investigation.get('searched'),
-        'web_citations': sum(len(i.get('citation_urls') or []) for i in investigation.get('items') or [])
-    })
-    check_cancel()
-    inv_ident = {**ident, **(investigation.get('identity') or {})}
-    local_web_review = call_engine("local_ai_document_review", review_web_items, investigation, inv_ident)
-    verification = call_engine("documentary_verdict_merger", attach_documentary_findings, verification, investigation, local_web_review)
-    snap('profile.documentary_comparison', verification)
-    record_items('local_ai_document_review', local_web_review.get('items') or [])
-    snap('profile.local_web_review', local_web_review)
-    emit('web.local_review.summary', {'status': local_web_review.get('status'), 'items': len(local_web_review.get('items') or [])})
-
-    # Retain existing LAB draft transport schema, without claiming AI-generated proof.
-    ai = {
-        'schema': 'EZStudioLab_assistant.ai-profile-review.v1',
-        'status': 'completed',
-        'provider': 'independent-evidence-verifier',
-        'model': None,
-        'confidence': None,
-        'summary': 'Vérification indépendante des valeurs musicales finales',
-        'dimensions': {
-            key: {'decision':'not_scored','confidence':None,
-                  'reason':'verification_in_final_assertions'}
-            for key in ('genre','instrumentation','lead_vocal','backing_vocals','choir')
-        },
-        'coverage': {'independent_verification': True}
-    }
-    payload = call_engine("documentary_payload_enricher", enrich_review_payload_with_documentary, payload, row, research)
-    payload = call_engine("ai_draft_payload_enricher", enrich_review_payload_with_ai, payload, ai)
-    payload.setdefault('comparison', {})['final_verification'] = verification
-    payload['comparison']['engine_steps'] = list(_CURRENT_STEPS)
-    # Provenance of the *loaded* decision functions, not a guessed semantic version.
-    provenance = _expertise_engine_provenance()
-    payload['comparison']['expertise_engine_provenance'] = provenance
-    payload['comparison']['profile_scientific_engine'] = row.get('engine')
-    payload.setdefault('consensus', {})['final_verification_summary'] = {
-        'bon': sum(x['verdict']=='bon' for x in verification['assertions']),
-        'faux': sum(x['verdict']=='faux' for x in verification['assertions']),
-        'non_trouve': sum(x['verdict']=='non_trouve' for x in verification['assertions'])
-    }
-    # Score only independent documentary BON/FAUX, never abstentions.
-    verdict_counts = payload['consensus']['final_verification_summary']
-    scored_count = verdict_counts['bon'] + verdict_counts['faux']
-    emit('profile.verdict_counts', {
-        'bon': verdict_counts['bon'],
-        'faux': verdict_counts['faux'],
-        'non_trouve': verdict_counts['non_trouve'],
-        'scored_count': scored_count,
-        'assertion_count': len(verification['assertions']),
-    })
-    # A completed inference is an advisory DRAFT, never independent validation.
-    all_urls = []
-    for a in verification.get('assertions') or []:
-        for s in a.get('sources') or []:
-            if isinstance(s, dict) and s.get('url') and s['url'] not in all_urls:
-                all_urls.append(s['url'])
-    if all_urls:
-        payload['sources'] = [{'url': u, 'title': u, 'provider': 'documentary_evidence'} for u in all_urls]
-    payload['status'] = 'draft'
-    payload['reviewer'] = 'assistant-lab-ui-qwen'
-    digest = hashlib.sha256(json.dumps(
-        {'ai': ai, 'verification': verification,
-         'documentary': payload.get('comparison', {}).get('documentary_catalogue_suggestions'),
-         'run_id': run_id, 'expertise_provenance': provenance,
-         'execution_id': execution_id}, sort_keys=True, ensure_ascii=True
-    ).encode('utf-8')).hexdigest()[:20]
-    # A new expertise execution must never UPSERT an earlier historical revision.
-    payload['revision_key'] = 'profile-provenance-' + str(run_id) + '-' + digest
+    payload = draft(run_id, execution_id, result, _CURRENT_STEPS)
     snap('lab.submit.request', payload)
-    started = time.perf_counter_ns()
-    try:
-        check_cancel()
-        submitted = call_engine("lab_revision_submit", client.submit_profile_review, payload)
-    except Exception as exc:
-        emit('lab.submit.error', {'type': type(exc).__name__, 'message': str(exc)}, start_ns=started)
-        raise
-    emit('lab.submit.duration', start_ns=started)
+    submitted = call_engine('lab_revision_submit', client.submit_profile_review, payload)
     snap('lab.submit.response', submitted)
-    if not submitted.get('ok') or not isinstance((submitted.get('revision') or {}).get('id'), int) or (submitted.get('revision') or {}).get('id') < 1:
+    revision = (submitted.get('revision') or {}).get('id')
+    if not submitted.get('ok') or type(revision) is not int or revision < 1:
         raise RuntimeError('revision_non_confirmee')
-    # Documentary archive only, after LAB acknowledges the existing draft.
-    # This has no checkpoint or Orchestrator progress side effects.
-    try:
-        registry_result = record_verified_assertions(
-            run_id, submitted['revision']['id'], ident, row, verification
-        )
-        emit('profile.expertise_registry.persisted', {
-            'status': registry_result['status'],
-            'inserted': registry_result['inserted'],
-            'reused': registry_result['reused'],
-            'skipped': registry_result['skipped'],
-        })
-    except Exception as registry_exc:
-        # A secondary archive cannot invalidate a LAB revision already saved.
-        emit('profile.expertise_registry.error', {'error_type': type(registry_exc).__name__})
-        print('PROFILE_EXPERTISE_DB_ERROR=' + type(registry_exc).__name__, flush=True)
-    return {
-        'run_id': run_id,
-        'revision': (submitted.get('revision') or {}).get('id'),
-        'ai_status': 'completed',
-        'review_status': 'draft',
-        'scored_count': scored_count,
-        'non_trouve_count': verdict_counts['non_trouve'],
-        'assertion_count': len(verification['assertions']),
-    }
+    return {'run_id':run_id, 'revision':revision, 'ai_status':'completed', 'review_status':'draft',
+            'scored_count':0, 'non_trouve_count':0, 'assertion_count':0,
+            'documentary_status':result['profile']['status'],
+            'documentary_counts':result['profile']['counts']}
 
 def once(client, target_job_id=None, target_run_id=None):
     print('E2E_ASSISTANT_ONCE_R2', 'global_job_id=' + str(os.environ.get('ORCHESTRATOR_JOB_ID', 'missing')), 'local_job_id=' + str(target_job_id), 'run_id=' + str(target_run_id), flush=True)
@@ -441,10 +269,12 @@ def once(client, target_job_id=None, target_run_id=None):
             try:
                 emit('job.claimed', {'run_id': rid, 'claim': True})
                 snap('worker.startup_provenance', STARTUP_PROVENANCE)
+                snap('worker.expertise_engine_provenance', _expertise_engine_provenance())
                 with execution_scope(rid, job_id, trace, on_step=lambda step: _report_step(job_id, step), on_start=lambda step: _report_start(job_id, step)):
                     outcome = process(rid, client, check_cancel=lambda: assert_running(rid, job_id))
                 assert_running(rid, job_id)
                 message = 'Révision IA #' + str(outcome['revision']) + ' enregistrée'
+                message += ' — documentaire : ' + str(outcome['documentary_counts']['items_with_evidence']) + '/11 items renseignés, 0/11 certifié'
                 print(json.dumps(outcome), flush=True)
             except ExpertiseCancelled:
                 status = 'cancelled'

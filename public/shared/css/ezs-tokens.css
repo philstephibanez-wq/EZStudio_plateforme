@@ -58,3 +58,17 @@
 .ezs-nav a:hover { background: #30363d; color: #ffffff !important; }
 .ezs-nav a[aria-current="page"], .ezs-nav a.active, .main-nav a.active { background: #313944 !important; color: #f1f5f9 !important; border-color: #64748b !important; font-weight: 700; }
 .ezs-nav span { color: #8b949e; border-color: #30363d; opacity: 0.7; cursor: default; }
+
+/* Shared job state presentation; existing palette unchanged. */
+[data-ezs-job-state="queued"], [data-ezs-job-state="pending"], [data-ezs-job-state="waiting"] { --ezs-job-color: var(--ezs-state-waiting); }
+[data-ezs-job-state="running"], [data-ezs-job-state="progressing"] { --ezs-job-color: var(--ezs-state-progressing); }
+[data-ezs-job-state="cancelling"] { --ezs-job-color: var(--ezs-state-cancelling); }
+[data-ezs-job-state="cancelled"] { --ezs-job-color: var(--ezs-state-cancelled); }
+[data-ezs-job-state="done"], [data-ezs-job-state="completed"], [data-ezs-job-state="ok"] { --ezs-job-color: var(--ezs-state-ok); }
+[data-ezs-job-state="failed"], [data-ezs-job-state="error"], [data-ezs-job-state="admission_error"], [data-ezs-job-state="ko"] { --ezs-job-color: var(--ezs-state-ko); }
+[data-ezs-job-state] { border-color: var(--ezs-job-color, currentColor); }
+span[data-ezs-job-state], div.meta[data-ezs-job-state] { color: var(--ezs-job-color, inherit); }
+progress[data-ezs-job-state] { accent-color: var(--ezs-job-color, currentColor); }
+progress[data-ezs-job-state]::-webkit-progress-value { background-color: var(--ezs-job-color, currentColor); }
+progress[data-ezs-job-state]::-moz-progress-bar { background-color: var(--ezs-job-color, currentColor); }
+.ezs-badge--state-neutral { background: transparent; color: inherit; border-color: currentColor; }

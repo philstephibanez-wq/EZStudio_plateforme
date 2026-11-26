@@ -115,18 +115,29 @@ class QueueDispatchControllerTest extends WebTestCase
         $this->parkExistingActiveRows($em);
 
         try {
-            $client->request('POST', '/api/queue/dispatch', [], [], $headers, json_encode([
-                'source' => 'assistant',
-                'payload' => [
-                    'job' => 'profile.review',
-                    'category' => 'Expertise',
-                    'label' => 'Automate Regression Guard',
-                    'job_id' => 99331,
-                    'run_id' => 99291,
-                    'functional_test' => true,
-                ],
-            ]));
-            $this->assertResponseStatusCodeSame(201);
+            $payload = [
+                'job' => 'profile.review',
+                'category' => 'Expertise',
+                'label' => 'Automate Regression Guard',
+                'job_id' => 99331,
+                'run_id' => 99291,
+                'functional_test' => true,
+            ];
+            // N3/N4: new admission must be refused before any fixture is inserted.
+            $client->request('POST', '/api/queue/dispatch', [], [], $headers, json_encode(['source'=>'assistant','payload'=>$payload]));
+            $this->assertResponseStatusCodeSame(409);
+            $this->assertSame('expertise_locale_suspendue', json_decode((string)$client->getResponse()->getContent(), true)['error'] ?? null);
+            $em = static::getContainer()->get(EntityManagerInterface::class);
+            $this->assertSame(0, (int)$em->getConnection()->fetchOne("SELECT COUNT(*) FROM job_queue WHERE json_extract(payload,'$.functional_test')=1"));
+            // Simulate a receipt admitted BEFORE suspension; no production escape hatch.
+            $seed = new \App\Entity\JobQueue('assistant', $payload);
+            $em->persist($seed);
+            $em->flush();
+            $seedId = $seed->getId();
+            $client->request('POST', '/api/queue/dispatch', [], [], $headers, json_encode(['source'=>'assistant','payload'=>$payload]));
+            $this->assertResponseStatusCodeSame(200);
+            $this->assertTrue(json_decode((string)$client->getResponse()->getContent(), true)['deduplicated'] ?? false);
+            $this->assertSame($seedId, (int)(json_decode((string)$client->getResponse()->getContent(), true)['queue_id'] ?? 0));
             $res = json_decode((string) $client->getResponse()->getContent(), true);
             $this->assertEquals('waiting', $res['status'] ?? null);
             $queueId = (int) ($res['queue_id'] ?? 0);
@@ -144,7 +155,7 @@ class QueueDispatchControllerTest extends WebTestCase
             $client->request('POST', '/api/queue/' . $queueId . '/complete', [], [], $headers);
             $this->assertResponseIsSuccessful();
 
-            $cmdFile = dirname(__DIR__, 2) . '/apps/orchestrator/src/Command/QueueConsumeCommand.php';
+            $cmdFile = dirname(__DIR__, 2) . '/apps/ezs_orchestrator/src/Command/QueueConsumeCommand.php';
             $cmdSource = (string) file_get_contents($cmdFile);
             $this->assertStringContainsString("'EZSTUDIOLAB_ASSISTANT_BASE_URL'", $cmdSource);
             $this->assertStringContainsString('lab.ezstudio.local:8000', $cmdSource);

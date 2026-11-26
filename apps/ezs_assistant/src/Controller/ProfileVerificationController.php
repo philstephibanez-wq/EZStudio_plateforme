@@ -21,6 +21,9 @@ final class ProfileVerificationController extends AbstractController
         if ($token === '') {
             return $this->json(['error' => 'unauthorized'], 401);
         }
+        if (\App\Service\ProfileExpertiseAdmission::SUSPENDED) {
+            return $this->json(['error'=>\App\Service\ProfileExpertiseAdmission::ERROR],409);
+        }
         try {
             $data = $request->toArray();
             if (array_key_exists('_auth_token', $data)) {

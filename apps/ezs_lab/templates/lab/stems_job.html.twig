@@ -6,7 +6,7 @@
 <h1>STEMS #{{ job.job_id }} — {{ job.song.title ?? 'Sans titre' }}</h1>
 <div class="meta">{{ job.state }} · {{ job.progress ?? 0 }}%{% if scientific_run %} · {{ scientific_run.public_id }}{% endif %}</div>
 </div>
-<span class="badge {{ job.state == 'done' ? 'ok' : (job.state == 'error' ? 'warn' : '') }}">{{ job.state }}</span>
+{% import '@shared/macros/ezs_ui.html.twig' as ezs_shared %}<span class="ezs-badge ezs-badge--state-{{ ezs_shared.job_state_class(job.state) }}">{{ job.state }}</span>
 </div>
 
 <div class="item-tabs">

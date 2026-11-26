@@ -66,6 +66,7 @@ SQL, ['job_id' => (int) $jobId]);
                     $conn->commit();
                     return $existing;
                 }
+                ProfileExpertiseAdmission::assertOpen();
                 $job = new JobQueue($source, $payload);
                 $this->entityManager->persist($job);
                 $this->entityManager->flush();
@@ -77,6 +78,9 @@ SQL, ['job_id' => (int) $jobId]);
             }
         }
 
+        if (ProfileExpertiseAdmission::blocksKind($payload['job'] ?? $payload['type'] ?? $payload['phase'] ?? null)) {
+            ProfileExpertiseAdmission::assertOpen();
+        }
         $existing = $this->findActiveDuplicate($source, $payload);
         if ($existing instanceof JobQueue) { return $existing; }
         $job = new JobQueue($source, $payload);
@@ -113,10 +117,12 @@ SQL, ['job_id' => (int) $jobId]);
 
     public function claimNextWaiting(): ?JobQueue
     {
+        // Hold all claims, including REST claims, while a recovery receipt is pending.
+        if (is_file(\App\Service\QueueBarrierPaths::stoppedCancellation(dirname(__DIR__, 2)))) return null;
         // EZS_QUEUE_STOP_ON_KO_R1: persistent pause is authoritative for GO.
         // This is checked before each claim, including after an EZS restart.
         // The global consumer lock prevents a concurrent pause/claim on MAIN.
-        $pausePath = dirname(__DIR__, 2) . '/var/orchestrator_queue_paused_on_error.json';
+        $pausePath = \App\Service\QueueBarrierPaths::pause(dirname(__DIR__, 2));
         // EZS_FIFO_ACTIVE_RETRY_R1B: while blocked, ONLY the exact failed job
         // may be re-executed after its explicit manual retry has set waiting.
         $blockedId = null;
@@ -133,7 +139,7 @@ SQL, ['job_id' => (int) $jobId]);
         $conn->beginTransaction();
         try {
             $activeCount = (int) $conn->fetchOne("SELECT COUNT(*) FROM job_queue WHERE status IN ('progressing', 'cancelling')");
-            if ($activeCount > 0) { $conn->commit(); return null; }
+            if ($activeCount > 0 || $this->pendingWaitingCancellations() !== []) { $conn->commit(); return null; }
             $id = $blockedId !== null
                 ? $conn->fetchOne("SELECT id FROM job_queue WHERE id = :id AND status = 'waiting' LIMIT 1", ['id' => $blockedId])
                 : $conn->fetchOne("SELECT id FROM job_queue WHERE status = 'waiting' ORDER BY created_at ASC, id ASC LIMIT 1");
@@ -175,13 +181,13 @@ SQL, ['job_id' => (int) $jobId]);
         if ($job->isTerminal() || $job->getStatus() === JobQueue::STATUS_CANCELLING) { return $job; }
         if ($this->jobLifecycleStateMachine->can($job, 'cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'cancel');
-            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('AnnulÃ©');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
             $this->entityManager->flush();
             return $job;
         }
         if ($this->jobLifecycleStateMachine->can($job, 'request_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'request_cancel');
-            $job->setHasError(false)->setErrorMessage('Annulation demandÃ©e');
+            $job->setHasError(false)->setErrorMessage('Annulation demandée');
             $this->entityManager->flush();
             return $job;
         }
@@ -196,7 +202,7 @@ SQL, ['job_id' => (int) $jobId]);
         if ($pid !== null && $pid > 0 && $this->isProcessAlive($pid)) { return $job; }
         if ($this->jobLifecycleStateMachine->can($job, 'confirm_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'confirm_cancel');
-            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('AnnulÃ©');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
             $this->entityManager->flush();
         }
         return $job;
@@ -209,7 +215,7 @@ SQL, ['job_id' => (int) $jobId]);
         if ($job->isTerminal()) { return $job; }
         if ($job->getStatus() === JobQueue::STATUS_CANCELLING && $this->jobLifecycleStateMachine->can($job, 'confirm_cancel')) {
             $this->jobLifecycleStateMachine->apply($job, 'confirm_cancel');
-            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('AnnulÃ©');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
             $this->entityManager->flush();
             return $job;
         }
@@ -237,15 +243,99 @@ SQL, ['job_id' => (int) $jobId]);
         return $updated === 1 ? $this->entityManager->find(JobQueue::class, $id) : null;
     }
 
+    public function pendingWaitingCancellations(): array
+    {
+        return array_map('intval', $this->entityManager->getConnection()->fetchFirstColumn(
+            "SELECT id FROM job_queue WHERE status='cancelled' AND error_message='cancel_pending_lab_ack' ORDER BY id"));
+    }
+
+    public function reserveWaitingCancellation(int $id): bool
+    {
+        $job = $this->findForStoppedCancellation($id);
+        if (!$job instanceof JobQueue || QueueCancellationRecovery::identity($job) === null
+            || $job->getStatus() !== 'waiting' || $job->getAttempts() !== 0 || $job->getWorkerPid() !== null
+            || !$this->jobLifecycleStateMachine->can($job, 'cancel')) return false;
+        $this->jobLifecycleStateMachine->apply($job, 'cancel');
+        if ($job->getStatus() !== 'cancelled') return false;
+        $n=$this->entityManager->getConnection()->executeStatement(
+            "UPDATE job_queue SET status='cancelled',has_error=0,error_message='cancel_pending_lab_ack',updated_at=:now WHERE id=:id AND status='waiting' AND attempts=0 AND worker_pid IS NULL",
+            ['id'=>$id,'now'=>(new \DateTimeImmutable())->format('Y-m-d H:i:s')]);
+        $this->entityManager->clear();
+        return $n===1;
+    }
+
+    public function ackWaitingCancellation(int $id): bool
+    {
+        $n=$this->entityManager->getConnection()->executeStatement(
+            "UPDATE job_queue SET error_message='Annulé',updated_at=:now WHERE id=:id AND status='cancelled' AND attempts=0 AND worker_pid IS NULL AND error_message='cancel_pending_lab_ack'",
+            ['id'=>$id,'now'=>(new \DateTimeImmutable())->format('Y-m-d H:i:s')]);
+        $this->entityManager->clear();
+        return $n===1;
+    }
+
     public function delete(int $id): bool
     {
         $conn = $this->entityManager->getConnection();
         $deleted = $conn->executeStatement(
-            "DELETE FROM job_queue WHERE id = :id AND status IN ('waiting', 'cancelled', 'ended')",
+            "DELETE FROM job_queue WHERE id = :id AND status IN ('cancelled', 'ended') AND (error_message IS NULL OR error_message <> 'cancel_pending_lab_ack')",
             ['id' => $id]
         );
         $this->entityManager->clear();
         return $deleted === 1;
+    }
+
+    /** Exact identity read; the consumer owns the recovery procedure. */
+    public function findForStoppedCancellation(int $id): ?JobQueue
+    {
+        $this->entityManager->clear();
+        $job = $this->entityManager->find(JobQueue::class, $id);
+        return $job instanceof JobQueue ? $job : null;
+    }
+
+    public function isOnlyActiveForStoppedCancellation(int $id): bool
+    {
+        $rows = $this->entityManager->getConnection()->fetchFirstColumn(
+            "SELECT id FROM job_queue WHERE status IN ('progressing','cancelling') ORDER BY id"
+        );
+        return count($rows) === 1 && (int)$rows[0] === $id;
+    }
+
+    /** Called after explicit stop evidence and verified LAB acknowledgement. */
+    public function confirmStoppedCancellation(int $id, int $attempt, ?int $pid): ?JobQueue
+    {
+        $conn = $this->entityManager->getConnection();
+        $conn->beginTransaction();
+        try {
+            $job = $this->findForStoppedCancellation($id);
+            if (!$job instanceof JobQueue || $job->getStatus() !== JobQueue::STATUS_CANCELLING
+                || $job->getAttempts() !== $attempt
+                || $job->getWorkerPid() !== $pid || !$this->isOnlyActiveForStoppedCancellation($id)
+                || !$this->jobLifecycleStateMachine->can($job, 'confirm_cancel')) {
+                $conn->commit();
+                return null;
+            }
+            $this->jobLifecycleStateMachine->apply($job, 'confirm_cancel');
+            if ($job->getStatus() !== JobQueue::STATUS_CANCELLED) throw new \RuntimeException('recovery_workflow_target_invalid');
+            $job->setHasError(false)->setWorkerPid(null)->setErrorMessage('Annulé');
+            $changed = $conn->executeStatement(
+                "UPDATE job_queue SET status=:target,worker_pid=NULL,has_error=0,error_message=:message,updated_at=:now
+                 WHERE id=:id AND status='cancelling' AND attempts=:attempt
+                 AND ((worker_pid IS NULL AND :pid IS NULL) OR worker_pid=:pid)",
+                ['target'=>$job->getStatus(),'message'=>'Annulé','now'=>(new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                 'id'=>$id,'attempt'=>$attempt,'pid'=>$pid]
+            );
+            if ($changed !== 1) {
+                $conn->commit();
+                $this->entityManager->clear();
+                return null;
+            }
+            $conn->commit();
+            return $this->findForStoppedCancellation($id);
+        } catch (\Throwable $e) {
+            if ($conn->isTransactionActive()) $conn->rollBack();
+            $this->entityManager->clear();
+            throw $e;
+        }
     }
 
     public function recoverInterruptedJobs(int $staleTimeoutSeconds = 0): int
@@ -265,7 +355,7 @@ SQL, ['job_id' => (int) $jobId]);
             $pid = isset($row['worker_pid']) && $row['worker_pid'] !== null ? (int) $row['worker_pid'] : null;
             if ($pid !== null && $pid > 0 && $this->isProcessAlive($pid)) { continue; }
             if ($status === JobQueue::STATUS_CANCELLING) {
-                $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'cancelled', worker_pid = NULL, has_error = 0, error_message = 'AnnulÃ©', updated_at = :now WHERE id = :id AND status = 'cancelling'", ['now' => $now, 'id' => $id]);
+                $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'cancelled', worker_pid = NULL, has_error = 0, error_message = 'Annulé', updated_at = :now WHERE id = :id AND status = 'cancelling'", ['now' => $now, 'id' => $id]);
                 continue;
             }
             $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'waiting', progress = 0, worker_pid = NULL, updated_at = :now WHERE id = :id AND status = 'progressing'", ['now' => $now, 'id' => $id]);

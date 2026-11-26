@@ -25,7 +25,8 @@ final class EzsFifoTrace
         // Destination hors dépôt ; PHP serveur et CLI peuvent avoir des TEMP différents.
         $dir = is_dir('H:/temp') && is_writable('H:/temp') ? 'H:/temp/EZS_FIFO_TRACE_R1' : sys_get_temp_dir();
         if ($dir === 'H:/temp/EZS_FIFO_TRACE_R1' && !is_dir($dir)) @mkdir($dir, 0770, true);
-        $file = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . ($dir === sys_get_temp_dir() ? 'ezs_fifo_trace_r1.jsonl' : 'events.jsonl');
+        $test = QueueBarrierPaths::isTest();
+        $file = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . ($dir === sys_get_temp_dir() ? ($test ? 'ezs_fifo_trace_r1_test.jsonl' : 'ezs_fifo_trace_r1.jsonl') : ($test ? 'events_test.jsonl' : 'events.jsonl'));
         @file_put_contents($file, $json . "\n", FILE_APPEND | LOCK_EX);
         error_log('[EZS_FIFO_TRACE_R1] ' . $json);
     }

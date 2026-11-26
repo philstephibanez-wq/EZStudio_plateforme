@@ -56,7 +56,10 @@ final class QueueAdmissionController
                 $data['resource_class'],
                 $data['priority'],
             );
-        } catch (\DomainException|\InvalidArgumentException) {
+        } catch (\DomainException|\InvalidArgumentException $e) {
+            if ($e instanceof \DomainException && $e->getMessage() === \App\Service\ProfileExpertiseAdmission::ERROR) {
+                return self::reply(['error'=>\App\Service\ProfileExpertiseAdmission::ERROR],409);
+            }
             return self::reply(['error' => 'queue_identity_collision'], 409);
         } catch (\Throwable) {
             return self::reply(['error' => 'queue_unavailable'], 503);

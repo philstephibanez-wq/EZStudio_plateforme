@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\Service\LabRetryClient;
 use App\Service\JobRetryCoordinator;
 use App\Service\QueueManager;
+use App\Service\QueueBarrierPaths;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Lock\LockFactory;
@@ -62,9 +63,28 @@ final class JobRetrySecurityTest extends WebTestCase
         $lf=$container->get(LockFactory::class);
         $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']='test_token';
         $calls=[];
+        $pauseFile=QueueBarrierPaths::pause(dirname(__DIR__, 2));
+        $this->assertTrue(QueueBarrierPaths::isTest());
+        $this->assertStringEndsWith('_test.json',$pauseFile);
+        $this->assertFileDoesNotExist($pauseFile);
+        $this->assertSame('orchestrator_test.sqlite',basename(str_replace('\\','/',(string)($em->getConnection()->getParams()['path'] ?? ''))));
+        $job=null;
+        $ownsPause=false;
+        $conn=$em->getConnection();
+        $prefix='__n2_'.bin2hex(random_bytes(6)).'_';
         try {
+            $conn->executeStatement("UPDATE job_queue SET status = ? || status WHERE status IN ('waiting','progressing','cancelling')",[$prefix]);
             $job=$qm->dispatch('lab',['job'=>'profile','analysis_job_id'=>201,'scientific_run_id'=>20,'song_id'=>601]);
-            $qm->claimNextWaiting();$qm->markFailed((int)$job->getId(),'failed');
+            $claimed=$qm->claimNextWaiting();
+            $this->assertSame($job->getId(),$claimed?->getId());
+            $qm->markFailed((int)$job->getId(),'failed');
+            $handle=fopen($pauseFile,'xb');
+            $this->assertIsResource($handle);
+            $ownsPause=true;
+            try {
+                $record=json_encode(['schema'=>'ezs.queue.pause_on_ko.v1','global_job_id'=>(int)$job->getId(),'reason'=>'test_failure','at_utc'=>gmdate('c')],JSON_THROW_ON_ERROR);
+                $this->assertSame(strlen($record),fwrite($handle,$record));
+            } finally { fclose($handle); }
             $http=new MockHttpClient(function(string $method,string $url,array $options)use(&$calls):MockResponse {
                 $action=basename($url);$calls[]=$action;
                 return new MockResponse('{"schema":"ezstudio.lab-job-retry.v1","ok":true,"reconciled":false}',['http_code'=>200]);
@@ -74,12 +94,21 @@ final class JobRetrySecurityTest extends WebTestCase
             $stub->method('findActiveDuplicate')->willReturn(null);
             $stub->method('retry')->willThrowException(new \RuntimeException('global failure'));
             $coord=new JobRetryCoordinator($em,$stub,$lf,new NullLogger(),new LabRetryClient($http));
+            $foreign=json_encode(['schema'=>'ezs.queue.pause_on_ko.v1','global_job_id'=>(int)$job->getId()+1],JSON_THROW_ON_ERROR);
+            $this->assertSame(strlen($foreign),file_put_contents($pauseFile,$foreign,LOCK_EX));
+            $denied=$coord->retry((int)$job->getId());
+            $this->assertFalse($denied['ok']);
+            $this->assertSame('job_non_bloquant_de_la_fifo',$denied['reason']);
+            $this->assertSame([],$calls);
+            $this->assertSame(strlen($record),file_put_contents($pauseFile,$record,LOCK_EX));
             $result=$coord->retry((int)$job->getId());
             $this->assertFalse($result['ok']);
             $this->assertSame('echec_rearmement_central',$result['reason']);
             $this->assertSame(['prepare','abort'],$calls);
         } finally {
-            $em->getConnection()->executeStatement('DELETE FROM job_queue');
+            if ($ownsPause) unlink($pauseFile);
+            if ($job!==null) $conn->executeStatement('DELETE FROM job_queue WHERE id=?',[(int)$job->getId()]);
+            $conn->executeStatement('UPDATE job_queue SET status=substr(status,?) WHERE substr(status,1,?)=?',[strlen($prefix)+1,strlen($prefix),$prefix]);
             unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']);
         }
     }
@@ -93,9 +122,28 @@ final class JobRetrySecurityTest extends WebTestCase
         $lf=$container->get(LockFactory::class);
         $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']='test_token';
         $calls=[];
+        $pauseFile=QueueBarrierPaths::pause(dirname(__DIR__, 2));
+        $this->assertTrue(QueueBarrierPaths::isTest());
+        $this->assertStringEndsWith('_test.json',$pauseFile);
+        $this->assertFileDoesNotExist($pauseFile);
+        $this->assertSame('orchestrator_test.sqlite',basename(str_replace('\\','/',(string)($em->getConnection()->getParams()['path'] ?? ''))));
+        $job=null;
+        $ownsPause=false;
+        $conn=$em->getConnection();
+        $prefix='__n2_'.bin2hex(random_bytes(6)).'_';
         try {
+            $conn->executeStatement("UPDATE job_queue SET status = ? || status WHERE status IN ('waiting','progressing','cancelling')",[$prefix]);
             $job=$qm->dispatch('lab',['job'=>'profile','analysis_job_id'=>202,'scientific_run_id'=>20,'song_id'=>602]);
-            $qm->claimNextWaiting();$qm->markFailed((int)$job->getId(),'failed');
+            $claimed=$qm->claimNextWaiting();
+            $this->assertSame($job->getId(),$claimed?->getId());
+            $qm->markFailed((int)$job->getId(),'failed');
+            $handle=fopen($pauseFile,'xb');
+            $this->assertIsResource($handle);
+            $ownsPause=true;
+            try {
+                $record=json_encode(['schema'=>'ezs.queue.pause_on_ko.v1','global_job_id'=>(int)$job->getId(),'reason'=>'test_failure','at_utc'=>gmdate('c')],JSON_THROW_ON_ERROR);
+                $this->assertSame(strlen($record),fwrite($handle,$record));
+            } finally { fclose($handle); }
             $http=new MockHttpClient(function(string $method,string $url,array $options)use(&$calls):MockResponse {
                 $action=basename($url);$calls[]=$action;
                 $reconciled=$action==='prepare'?'true':'false';
@@ -108,7 +156,9 @@ final class JobRetrySecurityTest extends WebTestCase
             $this->assertSame(['prepare','commit'],$calls);
             $this->assertSame('waiting',$em->getConnection()->fetchOne('SELECT status FROM job_queue WHERE id=?',[(int)$job->getId()]));
         } finally {
-            $em->getConnection()->executeStatement('DELETE FROM job_queue');
+            if ($ownsPause) unlink($pauseFile);
+            if ($job!==null) $conn->executeStatement('DELETE FROM job_queue WHERE id=?',[(int)$job->getId()]);
+            $conn->executeStatement('UPDATE job_queue SET status=substr(status,?) WHERE substr(status,1,?)=?',[strlen($prefix)+1,strlen($prefix),$prefix]);
             unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']);
         }
     }

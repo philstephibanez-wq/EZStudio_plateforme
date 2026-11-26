@@ -35,3 +35,5 @@
         <span class="ezs-badge ezs-badge--state-waiting">Enregistré (en attente)</span>
     {% endif %}
 {% endmacro %}
+
+{% macro job_state_class(state, has_error=false) %}{%- set key = state|default('')|lower -%}{%- set aliases = {'queued':'waiting','pending':'waiting','waiting':'waiting','running':'progressing','progressing':'progressing','cancelling':'cancelling','cancelled':'cancelled','done':'ok','completed':'ok','ok':'ok','failed':'ko','error':'ko','admission_error':'ko','ko':'ko'} -%}{%- if key == 'ended' -%}{{ has_error ? 'ko' : 'ok' }}{%- else -%}{{ aliases[key] ?? 'neutral' }}{%- endif -%}{% endmacro %}

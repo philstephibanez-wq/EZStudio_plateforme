@@ -76,7 +76,7 @@
 
   {% if selected_stems_run %}
     <div class="run-state" style="margin-top:12px">
-      <span class="badge {{ selected_stems_run.state == 'done' ? 'ok' : 'warn' }}">{{ selected_stems_run.state }}</span>
+      {% import '@shared/macros/ezs_ui.html.twig' as ezs_shared %}<span class="ezs-badge ezs-badge--state-{{ ezs_shared.job_state_class(selected_stems_run.state) }}">{{ selected_stems_run.state }}</span>
       <code>{{ selected_stems_run.public_id }}</code>
       <span class="meta">{{ selected_stems_run.audio_artifacts|length }} piste(s) audio</span>
       <a href="{{ path('scientific_run',{id:selected_stems_run.id}) }}">Preset</a>

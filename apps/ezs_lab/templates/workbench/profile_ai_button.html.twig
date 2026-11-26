@@ -4,7 +4,7 @@
   <h2>ASSISTANT · Expertise musicale IA</h2>
   <div class="meta">Qwen sur XPS · run #{{ selected_profile_run.id }} · aucune modification du résultat scientifique ou des presets.</div>
   <form id="profile-ai-request-form" action="{{ path('profile_ai_review_request', {id: selected_profile_run.id}) }}" method="post" onsubmit="return false">
-    <button type="button" id="profile-ai-run-button">Expertiser avec l’IA</button>
+    <button type="button" id="profile-ai-run-button" disabled title="Nouvelles expertises IA locales suspendues">Expertise suspendue</button>
     <button type="button" id="profile-ai-cancel-button" style="display:none">Annuler l’expertise IA</button>
   </form>
   <div class="profile-ai-progress" aria-label="Progression de l’expertise IA">
@@ -27,7 +27,7 @@
     const busy = (s==='running' || s==='queued');
     const cancelling = (s==='cancelling');
     button.style.display = (busy || cancelling) ? 'none' : '';
-    button.disabled = (busy || cancelling);
+    button.disabled = true;
     if (cancelBtn) {
       cancelBtn.style.display = (busy || cancelling) ? '' : 'none';
       cancelBtn.disabled = cancelling;
@@ -40,6 +40,8 @@
     const s=item?.status || 'idle';
     if (s==='running' || s==='queued' || s==='cancelling') { wasActive=true; }
     applyFsm(s);
+    state.dataset.ezsJobState=s;
+    progress.dataset.ezsJobState=s;
     const number=Number(item?.progress);
     const known=item?.progress!==null && item?.progress!==undefined && Number.isFinite(number) && number>=0 && number<=100;
     const pct=s==='completed' ? 100 : (known ? Math.round(number) : 0);
@@ -89,15 +91,6 @@
     applyFsm('cancelling');
     try { await fetch('/analysis/jobs/' + activeJobId + '/cancel', {method:'POST', credentials:'same-origin', headers:{'Accept':'application/json'}}); refresh(); }
     catch(e) { refresh(); }
-  });
-  button.addEventListener('click',async function(e){
-    e.preventDefault();applyFsm('queued');state.textContent='Demande d’expertise en cours…';progress.removeAttribute('value');
-    try {
-      const r=await fetch(form.action,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Profile-AI-Action':'request','Accept':'application/json'}});
-      const j=await r.json();if(!r.ok) throw new Error(j.error||'HTTP '+r.status);
-      if (!Number(j?.request?.job_id || 0)) throw new Error('expertise_global_admission_missing');
-      show(j.request);
-    } catch(err){state.textContent='Erreur : '+err.message;progress.value=0;applyFsm('idle');}
   });
   refresh();setInterval(refresh,2500);
 })();

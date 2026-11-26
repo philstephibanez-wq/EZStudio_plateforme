@@ -23,6 +23,8 @@ services:
             $databasePath: '%app.queue_database_path%'
 
 when@test:
+    parameters:
+        app.queue_database_path: '%kernel.project_dir%/var/orchestrator_test.sqlite'
     services:
         App\Service\QueueManager:
             public: true

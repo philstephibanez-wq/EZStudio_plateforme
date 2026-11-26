@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EZSLab\Controller;
 
+use EZSLab\Service\LabProductVersion;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -11,8 +12,6 @@ use Symfony\Component\Routing\Attribute\Route;
 /** Statut REST minimal LAB pour la supervision federée ; aucun acces aux jobs. */
 final class ServiceStatusController
 {
-    private const VERSION_PATTERN = '/^\d+\.\d+(?:[a-z]+\d*)?$/D';
-
     public static function allowed(string $host, string $clientIp): bool
     {
         return in_array($host, ['127.0.0.1', 'localhost'], true)
@@ -22,7 +21,7 @@ final class ServiceStatusController
     /** Contrat exact accepte par le collecteur WebSoftPingController (v4.2e). */
     public static function payload(string $version, string $timestampUtc): array
     {
-        $valid = preg_match(self::VERSION_PATTERN, $version) === 1;
+        $valid = LabProductVersion::isValid($version);
 
         return [
             'schema' => 'ezs.service-status.v1',

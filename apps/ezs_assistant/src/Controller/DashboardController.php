@@ -122,6 +122,9 @@ final class DashboardController extends AbstractController {
             return $this->json(['ok'=>false,'error'=>'invalid_research_request'],400);
         }
 
+        if (\App\Service\ProfileExpertiseAdmission::SUSPENDED) {
+            return $this->json(['ok'=>false,'error'=>\App\Service\ProfileExpertiseAdmission::ERROR],409);
+        }
         $root = dirname(__DIR__, 2);
         $stateDir = $root.'/runtime/state/profile-direct';
         if (!is_dir($stateDir) && !mkdir($stateDir, 0775, true) && !is_dir($stateDir)) {

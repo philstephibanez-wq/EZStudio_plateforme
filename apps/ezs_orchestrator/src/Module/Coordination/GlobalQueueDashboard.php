@@ -10,7 +10,7 @@ final class GlobalQueueDashboard
 {
     public static function read(?string $path = null, array $filters = []): array
     {
-        $path ??= dirname(__DIR__, 5) . '/data/databases/EZS_Orchestrator.sqlite';
+        $path ??= dirname(__DIR__, 5) . (\App\Service\QueueBarrierPaths::isTest() ? '/var/orchestrator_test.sqlite' : '/data/databases/EZS_Orchestrator.sqlite');
         $stateFilter = in_array((string) ($filters['state'] ?? 'all'), ['all', 'active', 'waiting', 'progressing', 'cancelling', 'ended_ko'], true) ? (string) $filters['state'] : 'all';
         $actorFilter = in_array((string) ($filters['actor'] ?? 'all'), ['all', 'lab', 'assistant'], true) ? (string) $filters['actor'] : 'all';
         $categoryFilter = in_array((string) ($filters['category'] ?? 'all'), ['all', 'Analyse', 'Expertise'], true) ? (string) $filters['category'] : 'all';
@@ -43,7 +43,7 @@ final class GlobalQueueDashboard
 
             // EZS_FIFO_ACTIVE_RETRY_R1B: Orchestrator is an active queue, NOT
             // a historical catalogue. Show one blocker (if any) and live jobs.
-            $pausePath = dirname(__DIR__, 5) . '/var/orchestrator_queue_paused_on_error.json';
+            $pausePath = \App\Service\QueueBarrierPaths::pause(dirname(__DIR__, 5));
             $blockedId = 0;
             if (is_file($pausePath)) {
                 $pauseRaw = @file_get_contents($pausePath);

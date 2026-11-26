@@ -34,7 +34,7 @@ final class JobRetryCoordinator
             if (!$job instanceof JobQueue) return ['ok'=>false,'reason'=>'tache_introuvable','job'=>null];
             // EZS_FIFO_ACTIVE_RETRY_R1B: retry is reserved to the ONE job
             // currently blocking the queue; historical failures cannot re-enter.
-            $pauseFile = dirname(__DIR__, 2) . '/var/orchestrator_queue_paused_on_error.json';
+            $pauseFile = \App\Service\QueueBarrierPaths::pause(dirname(__DIR__, 2));
             $pauseRaw = is_file($pauseFile) ? @file_get_contents($pauseFile) : false;
             $pause = is_string($pauseRaw) ? json_decode($pauseRaw, true) : null;
             if (!is_array($pause) || ($pause['schema'] ?? null) !== 'ezs.queue.pause_on_ko.v1'

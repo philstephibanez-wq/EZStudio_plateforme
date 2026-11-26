@@ -185,10 +185,10 @@
 </style>
 <section class="card" id="part-3-expertise">
     <div class="prof-bar">
-      <div><span class="badge">3 · Expertise IA</span> <h2 style="display:inline-block;margin-left:6px">Verdicts &amp; Preuves</h2></div>
+      <div><span class="badge">3 · Expertise IA</span> <h2 style="display:inline-block;margin-left:6px">Expertise documentaire &amp; preuves</h2></div>
       <div class="prof-actions">
         {% if selected_profile_run and selected_profile_run.state == 'done' %}
-          <button type="button" id="profile-ai-run-button">Expertiser</button>
+          <button type="button" id="profile-ai-run-button" disabled title="Nouvelles expertises IA locales suspendues">Expertise suspendue</button>
           <button type="button" class="secondary" id="profile-ai-cancel-button" disabled>Annuler</button>
         {% endif %}
         {% set revs = profile_external_revisions ?? [] %}
@@ -239,6 +239,10 @@
     {% for revision in panels_list %}
       {% set fv = revision.comparison.final_verification ?? {} %}{% set assertions = fv.assertions ?? [] %}
       <div class="exp-rev-panel" id="exp-rev-{{ revision.id }}" style="{{ not loop.first ? 'display:none' : '' }}">
+        {% set doc_profile = revision.comparison.documentary_profile.profile ?? null %}
+        {% if doc_profile and (doc_profile.provisional.items ?? {}) is not empty %}
+          {% include 'workbench/_documentary_profile.html.twig' with {'doc_profile': doc_profile} only %}
+        {% else %}
         <table class="prof-tbl">
           <thead><tr><th>Dimension</th><th>LAB</th><th>Verdict</th><th>Externe</th><th>Analyse &amp; Sources</th></tr></thead>
           <tbody>
@@ -258,7 +262,7 @@
               {% set search_failure = (web_item.status ?? '') == 'error' or (fv.web_investigation.status ?? '') == 'error' %}
               {% set badge_lbl = v == 'bon' ? 'BON' : (v == 'faux' ? 'FAUX' : (found is null ? 'SANS EXPERTISE' : (search_failure ? 'RECHERCHE EN ERREUR' : 'NON VÉRIFIÉ'))) %}
               {% set v_desc = v == 'bon' ? 'BON : une source indépendante confirme directement l’analyse LAB.' : (v == 'faux' ? 'FAUX : une source indépendante contredit l’analyse LAB.' : (search_failure ? 'Recherche Web en erreur ; aucune conclusion documentaire possible.' : 'Vérification documentaire insuffisante ; ce statut ne signifie pas absence de recherche.')) %}
-              {% set v_detail = found.reason ?? found.documentary_observation.reason ?? (revs is empty ? 'Aucune expertise lancée sur ce run.' : 'En attente de vérification sur ce point.') %}
+              {% set v_detail = found.reason ?? found.documentary_observation.reason ?? (revs is empty ? 'Aucune révision d’expertise enregistrée pour ce run.' : 'En attente de vérification sur ce point.') %}
               {% set raw_ref = found.reference_value ?? found.documentary_observation.reference_value ?? '' %}
               {% set disp_ref = (row_def.label == 'Durée' and raw_ref matches '/^[0-9.]+$/') ? ((raw_ref / 60)|round(0,'floor') ~ ':' ~ '%02d'|format((raw_ref % 60)|round(0,'floor'))) : (raw_ref ?: '—') %}
               <tr>
@@ -287,6 +291,7 @@
             {% endfor %}
           </tbody>
         </table>
+        {% endif %}
         {% set expertise_engine_steps = revision.comparison.engine_steps ?? [] %}
         {% set ezs_expertise_locale = app.request.attributes.get('_locale') ?: 'fr' %}
         {% set ezs_expertise_engine_keys = {
@@ -302,6 +307,7 @@
           'ai_draft_payload_enricher': 'ezs.profile.engine.ai_draft_payload_enricher',
           'lab_revision_submit': 'ezs.profile.engine.lab_revision_submit'
         } %}
+        {% set r8_engine_labels = {"r8_structured_sources": "Sources structurées", "r8_item_tempo": "Tempo", "r8_item_duration": "Durée", "r8_item_meter": "Mesure", "r8_item_key": "Tonalité", "r8_item_genre": "Genre", "r8_item_instrument": "Instrumentation", "r8_item_lead_vocal": "Voix principale", "r8_item_backing_vocals": "Voix accomp.", "r8_item_vocal_harmonies": "Harmonies vocales", "r8_item_choir": "Chœur", "r8_item_year": "Année", "r8_archive": "Archivage documentaire", "lab_revision_submit": "Persistance LAB"} %}
         <details class="expertise-pipeline-details ezs-tech-pipeline" style="margin-top:24px">
           <summary class="expertise-pipeline-summary" style="cursor:pointer;font-size:11px;font-weight:600">{{ 'ezs.profile.pipeline.history'|trans({'%count%': expertise_engine_steps|length, '%id%': revision.id}, 'ezs_profile', ezs_expertise_locale) }}</summary>
           <table class="prof-tbl" style="margin-top:4px">
@@ -315,7 +321,7 @@
                   {% set ezs_device = ezs_device not in ['OK','DEGRADED','ERROR','FAILED','RUNNING'] ? ezs_device : null %}
                   {% set ezs_status = (engine_step.status ?? '')|lower %}
                   {% set ezs_status_key = ezs_status in ['ok','completed','degraded','error','failed','skipped','running','pending','blocked'] ? 'ezs.profile.status.' ~ ezs_status : 'ezs.profile.status.unknown' %}
-                  {{ ezs_pipeline.row(loop.index, ezs_engine_key ? ezs_engine_key|trans({}, 'ezs_profile', ezs_expertise_locale) : (ezs_engine_id ? ezs_engine_id|replace({'_':' '})|capitalize : '—'), ezs_engine_id ? ezs_engine_id|replace({'_':' '})|title : '—', ezs_device, ezs_status_key|trans({}, 'ezs_profile', ezs_expertise_locale), engine_step.duration_ms is defined and engine_step.duration_ms is not null ? engine_step.duration_ms / 1000 : null, ezs_engine_id) }}
+                  {{ ezs_pipeline.row(loop.index, ezs_engine_key ? ezs_engine_key|trans({}, 'ezs_profile', ezs_expertise_locale) : (r8_engine_labels[ezs_engine_id] ?? (ezs_engine_id ? ezs_engine_id|replace({'_':' '})|capitalize : '—')), ezs_engine_id ? ezs_engine_id|replace({'_':' '})|title : '—', ezs_device, ezs_status_key|trans({}, 'ezs_profile', ezs_expertise_locale), engine_step.duration_ms is defined and engine_step.duration_ms is not null ? engine_step.duration_ms / 1000 : null, ezs_engine_id) }}
               {% else %}
                 <tr><td colspan="6" class="meta">{{ 'ezs.profile.table.no_details'|trans({}, 'ezs_profile', ezs_expertise_locale) }}</td></tr>
               {% endfor %}
@@ -393,7 +399,6 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
     }
   }
   const root=document.getElementById('profile-ai-request'), btn=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), state=document.getElementById('profile-ai-request-state'), prog=document.getElementById('profile-ai-progress');
-  if(!root||!btn||!state||!prog) return;
   let activeJob=0, activeLocalJob=0, wasActive=false;
   const ezsExpertiseLocale = {{ (app.request.attributes.get('_locale') ?: 'fr')|json_encode|raw }};
   const stepNames={
@@ -409,6 +414,7 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
     'engine.ai_draft_payload_enricher': {{ ('ezs.profile.engine.ai_draft_payload_enricher'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
     'engine.lab_revision_submit': {{ ('ezs.profile.engine.lab_revision_submit'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
   };
+  const r8StepNames={"engine.r8_structured_sources": "Sources structurées", "engine.r8_item_tempo": "Tempo", "engine.r8_item_duration": "Durée", "engine.r8_item_meter": "Mesure", "engine.r8_item_key": "Tonalité", "engine.r8_item_genre": "Genre", "engine.r8_item_instrument": "Instrumentation", "engine.r8_item_lead_vocal": "Voix principale", "engine.r8_item_backing_vocals": "Voix accomp.", "engine.r8_item_vocal_harmonies": "Harmonies vocales", "engine.r8_item_choir": "Chœur", "engine.r8_item_year": "Année", "engine.r8_archive": "Archivage documentaire", "engine.lab_revision_submit": "Persistance LAB"};
   const ezsLiveStates = {
     completed: {{ ('ezs.profile.live.completed'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
     failed: {{ ('ezs.profile.live.failed'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
@@ -476,8 +482,9 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
       }
       return;
     }
-    const allowed=Object.keys(stepNames);
     const steps=Array.isArray(item?.checkpoints)?item.checkpoints.filter(e=>e&&typeof e.event_key==='string'):[];
+    const liveNames=steps.some(e=>/engine\.(start\.)?r8_/.test(e.event_key)) || !steps.length ? r8StepNames : stepNames;
+    const allowed=Object.keys(liveNames);
     const map=new Map();
     for(const entry of steps){
       const normalized=entry.event_key.replace('engine.start.','engine.');
@@ -494,33 +501,26 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
       const state=ev ? (ev.outcome==='ok'?ezsLiveStates.completed:ev.outcome==='failed'?ezsLiveStates.failed:ev.outcome==='blocked'?ezsLiveStates.blocked:ezsLiveStates.observed) : started?ezsLiveStates.running:ezsLiveStates.pending;
       // Les étapes sans checkpoint terminé ne sont jamais présentées comme finies.
       const observedDevice = ev?.detail?.device ?? started?.detail?.device ?? null;
-      ezsPipelineAppendRow(tbody,index+1,stepNames[key],key.replace('engine.','').replace(/_/g,' ').replace(/(^| )([a-z])/g,(m,a,b)=>a+b.toUpperCase()),observedDevice,state,null);
+      ezsPipelineAppendRow(tbody,index+1,liveNames[key],key.replace('engine.','').replace(/_/g,' ').replace(/(^| )([a-z])/g,(m,a,b)=>a+b.toUpperCase()),observedDevice,state,null);
     }
   }
-  function setFsm(s){ const busy=(s==='running'||s==='queued'||s==='cancelling'); btn.disabled=(s==='cancelling'); if(cancelBtn){cancelBtn.disabled=!busy || s==='cancelling';} }
+  function setFsm(s){ const busy=(s==='running'||s==='queued'||s==='cancelling'); btn.disabled=true; if(cancelBtn){cancelBtn.disabled=!busy || s==='cancelling';} }
   function render(item){
     activeJob=Number(item?.job_id||0); activeLocalJob=Number(item?.analysis_job_id||0); const s=item?.status||'idle'; if(s==='running'||s==='queued') wasActive=true; setFsm(s);
     const pct=s==='completed'?100:(Number.isFinite(Number(item?.progress))?Math.round(Number(item.progress)):0);
     prog.value=pct; renderPipeline(item);
-    const stepLabel = item?.current_stage ? (stepNames[item.current_stage] || item.current_stage.replace(/^engine\./, '').replace(/_/g,' ')) : '';
+    const stepLabel = item?.current_stage ? (r8StepNames[item.current_stage] || stepNames[item.current_stage] || item.current_stage.replace(/^engine\./, '').replace(/_/g,' ')) : '';
     const started = item?.step_started_at ? Date.parse(item.step_started_at) : NaN;
     const elapsed = Number.isFinite(started) && started <= Date.now() ? ' · '+Math.floor((Date.now()-started)/1000)+' s' : '';
     const currentStep = document.getElementById('profile-ai-step-current');
     if (currentStep) currentStep.textContent = stepLabel ? stepLabel + elapsed : '';
-    state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='cancelling'?'Annulation en cours':s==='cancelled'?'Annulée':s==='error'?'Erreur':'Prêt')+(item?.queue_id?' · #'+item.queue_id : item?.job_id?' · LAB #'+item.job_id:'')+(item?.message?' · '+item.message:'');
+    state.dataset.ezsJobState=s;
+    document.getElementById("profile-ai-progress").dataset.ezsJobState=s;
+    state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='cancelling'?'Annulation en cours':s==='cancelled'?'Annulée':s==='error'?'Erreur':'Nouvelles expertises suspendues')+(item?.queue_id?' · #'+item.queue_id : item?.job_id?' · LAB #'+item.job_id:'')+(item?.message?' · '+item.message:'');
     if(wasActive && s==='completed'){ wasActive=false; window.location.reload(); }
   }
   async function poll(){ try{ const r=await fetch(root.dataset.url,{credentials:'same-origin',cache:'no-store'}); if(r.ok){const j=await r.json(); render(j.request);} }catch(_){} }
-  btn.addEventListener('click',async()=>{ setFsm('queued'); state.textContent='Lancement…'; try{ const r=await fetch(root.dataset.action,{method:'POST',credentials:'same-origin',headers:{'X-EZS-Profile-AI-Action':'request','Accept':'application/json'}}); const raw=await r.text(); let j={};
-      try { j=raw ? JSON.parse(raw) : {}; } catch (_) { j={}; }
-      if (!r.ok || j.ok===false) {
-        const detail=String(j.error||j.reason||j.message||'rÃ©ponse REST inexploitable');
-        throw new Error('HTTP '+r.status+' Â· '+detail);
-      }
-      if (!j.request || !Number(j.request.job_id)) {
-        throw new Error('HTTP '+r.status+' Â· admission globale non confirmÃ©e');
-      }
-      render(j.request); }catch(e){state.textContent='Err: '+e.message; setFsm('idle');} });
+  if (root && btn && state && prog) {
   cancelBtn?.addEventListener('click',async()=>{
       if(!activeJob||!activeLocalJob||!root.dataset.cancelUrl){state.textContent='Annulation indisponible : identité du job manquante';return;}
       setFsm('cancelling');state.textContent='Annulation demandée…';
@@ -534,6 +534,7 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
       } catch(error){state.textContent='Erreur annulation : '+error.message;setFsm('running');}
     });
   poll(); setInterval(poll,2500);
+  }
   // Suivi temps reel de la barre de progression Analyse LAB (profile_oneshot_status)
   const labUrl = {{ selected_song ? path('profile_oneshot_status', {id: selected_song.id})|json_encode|raw : '""' }};
   const labCancelPattern = {{ path('profile_once_cancel', {id: 999999999})|json_encode|raw }};
@@ -593,6 +594,8 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
           ? ('Observation en direct · job LAB #'+labJobId+' · run #'+scientificId+(selectedScientificRun>0 && scientificId!==selectedScientificRun?' · attention : la projection historique affichée concerne le run #'+selectedScientificRun:'')+' · '+(stage||'moteur en cours non communiqué')+' · fin individuelle des moteurs non attestée par l’API')
           : ('Dernier job LAB #'+labJobId+' : '+String(d.job_status||d.state||'état inconnu')+' · vue historique séparée');
       }
+      labState.dataset.ezsJobState = d.job_status || d.state;
+      labProg.dataset.ezsJobState = d.job_status || d.state;
       if (active) labWasActive = true;
       const pct = Math.max(0, Math.min(100, Number(d.progress) || 0));
       labProg.value = active ? pct : ({{ selected_profile_run and selected_profile_run.state == 'done' ? 100 : 0 }});
