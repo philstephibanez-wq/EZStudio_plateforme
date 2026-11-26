@@ -19,7 +19,7 @@ try {
     $state = Controller::readState($file);
     if (($state['id']??'') !== $id || ($state['state']??'') !== 'RUNNING') exit(4);
     $groups = $state['groups']??[];
-    if (!is_array($groups) || array_diff($groups,['dev','lab','assistant','prod'])) exit(5);
+    if (!is_array($groups) || array_diff($groups,['dev','lab','prod'])) exit(5);
     $errors=[];
     foreach ($groups as $group) {
         // Re-read current intention just before each action: STOPPED must always win.

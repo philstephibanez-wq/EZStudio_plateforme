@@ -10,7 +10,7 @@ final class NativeSiteLifecycle
 {
     private static function root(): string { return dirname(__DIR__, 4) . '/apps/orchestrator'; }
     private static function script(): string { return self::root().'/bin/ezs_platform_control.ps1'; }
-    private const SITES = ['dev', 'lab', 'assistant', 'prod'];
+    private const SITES = ['dev', 'lab', 'prod'];
 
     /** @var \Closure(list<string>):array{exit_code:int,stdout:string,stderr:string} */
     private readonly \Closure $invoke;
@@ -81,9 +81,7 @@ final class NativeSiteLifecycle
             'INTENT_MISSING','INTENT_SCHEMA_INVALID','INTENT_SITE_INVALID',
             'INTENT_STOPPED_REFUSED','FOREIGN_LISTENER','MULTIPLE_OWNED',
             'ALREADY_RUNNING_OR_STALE_OWNER_REFUSED','OWNER_RECORD_INVALID',
-            'START_PROCESS_NOT_FOUND','PLATFORM_DELEGATE_MISSING',
-            'ASSISTANT_CANONICAL_SCRIPT_MISSING','ASSISTANT_INTENT_MISSING',
-            'ASSISTANT_LEGACY_SITE_RETIRED_USE_EZS'] as $token) {
+            'START_PROCESS_NOT_FOUND','PLATFORM_DELEGATE_MISSING'] as $token) {
             if (preg_match('/(?<![A-Z0-9_])'.preg_quote($token,'/').'(?![A-Z0-9_])/', $stderr) === 1) {
                 return $token;
             }

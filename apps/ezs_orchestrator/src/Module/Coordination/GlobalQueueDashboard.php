@@ -12,7 +12,7 @@ final class GlobalQueueDashboard
     {
         $path ??= dirname(__DIR__, 5) . (\App\Service\QueueBarrierPaths::isTest() ? '/var/orchestrator_test.sqlite' : '/data/databases/EZS_Orchestrator.sqlite');
         $stateFilter = in_array((string) ($filters['state'] ?? 'all'), ['all', 'active', 'waiting', 'progressing', 'cancelling', 'ended_ko', 'ended_ok', 'cancelled', 'blocking'], true) ? (string) $filters['state'] : 'all';
-        $actorFilter = in_array((string) ($filters['actor'] ?? 'all'), ['all', 'lab', 'assistant'], true) ? (string) $filters['actor'] : 'all';
+        $actorFilter = in_array((string) ($filters['actor'] ?? 'all'), ['all', 'lab'], true) ? (string) $filters['actor'] : 'all';
         $categoryFilter = in_array((string) ($filters['category'] ?? 'all'), ['all', 'Analyse', 'Expertise'], true) ? (string) $filters['category'] : 'all';
         $itemFilter = in_array((string) ($filters['item'] ?? 'all'), ['all', 'Profile', 'Stems', 'Chords', 'Lyrics'], true) ? (string) $filters['item'] : 'all';
         $limit = in_array((int) ($filters['limit'] ?? 30), [20, 30, 50, 100], true) ? (int) $filters['limit'] : 30;
@@ -88,7 +88,7 @@ final class GlobalQueueDashboard
                 $rawJob = strtolower(trim((string) ($payload['item'] ?? $payload['job'] ?? $payload['phase'] ?? $payload['type'] ?? '')));
                 $item = match (true) { str_starts_with($rawJob, 'profile') => 'Profile', str_starts_with($rawJob, 'stems') => 'Stems', str_starts_with($rawJob, 'chords') => 'Chords', str_starts_with($rawJob, 'lyrics') => 'Lyrics', default => '' };
                 $category = trim((string) ($payload['category'] ?? ''));
-                if ($category === '' && $rawJob !== '') { $category = (str_contains($rawJob, 'review') || str_contains($rawJob, 'direct_research') || $actor === 'assistant') ? 'Expertise' : 'Analyse'; }
+                if ($category === '' && $rawJob !== '') { $category = (str_contains($rawJob, 'review') || str_contains($rawJob, 'direct_research')) ? 'Expertise' : 'Analyse'; }
                 $label = trim((string) ($payload['label'] ?? ''));
 
                 if ($categoryFilter !== 'all' && $category !== $categoryFilter) { continue; }

@@ -5,7 +5,7 @@ namespace Ezs\Web\Module\Infrastructure;
 /** Conservative interpretation of attested native status, with bounded diagnostics. */
 final class NativeSiteObservation
 {
-    private const PORTS = ['dev' => 2, 'lab' => 2, 'assistant' => 3];
+    private const PORTS = ['dev' => 2, 'lab' => 2];
 
     public function __construct(private readonly NativeSiteLifecycle $lifecycle = new NativeSiteLifecycle()) {}
 
@@ -17,7 +17,7 @@ final class NativeSiteObservation
         $matches = null;
         foreach ($lines as $line) {
             if (!str_starts_with($line, 'SITE=')) continue;
-            if ($matches !== null || !preg_match('/^SITE=(dev|lab|assistant) INTENT=(RUNNING|STOPPED) OWNED=(\d+) LISTENERS=(\d+)$/D', $line, $m)) {
+            if ($matches !== null || !preg_match('/^SITE=(dev|lab) INTENT=(RUNNING|STOPPED) OWNED=(\d+) LISTENERS=(\d+)$/D', $line, $m)) {
                 throw new \RuntimeException('EZS_NATIVE_OBSERVATION_UNVERIFIED');
             }
             $matches = $m;

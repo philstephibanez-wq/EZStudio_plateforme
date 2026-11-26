@@ -19,7 +19,7 @@ final class DevGroupDebugController
     public static function summary(array $states):array
     {
         $result=[];
-        foreach(['dev'=>['ezscore_dev','ezscore_preview'],'lab'=>['lab'],'assistant'=>['assistant']] as $group=>$names){
+        foreach(['dev'=>['ezscore_dev','ezscore_preview'],'lab'=>['lab']] as $group=>$names){
             $members=[];
             foreach($names as $name)$members[$name]=(string)($states[$name]??'MISSING');
             $result[$group]=$members;
@@ -48,7 +48,7 @@ final class DevGroupDebugController
         $observer=new NativeSiteObservation();
         $diagnostics=[];
         $groups=[];
-        foreach (['dev','lab','assistant'] as $site) {
+        foreach (['dev','lab'] as $site) {
             $diagnostics[$site]=self::diagnostic($observer,$site);
             $groups[$site]=[$site=>$diagnostics[$site]['state']];
         }

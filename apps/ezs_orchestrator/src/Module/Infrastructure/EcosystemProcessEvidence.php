@@ -17,12 +17,12 @@ final class EcosystemProcessEvidence
         'ezscore-dev-fastcgi'=>['env'=>'DEV','exe'=>'php-cgi.exe','needle'=>'-b 127.0.0.1:8602'],
         'ezscore-preview-fastcgi'=>['env'=>'DEV','exe'=>'php-cgi.exe','needle'=>'-b 127.0.0.1:8862'],
         'lab-fastcgi'=>['env'=>'DEV','exe'=>'php-cgi.exe','needle'=>'-b 127.0.0.1:8701'],
-        'assistant-fastcgi'=>['env'=>'DEV','exe'=>'php-cgi.exe','needle'=>'-b 127.0.0.1:8713'],
+
         'ezscore-prod-fastcgi'=>['env'=>'PROD','exe'=>'php-cgi.exe','needle'=>'-b 127.0.0.1:8512'],
         'dev-caddy'=>['env'=>'DEV','exe'=>'caddy.exe','needle'=>'Caddyfile.dev-lab-assistant-candidate'],
         'prod-caddy-internal'=>['env'=>'PROD','exe'=>'caddy.exe','needle'=>'Caddyfile.prod-internal-candidate'],
         'prod-caddy-edge'=>['env'=>'PROD','exe'=>'caddy.exe','needle'=>'Caddyfile.prod'],
-        'assistant-llama'=>['env'=>'DEV','exe'=>'llama-server.exe','needle'=>'--port 8720'],
+
     ];
 
     /**

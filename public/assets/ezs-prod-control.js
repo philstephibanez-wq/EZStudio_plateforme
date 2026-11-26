@@ -47,7 +47,7 @@
          $mode.text(d.maintenance===true?'Activée':d.maintenance===false?'Mode normal':'Indéterminée');
          showMaintenance(typeof d.maintenance==='boolean'?d.maintenance:null);
          $edge.text(d.caddy_listening?'Écoute 8501':'Arrêté');
-         // Same user-facing service vocabulary as DEV, LAB and Assistant.
+         // Same user-facing service vocabulary as DEV and LAB.
          // Maintenance is a separate operational mode, not the service-health badge.
          if (d.maintenance===true && d.caddy_listening) {
            setStatus('Maintenance','warning');

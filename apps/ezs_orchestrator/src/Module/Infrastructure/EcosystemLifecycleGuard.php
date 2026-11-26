@@ -8,8 +8,8 @@ final class EcosystemLifecycleGuard
     public const STATES = [
         'runtime/v2-dev/processes.json' => ['php_pid', 'caddy_pid'],
         'runtime/v2-dev/app-backends.json' => ['dev_pid', 'preview_pid'],
-        'runtime/v2-dev/lab-assistant.json' => ['lab_pid', 'assistant_pid'],
-        'runtime/v2-dev/assistant-ai.json' => ['pid'],
+        'runtime/v2-dev/lab-assistant.json' => ['lab_pid'],
+
         'runtime/v2-prod/processes.json' => ['php_pid', 'internal_pid', 'gateway_pid', 'edge_pid'],
     ];
     public const PORTS = [8790,8791,8502,8852,8602,8862,8701,8702,8712,8713,8720,8501,8510,8511,8512];
@@ -69,8 +69,8 @@ final class EcosystemLifecycleGuard
     public const DEV_STATES = [
         'runtime/v2-dev/processes.json' => ['php_pid', 'caddy_pid'],
         'runtime/v2-dev/app-backends.json' => ['dev_pid', 'preview_pid'],
-        'runtime/v2-dev/lab-assistant.json' => ['lab_pid', 'assistant_pid'],
-        'runtime/v2-dev/assistant-ai.json' => ['pid'],
+        'runtime/v2-dev/lab-assistant.json' => ['lab_pid'],
+
     ];
     public const DEV_PORTS = [8790,8791,8502,8852,8602,8862,8701,8702,8712,8713,8720];
 
@@ -126,7 +126,7 @@ final class EcosystemLifecycleGuard
                     }
                     $cmd = strtolower(str_replace('/', '\\', $process['command']));
                     if (str_contains($cmd, 'h:\\ezs_orchestrator\\') || str_contains($cmd, 'h:\\ezscore_dev\\')
-                        || str_contains($cmd, 'h:\\ezstudio_lab\\') || str_contains($cmd, 'h:\\ezstudiolab_assistant\\')
+
                         || str_contains($cmd, 'caddyfile.dev')) {
                         throw new \RuntimeException('EZS_DEV_UNVERIFIED_PROCESS:' . $pid);
                     }

@@ -60,8 +60,7 @@ final class QueueCancellationRecovery
         $p = $job->getPayload();
         $kind = (string) ($p['job'] ?? '');
         if (($source === 'lab' && !in_array($kind, ['profile','stems','chords','lyrics'], true))
-            || ($source === 'assistant' && !in_array($kind, ['profile.review','stems.review','chords.review','lyrics.review'], true))
-            || !in_array($source, ['lab','assistant'], true)) {
+            || !in_array($source, ['lab'], true)) {
             return null;
         }
         $local = (int) ($source === 'lab' ? ($p['analysis_job_id'] ?? 0) : ($p['job_id'] ?? 0));
@@ -109,7 +108,7 @@ final class QueueCancellationRecovery
             }
             $token = self::labToken($platformRoot);
             if ($token === '') return $this->blocked('lab_token_unavailable', $id);
-            $base = trim((string) ($_ENV['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? getenv('EZSTUDIOLAB_ASSISTANT_BASE_URL') ?: 'http://lab.ezstudio.local:8000'));
+            $base = trim((string) ($_ENV['EZSTUDIO_LAB_BASE_URL'] ?? $_SERVER['EZSTUDIO_LAB_BASE_URL'] ?? getenv('EZSTUDIO_LAB_BASE_URL') ?: 'http://lab.ezstudio.local:8000'));
             $response = $this->httpClient->request('POST', rtrim($base,'/').'/internal/analysis/desktop/jobs/recovery/cancel', [
                 'headers'=>['X-EZScore-Analysis-Token'=>$token, 'Accept'=>'application/json'],
                 'json'=>$identity + ['global_job_id'=>$id,'attempt'=>$job->getAttempts()],
@@ -185,8 +184,7 @@ final class QueueCancellationRecovery
 
     private static function labToken(string $root): string
     {
-        $token = trim((string) ($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_TOKEN'] ?? getenv('EZSTUDIOLAB_ASSISTANT_TOKEN') ?: ''));
-        if ($token === '') $token = trim((string) ($_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN'] ?? $_SERVER['EZSTUDIO_ANALYSIS_WORKER_TOKEN'] ?? getenv('EZSTUDIO_ANALYSIS_WORKER_TOKEN') ?: ''));
+        $token = trim((string) ($_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN'] ?? $_SERVER['EZSTUDIO_ANALYSIS_WORKER_TOKEN'] ?? getenv('EZSTUDIO_ANALYSIS_WORKER_TOKEN') ?: ''));
         if ($token !== '') return $token;
         $path = $root.'/apps/ezs_lab/.env.local';
         if (!is_file($path)) return '';

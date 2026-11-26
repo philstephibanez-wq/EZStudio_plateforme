@@ -12,7 +12,7 @@ final readonly class QueueJobReference
         public string $producer,
         public int $claimGeneration = 0,
     ) {
-        if ($jobId < 1 || $claimGeneration < 0 || !in_array($producer, ['lab', 'assistant', 'ezscore'], true)) {
+        if ($jobId < 1 || $claimGeneration < 0 || !in_array($producer, ['lab', 'ezscore'], true)) {
             throw new \InvalidArgumentException('invalid_queue_job_reference');
         }
     }

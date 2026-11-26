@@ -10,8 +10,7 @@ return static function (array $context) {
 
     $appId = match ($hostOnly) {
         'lab.ezstudio.local'          => 'ezs_lab',
-        'assistant.ezstudio.local'    => 'ezs_assistant',
-        'orchestrator.ezstudio.local' => 'orchestrator',
+            'orchestrator.ezstudio.local' => 'orchestrator',
         'dev.ezstudio.local'          => 'ezstudio_dev',
         'ezstudio.local'              => 'ezstudio',
         default                       => $context['APP_ID'] ?? 'orchestrator',

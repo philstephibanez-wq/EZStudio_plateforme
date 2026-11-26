@@ -17,7 +17,7 @@ class Kernel extends BaseKernel
     public function __construct(string $environment, bool $debug, ?string $appId = null)
     {
         $resolved = $appId ?? $_SERVER['APP_ID'] ?? $_ENV['APP_ID'] ?? getenv('APP_ID') ?: 'orchestrator';
-        $this->appId = in_array($resolved, ['orchestrator', 'ezs_orchestrator', 'ezs_lab', 'ezs_assistant', 'ezstudio_dev', 'ezstudio', 'ezscore_dev', 'ezscore'], true)
+        $this->appId = in_array($resolved, ['orchestrator', 'ezs_orchestrator', 'ezs_lab', 'ezstudio_dev', 'ezstudio', 'ezscore_dev', 'ezscore'], true)
             ? $resolved
             : 'orchestrator';
 

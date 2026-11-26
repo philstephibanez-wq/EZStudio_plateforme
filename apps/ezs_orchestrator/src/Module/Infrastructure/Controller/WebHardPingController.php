@@ -13,7 +13,7 @@ final class WebHardPingController
     private const SITES = [
         'dev' => ['ports' => [8000], 'app' => 'ezstudio_dev', 'host' => 'dev.ezstudio.local', 'page' => 'http://127.0.0.1:8000/'],
         'lab' => ['ports' => [8000], 'app' => 'ezs_lab', 'host' => 'lab.ezstudio.local', 'page' => 'http://127.0.0.1:8000/'],
-        'assistant' => ['ports' => [8000], 'app' => 'ezs_assistant', 'host' => 'assistant.ezstudio.local', 'page' => 'http://127.0.0.1:8000/'],
+
         'prod' => ['ports' => [8000], 'app' => 'ezstudio', 'host' => 'ezstudio.local', 'page' => 'http://127.0.0.1:8000/'],
     ];
 

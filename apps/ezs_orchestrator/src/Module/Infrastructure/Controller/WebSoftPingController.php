@@ -14,7 +14,7 @@ final class WebSoftPingController
     private const TARGETS = [
         'dev' => 'ezstudio_dev',
         'lab' => 'ezs_lab',
-        'assistant' => 'ezs_assistant',
+
         'prod' => 'ezstudio',
     ];
 

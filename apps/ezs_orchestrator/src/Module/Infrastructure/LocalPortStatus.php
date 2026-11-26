@@ -8,7 +8,7 @@ final class LocalPortStatus
     private const ENDPOINTS = [
         ['component' => 'ezscore', 'environment' => 'dev', 'port' => 8502],
         ['component' => 'lab', 'environment' => 'dev', 'port' => 8702],
-        ['component' => 'assistant', 'environment' => 'dev', 'port' => 8712],
+
     ];
     public function snapshot(): array
     {

@@ -106,63 +106,11 @@ class QueueDispatchControllerTest extends WebTestCase
         }
     }
 
-    public function testAssistantAutomateDispatchProgressAndSubprocessEnvContract(): void
+    public function testRemovedActorCannotDispatch(): void
     {
         $client = static::createClient();
-        $headers = $this->authServer();
-        $this->purgeTestRows();
-        $em = static::getContainer()->get(EntityManagerInterface::class);
-        $this->parkExistingActiveRows($em);
-
-        try {
-            $payload = [
-                'job' => 'profile.review',
-                'category' => 'Expertise',
-                'label' => 'Automate Regression Guard',
-                'job_id' => 99331,
-                'run_id' => 99291,
-                'functional_test' => true,
-            ];
-            // N3/N4: new admission must be refused before any fixture is inserted.
-            $client->request('POST', '/api/queue/dispatch', [], [], $headers, json_encode(['source'=>'assistant','payload'=>$payload]));
-            $this->assertResponseStatusCodeSame(409);
-            $this->assertSame('expertise_locale_suspendue', json_decode((string)$client->getResponse()->getContent(), true)['error'] ?? null);
-            $em = static::getContainer()->get(EntityManagerInterface::class);
-            $this->assertSame(0, (int)$em->getConnection()->fetchOne("SELECT COUNT(*) FROM job_queue WHERE json_extract(payload,'$.functional_test')=1"));
-            // Simulate a receipt admitted BEFORE suspension; no production escape hatch.
-            $seed = new \App\Entity\JobQueue('assistant', $payload);
-            $em->persist($seed);
-            $em->flush();
-            $seedId = $seed->getId();
-            $client->request('POST', '/api/queue/dispatch', [], [], $headers, json_encode(['source'=>'assistant','payload'=>$payload]));
-            $this->assertResponseStatusCodeSame(200);
-            $this->assertTrue(json_decode((string)$client->getResponse()->getContent(), true)['deduplicated'] ?? false);
-            $this->assertSame($seedId, (int)(json_decode((string)$client->getResponse()->getContent(), true)['queue_id'] ?? 0));
-            $res = json_decode((string) $client->getResponse()->getContent(), true);
-            $this->assertEquals('waiting', $res['status'] ?? null);
-            $queueId = (int) ($res['queue_id'] ?? 0);
-            $this->assertGreaterThan(0, $queueId);
-
-            $client->request('POST', '/api/queue/claim', [], [], $headers);
-            $claim = json_decode((string) $client->getResponse()->getContent(), true);
-            $this->assertEquals($queueId, $claim['job']['id'] ?? null);
-
-            $client->request('POST', '/api/queue/' . $queueId . '/progress', [], [], $headers, json_encode(['progress' => 55]));
-            $this->assertResponseIsSuccessful();
-            $prog = json_decode((string) $client->getResponse()->getContent(), true);
-            $this->assertSame(55, (int) ($prog['progress'] ?? 0));
-
-            $client->request('POST', '/api/queue/' . $queueId . '/complete', [], [], $headers);
-            $this->assertResponseIsSuccessful();
-
-            $cmdFile = dirname(__DIR__, 2) . '/apps/ezs_orchestrator/src/Command/QueueConsumeCommand.php';
-            $cmdSource = (string) file_get_contents($cmdFile);
-            $this->assertStringNotContainsString('profile_ai_requests_worker.py', $cmdSource);
-            $this->assertStringNotContainsString('profile_direct_job.py', $cmdSource);
-            $this->assertStringContainsString('expertise_locale_suspendue', $cmdSource);
-        } finally {
-            $this->purgeTestRows();
-            $this->restoreParkedRows($em);
-        }
+        $client->request('POST', '/api/queue/dispatch', [], [], $this->authServer(), json_encode(['source'=>'assistant','payload'=>['job'=>'profile.review']]));
+        $this->assertResponseStatusCodeSame(422);
     }
+
 }

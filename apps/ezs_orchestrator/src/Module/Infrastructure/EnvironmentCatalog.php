@@ -13,7 +13,7 @@ final class EnvironmentCatalog
             ['component' => 'ezstudio', 'environment' => 'dev', 'maintenance' => false],
             ['component' => 'ezstudio', 'environment' => 'prod', 'maintenance' => true],
             ['component' => 'lab', 'environment' => 'dev', 'maintenance' => false],
-            ['component' => 'assistant', 'environment' => 'dev', 'maintenance' => false],
+
         ];
     }
 }

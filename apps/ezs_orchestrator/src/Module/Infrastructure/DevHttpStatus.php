@@ -9,7 +9,7 @@ final class DevHttpStatus
         ['component'=>'ezscore','port'=>8502,'path'=>'/','kind'=>'facade'],
         ['component'=>'lab','port'=>8702,'path'=>'/','kind'=>'facade'],
         ['component'=>'lab','port'=>8701,'path'=>'/','kind'=>'backend'],
-        ['component'=>'assistant','port'=>8712,'path'=>'/','kind'=>'facade'],
+
     ];
     public function snapshot(): array
     {

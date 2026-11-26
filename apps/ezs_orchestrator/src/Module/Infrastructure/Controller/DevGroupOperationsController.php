@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 /** DEV-local REST facade for the canonical FrankenPHP native lifecycle.
- * No legacy PHP-CGI process manager. Assistant delegates to its own canonical scripts.
+ * No legacy PHP-CGI process manager.
  */
 final class DevGroupOperationsController
 {
@@ -26,7 +26,7 @@ final class DevGroupOperationsController
      */
     public static function permission(array $states, string $group): array
     {
-        $groups = ['dev' => ['ezscore_dev','ezscore_preview'], 'lab' => ['lab'], 'assistant' => ['assistant']];
+        $groups = ['dev' => ['ezscore_dev','ezscore_preview'], 'lab' => ['lab']];
         if (!isset($groups[$group])) throw new \InvalidArgumentException('EZS_DEV_GROUP_UNKNOWN');
         $names = $groups[$group];
         foreach ($names as $name) {
@@ -39,18 +39,6 @@ final class DevGroupOperationsController
         $state = $up === count($values) ? 'RUNNING' : ($up === 0 ? 'STOPPED' : 'PARTIAL');
         return ['start'=>$state === 'STOPPED','restart'=>$state === 'RUNNING',
             'stop'=>$state === 'RUNNING' || $state === 'PARTIAL','state'=>$state];
-    }
-
-    private static function inaccessibleAssistant(): array
-    {
-        return ['state'=>'UNVERIFIED','start'=>false,'restart'=>false,'stop'=>false,'desired'=>'UNVERIFIED'];
-    }
-
-    /** Failure to prove Assistant ownership stays UNVERIFIED, never STOPPED. */
-    private static function assistantObservation(NativeSiteObservation $observer): array
-    {
-        try { return $observer->observe('assistant'); }
-        catch (\Throwable) { return self::inaccessibleAssistant(); }
     }
 
     private function allowedRequest(Request $request): bool
@@ -79,7 +67,7 @@ final class DevGroupOperationsController
                 'groups'=>[
                     'dev'=>$observation->observe('dev'),
                     'lab'=>$observation->observe('lab'),
-                    'assistant'=>self::assistantObservation($observation),
+
                 ],
             ],200,['Cache-Control'=>'no-store']);
         } catch (\Throwable $error) {
@@ -87,23 +75,21 @@ final class DevGroupOperationsController
         }
     }
 
-    #[Route('/api/v2/infrastructure/dev-group/{group}', name: 'ezs_dev_group_read_single', requirements: ['group'=>'dev|lab|assistant'], methods: ['GET'])]
+    #[Route('/api/v2/infrastructure/dev-group/{group}', name: 'ezs_dev_group_read_single', requirements: ['group'=>'dev|lab'], methods: ['GET'])]
     public function readGroup(Request $request, string $group): JsonResponse
     {
         if (!$this->allowedRequest($request)) return new JsonResponse(['error'=>'forbidden'],403);
-        if (!in_array($group,['dev','lab','assistant'],true)) return new JsonResponse(['error'=>'unknown_group'],404);
+        if (!in_array($group,['dev','lab'],true)) return new JsonResponse(['error'=>'unknown_group'],404);
         try {
             return new JsonResponse(['schema'=>'ezs.dev_group_single.v1','group'=>$group,
-                'permission'=>$group === 'assistant'
-                    ? self::assistantObservation(new NativeSiteObservation())
-                    : (new NativeSiteObservation())->observe($group),
+                'permission'=>(new NativeSiteObservation())->observe($group),
                 'csrf'=>$this->token()],200,['Cache-Control'=>'no-store']);
         } catch (\Throwable $error) {
             return new JsonResponse(['error'=>'group_inventory_unavailable'],503,['Cache-Control'=>'no-store']);
         }
     }
 
-    #[Route('/api/v2/infrastructure/dev-groups/{group}/{action}', name: 'ezs_dev_groups_action', requirements: ['group'=>'dev|lab|assistant','action'=>'start|stop|restart'], methods: ['POST'])]
+    #[Route('/api/v2/infrastructure/dev-groups/{group}/{action}', name: 'ezs_dev_groups_action', requirements: ['group'=>'dev|lab','action'=>'start|stop|restart'], methods: ['POST'])]
     public function action(Request $request, string $group, string $action): JsonResponse
     {
         if (!$this->allowedRequest($request)) return new JsonResponse(['error'=>'forbidden'],403);
@@ -116,7 +102,7 @@ final class DevGroupOperationsController
         if ((string) $request->request->get('confirmation','') !== strtoupper($action).'_'.strtoupper($group)) {
             return new JsonResponse(['error'=>'confirmation_required'],400);
         }
-        if (!in_array($group,['dev','lab','assistant'],true)) {
+        if (!in_array($group,['dev','lab'],true)) {
             return new JsonResponse(['error'=>'native_site_only'],409,['Cache-Control'=>'no-store']);
         }
         try {

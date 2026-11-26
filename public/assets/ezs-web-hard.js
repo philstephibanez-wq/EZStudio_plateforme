@@ -3,7 +3,7 @@
 (function($){
     if (!$) return;
     $(function(){
-        const names=['dev','lab','assistant'];
+        const names=['dev','lab'];
         const refreshButton=$('#refresh-dev-health');
         const feedback=$('#dev-health-feedback');
         let busy=false;
@@ -17,12 +17,12 @@
                 .addClass('text-bg-'+(ok?'success':maintenance?'warning':'danger'));
             $card.attr('data-ezs-state',data ? data.state : 'INCONNU');
             $card.attr('data-ezs-probe',data?'hard_tcp_http':'unavailable');
-            const publicPort={dev:'8000',lab:'8000',assistant:'8000'}[site];
+            const publicPort={dev:'8000',lab:'8000'}[site];
             const publicOpen=Boolean(data && data.ports && data.ports[publicPort]);
             $('#tcp-'+site).text(publicOpen?'Ouvert':'Fermé');
             $('#http-'+site).text(data && data.http && data.http.status!==null?String(data.http.status):'Sans réponse');
             $('#tech-http-'+site).text(data && data.http && data.http.status!==null?String(data.http.status):'Sans réponse');
-            const backend={dev:'8000',lab:'8000',assistant:'8000'}[site];
+            const backend={dev:'8000',lab:'8000'}[site];
             const b=Boolean(data && data.ports && data.ports[backend]);
             if(site==='dev'){
                 $('#dev-backend').text(b?'Port TCP ouvert':'Port TCP fermé');

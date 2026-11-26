@@ -3,7 +3,7 @@
 (function($){
     if (!$) return;
     $(function(){
-        const names = ['dev','lab','assistant','prod'];
+        const names = ['dev','lab','prod'];
         let busy = false;
         function render(name, item){
             const element = $('#soft-'+name);

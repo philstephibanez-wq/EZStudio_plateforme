@@ -1,1 +1,0 @@
-{"items":["tempo","duration","meter","key","genre","instrument","lead_vocal","backing_vocals","vocal_harmonies","choir","year"],"numeric":{"tempo":10,"duration":5,"year":1},"aliases":{"instrument":{"guitare":"guitar","piano":"piano"},"lead_vocal":{"present":"present","absent":"absent"}}}

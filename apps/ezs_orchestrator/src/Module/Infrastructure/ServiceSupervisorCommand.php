@@ -14,12 +14,12 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class ServiceSupervisorCommand extends Command
 {
     private static function root(): string { return dirname(__DIR__, 4) . '/apps/orchestrator'; }
-    private const GROUPS=['root','dev','lab','assistant','prod'];
+    private const GROUPS=['root','dev','lab','prod'];
 
     protected function configure(): void
     {
         $this->addArgument('action',InputArgument::REQUIRED,'status|tick|diagnostics|start|stop|restart')
-            ->addArgument('group',InputArgument::OPTIONAL,'root|dev|lab|assistant|prod');
+            ->addArgument('group',InputArgument::OPTIONAL,'root|dev|lab|prod');
     }
 
     public static function nextAttempt(int $failures,int $now): int
@@ -60,7 +60,7 @@ final class ServiceSupervisorCommand extends Command
                 return Command::FAILURE;
             }
             if (!in_array($group,['dev','lab'],true)) {
-                // ROOT has a dedicated watchdog; PROD and Assistant require their own explicit lifecycle.
+                // ROOT has a dedicated watchdog; PROD requires their own explicit lifecycle.
                 throw new \RuntimeException('EZS_GROUP_OUT_OF_SCOPE_NO_MUTATION_'.$group);
             }
             if ($action==='restart') {

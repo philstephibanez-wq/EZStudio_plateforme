@@ -8,10 +8,10 @@ final class ServiceProbeR6
     public const PORTS = [
         'dev' => [8502, 8602],
         'lab' => [8702, 8701],
-        'assistant' => [8712, 8713],
+
         'prod' => [8501, 8510, 8511],
     ];
-    public const SOFT_PORTS = ['dev'=>8602,'lab'=>8701,'assistant'=>8713,'prod'=>8511];
+    public const SOFT_PORTS = ['dev'=>8602,'lab'=>8701,'prod'=>8511];
 
     public static function classifySoft(string $service, int $http, ?array $json, ?string $error): array
     {

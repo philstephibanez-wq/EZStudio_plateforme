@@ -5,7 +5,7 @@ namespace Shared\Hardware;
 
 /**
  * Strict, non-persistent technical-agent credential resolver for hardware REST.
- * Shared by the Symfony authenticator and the LAB/Assistant clients.
+ * Shared by the Symfony authenticator and the LAB clients.
  * Never exposes credentials to browsers, application logs or the inventory JSON.
  * Its fallback is restricted to the root private .env.local, not arbitrary paths.
  */
@@ -13,7 +13,6 @@ final class AgentCredentials
 {
     private const KEYS = [
         'lab' => 'EZS_QUEUE_LAB_TOKEN',
-        'assistant' => 'EZS_QUEUE_ASSISTANT_TOKEN',
         'ezscore' => 'EZS_QUEUE_EZSCORE_TOKEN',
     ];
     private const FORMAT = '~\A[A-Za-z0-9._\~+/=\-]{32,256}\z~D';

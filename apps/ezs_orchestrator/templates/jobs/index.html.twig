@@ -35,7 +35,6 @@
                     <select name="actor" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="all" {{ f.actor == 'all' ? 'selected' }}>Tous</option>
                         <option value="lab" {{ f.actor == 'lab' ? 'selected' }}>lab</option>
-                        <option value="assistant" {{ f.actor == 'assistant' ? 'selected' }}>assistant</option>
                     </select></div>
                 <div class="col-auto"><label class="form-label small text-body-secondary mb-1">Type</label>
                     <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -144,7 +143,7 @@ document.getElementById('deleteJobModal')?.addEventListener('show.bs.modal', fun
     const names = ['state', 'actor', 'category', 'item', 'limit'];
     const allowed = {
         state: ['all','active','waiting','progressing','cancelling','ended_ko','ended_ok','cancelled','blocking'],
-        actor: ['all','lab','assistant'],
+        actor: ['all','lab'],
         category: ['all','Analyse','Expertise'],
         item: ['all','Profile','Stems','Chords','Lyrics'],
         limit: ['20','30','50','100']

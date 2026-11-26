@@ -8,10 +8,10 @@
         const $refresh = $('#refresh-dev-health');
         let pending = false;
         // Snapshot fusion: an HTTP response alone never proves the native process is running.
-        const serviceTransport = {dev:null,lab:null,assistant:null};
-        const serviceNative = {dev:null,lab:null,assistant:null};
-        const groups = {dev:'#dev-title',lab:'#lab-title',assistant:'#assistant-title'};
-        const serviceDesired = {dev:null,lab:null,assistant:null};
+        const serviceTransport = {dev:null,lab:null};
+        const serviceNative = {dev:null,lab:null};
+        const groups = {dev:'#dev-title',lab:'#lab-title'};
+        const serviceDesired = {dev:null,lab:null};
         function renderServiceBadge(group) {
             const native = serviceNative[group];
             const desired = serviceDesired[group];
@@ -43,7 +43,7 @@
             $.ajax({url:'/api/v2/infrastructure/dev-health', method:'GET', dataType:'json', cache:false, timeout:9000})
               .done(function (data) {
                 if (!data || data.schema !== 'ezs.dev_health.v1' || !Array.isArray(data.items)) throw new Error('bad_payload');
-                const mapping = {ezscore:'dev',lab:'lab',assistant:'assistant'};
+                const mapping = {ezscore:'dev',lab:'lab'};
                 let labBackend = null;
                 data.items.forEach(function (item) {
                     if (item.component === 'lab' && item.kind === 'backend') { labBackend = item; return; }
@@ -89,15 +89,14 @@
         const controls = {};
         let csrf = '';
         // No global action flag: one inflight operation per group.
-        const modes = {dev:null,lab:null,assistant:null};
+        const modes = {dev:null,lab:null};
         // La vérification native peut prendre plusieurs secondes ; ne jamais simuler un état prêt.
-        const groupRequestStart = {dev:0, lab:0, assistant:0};
+        const groupRequestStart = {dev:0, lab:0};
         const $statusline = $('.ezs-statusline .text-body-secondary').first();
-        $statusline.text('État des environnements — commandes DEV / LAB / Assistant vérifiées par le serveur');
+        $statusline.text('État des environnements — commandes DEV / LAB vérifiées par le serveur');
         const actionDescriptions = {
             dev:'Commandes natives disponibles après vérification des processus',
             lab:'Démarrer / Redémarrer / Arrêter sous contrôle de l’Orchestrator',
-            assistant:'Commandes natives supervisées ; aucune action sur les jobs ou l’IA'
         };
         Object.keys(groups).forEach(function (group) {
             const $card = $(groups[group]).closest('.ezs-server-card');
@@ -105,13 +104,13 @@
                 .next('dd').text(actionDescriptions[group]);
             if (group === 'dev') $card.find('dt').filter(function () { return $(this).text().trim() === 'État complémentaire'; })
                 .next('dd').text('État confirmé par l’inventaire natif avant toute commande');
-            if (group === 'lab' || group === 'assistant') $card.find('dt').filter(function () { return $(this).text().trim() === 'Autorité Orchestrator'; })
+            if (group === 'lab') $card.find('dt').filter(function () { return $(this).text().trim() === 'Autorité Orchestrator'; })
                 .next('dd').text('Orchestrator local · processus attestés · protection CSRF');
         });
         // EZS_GROUPS_STABLE_R82: seule une attestation change l'etat visible.
         let groupsPending = false;
         let groupsEpoch = 0;
-        const rendered = {dev:null,lab:null,assistant:null};
+        const rendered = {dev:null,lab:null};
         Object.keys(groups).forEach(function(group) {
             const $buttons = $(groups[group]).closest('.ezs-server-card').find('.ezs-server-actions button');
             controls[group] = {start:$buttons.eq(0), stop:$buttons.eq(1)};
@@ -134,9 +133,9 @@
         }
         function $cardFor(group) { return $(groups[group]).closest('.ezs-server-card'); }
         // Each group owns its own request, state and failure boundary.
-        const groupPending = {dev:false,lab:false,assistant:false};
-        const groupEpoch = {dev:0,lab:0,assistant:0};
-        const groupActing = {dev:false,lab:false,assistant:false};
+        const groupPending = {dev:false,lab:false};
+        const groupEpoch = {dev:0,lab:0};
+        const groupActing = {dev:false,lab:false};
         function failGroup(group, reason) {
             controls[group].start.prop('disabled', true);
             controls[group].stop.prop('disabled', true);
@@ -243,7 +242,7 @@
             if (!controls[group]) return;
             const button = verb === 'stop' ? controls[group].stop : controls[group].start;
             if (groupActing[group] || !csrf || !button || button.prop('disabled')) return;
-            const label = {dev:'EZScore DEV',lab:'EZStudio LAB',assistant:'Assistant'}[group];
+            const label = {dev:'EZScore DEV',lab:'EZStudio LAB'}[group];
             const confirmation = verb === 'stop' ?
                 'Arrêter les processus natifs de '+label+' ? Les travaux en cours peuvent être interrompus. Les autres groupes et l’IA restent inchangés.' :
                 verb === 'restart' ? 'Redémarrer les processus natifs de '+label+' ? Les travaux en cours peuvent être interrompus. Si la relance échoue, le groupe peut rester arrêté. PROD et les autres groupes restent inchangés.' :

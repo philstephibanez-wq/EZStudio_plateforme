@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$true)][ValidateSet('prod','dev','lab','assistant')][string]$Site,
+    [Parameter(Mandatory=$true)][ValidateSet('prod','dev','lab')][string]$Site,
     [Parameter(Mandatory=$true)][ValidateSet('Preflight','Status','Start','Stop')][string]$Action
 )
 $ErrorActionPreference = 'Stop'
@@ -10,7 +10,7 @@ $exe='H:\FRANKENPHP\bin\frankenphp.exe'
 if ($Site -eq 'prod' -and $Action -eq 'Stop') {
     throw 'PROD_STOP_PROTECTED_REFUSED'
 }
-if ($Site -eq 'assistant') { throw 'ASSISTANT_LEGACY_SITE_RETIRED_USE_EZS' }
+
 $target=$native
 if(!(Test-Path -LiteralPath $target -PathType Leaf)) {throw ('PLATFORM_DELEGATE_MISSING '+$target)}
 # Verify a native PHP configuration without launching any process.

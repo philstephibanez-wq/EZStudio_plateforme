@@ -24,7 +24,7 @@ final class HardwareAgentAuthenticator extends AbstractAuthenticator
     public function authenticate(Request $request): SelfValidatingPassport
     {
         $agent = (new AgentCredentials())->identify($request->headers->get('Authorization'));
-        if (!in_array($agent, ['lab','assistant','ezscore'], true)) {
+        if (!in_array($agent, ['lab','ezscore'], true)) {
             throw new AuthenticationException('agent_authentication_failed');
         }
         return new SelfValidatingPassport(new UserBadge('agent:'.$agent,

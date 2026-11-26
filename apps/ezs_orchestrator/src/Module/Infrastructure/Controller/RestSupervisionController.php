@@ -61,7 +61,7 @@ final class RestSupervisionController
         // no caller may specify commands, paths, groups or desired states.
         try {
             $desired = (new DesiredServiceState())->all();
-            $groups = array_values(array_filter(['dev','lab','assistant','prod'],
+            $groups = array_values(array_filter(['dev','lab','prod'],
                 static fn(string $group): bool => ($desired[$group]??'') === DesiredServiceState::RUNNING));
             if ($groups === []) return new JsonResponse(['state'=>'IDLE','detail'=>'no_running_intentions'],200,$headers);
             if (!is_dir(self::dir()) && !mkdir(self::dir(),0700,true) && !is_dir(self::dir()))

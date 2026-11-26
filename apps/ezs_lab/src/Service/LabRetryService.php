@@ -15,10 +15,6 @@ final class LabRetryService
         'lab:stems' => ['stems_scientific', 'stems'],
         'lab:chords' => ['chords_scientific', 'chords'],
         'lab:lyrics' => ['lyrics_scientific', 'lyrics'],
-        'assistant:profile.review' => ['assistant.profile.review'],
-        'assistant:stems.review' => ['assistant.stems.review'],
-        'assistant:chords.review' => ['assistant.chords.review'],
-        'assistant:lyrics.review' => ['assistant.lyrics.review'],
     ];
 
     public function __construct(private readonly Database $database) {}

@@ -13,6 +13,6 @@ final class FastCgiPolicy
 
     public static function isFastCgi(string $name): bool
     {
-        return in_array($name, ['ezscore_dev','ezscore_preview','lab','assistant','prod_backend','prod_gateway'], true);
+        return in_array($name, ['ezscore_dev','ezscore_preview','lab','prod_backend','prod_gateway'], true);
     }
 }

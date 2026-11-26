@@ -8,7 +8,6 @@ final class QueueRestAccess
 {
     private const KEYS = [
         'lab' => 'EZS_QUEUE_LAB_TOKEN',
-        'assistant' => 'EZS_QUEUE_ASSISTANT_TOKEN',
         'ezscore' => 'EZS_QUEUE_EZSCORE_TOKEN',
     ];
 

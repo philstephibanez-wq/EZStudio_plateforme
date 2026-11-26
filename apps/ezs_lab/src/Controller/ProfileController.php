@@ -31,6 +31,7 @@ final class ProfileController extends AbstractController
         ProfileFrenchSummary $summary,
         ProfileValidationService $validation,
         ProfileItemsView $itemsView,
+        \EZSLab\Service\ProfileExpertisePrompt $expertisePrompt,
     ): Response {
         $song = $catalog->selectedSong($this->songId($request));
         $runs = [];
@@ -72,6 +73,8 @@ final class ProfileController extends AbstractController
             'profile_job' => $selected ? $execution->jobForRun((int)$selected['id']) : null,
             'profile_summary' => $selected ? $summary->build($selected) : null,
             'profile_items_view' => $itemsView->build($selected),
+            'expertise_prompt_active' => $expertisePrompt->active(),
+            'expertise_prompt_history' => $expertisePrompt->history(),
             'profile_validation_subjects' => $selected
                 ? $validation->subjectsForRun($selected)
                 : [],

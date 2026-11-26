@@ -9,7 +9,7 @@
 http://ezstudio.local:8000,
 http://dev.ezstudio.local:8000,
 http://lab.ezstudio.local:8000,
-http://assistant.ezstudio.local:8000,
+
 http://orchestrator.ezstudio.local:8000,
 http://127.0.0.1:8000,
 http://localhost:8000 {

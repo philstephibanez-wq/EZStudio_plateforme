@@ -12,10 +12,6 @@ final class LabCancellationRecovery
     private const KINDS = [
         'lab:profile'=>['profile'], 'lab:stems'=>['stems'],
         'lab:chords'=>['chords_scientific'], 'lab:lyrics'=>['lyrics','lyrics_scientific'],
-        'assistant:profile.review'=>['assistant.profile.review'],
-        'assistant:stems.review'=>['assistant.stems.review'],
-        'assistant:chords.review'=>['assistant.chords.review'],
-        'assistant:lyrics.review'=>['assistant.lyrics.review'],
     ];
 
     public function __construct(
@@ -75,7 +71,7 @@ final class LabCancellationRecovery
             // PROFILE and expertise have a durable admission receipt. Existing STEMS
             // and CHORDS lack this field; their exact local/run/song/kind proof is used.
             if (($receiptId > 0 && $receiptId !== $r['global_job_id'])
-                || (($r['source'] === 'assistant' || $r['kind'] === 'profile') && $receiptId !== $r['global_job_id'])) {
+                || (($r['kind'] === 'profile') && $receiptId !== $r['global_job_id'])) {
                 throw new \DomainException('recovery_local_receipt_mismatch');
             }
             $status = (string)$job['status'];

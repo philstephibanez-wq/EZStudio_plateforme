@@ -33,7 +33,7 @@ final class QueueDispatchController extends AbstractController
         if (!is_array($data)) { \App\Service\EzsFifoTrace::log('E2E_DISPATCH_REJECT_R2',['source'=>'orchestrator','reason'=>'invalid_json']); return $this->json(['ok' => false, 'error' => 'invalid_json'], 400); }
         $source = trim((string) ($data['source'] ?? ''));
         $payload = $data['payload'] ?? null;
-        if (!in_array($source, ['lab', 'assistant'], true) || !is_array($payload)) {
+        if (!in_array($source, ['lab'], true) || !is_array($payload)) {
             \App\Service\EzsFifoTrace::log('E2E_DISPATCH_REJECT_R2',['source'=>'orchestrator','reason'=>'invalid_dispatch_envelope']);
             return $this->json(['ok' => false, 'error' => 'invalid_dispatch_envelope'], 422);
         }

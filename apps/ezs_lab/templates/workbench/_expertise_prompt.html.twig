@@ -1,0 +1,61 @@
+<section class="card" id="profile-expertise-prompt" style="min-width:0;align-self:start">
+  <h2>Prompt d’expertise PROFILE</h2>
+  {% if expertise_prompt_active %}
+    <p>Révision active : <strong>#{{ expertise_prompt_active.id }}</strong></p>
+    <p style="overflow-wrap:anywhere"><small>SHA-256 : {{ expertise_prompt_active.sha256 }}</small></p>
+  {% else %}
+    <p>Aucun prompt actif. Initialisation requise.</p>
+  {% endif %}
+  <form data-prompt-action="create" method="post" action="{{ path('profile_expertise_prompt_save') }}">
+    <label for="expertise-prompt-content">Texte de la nouvelle révision</label>
+    <textarea id="expertise-prompt-content" name="content" rows="12" required style="width:100%;box-sizing:border-box;resize:vertical">{{ expertise_prompt_active.content ?? '' }}</textarea>
+    <button type="submit">Créer une révision</button>
+    <small>La création ne modifie pas le prompt actif.</small>
+  </form>
+  <h3>Historique des révisions</h3>
+  {% for revision in expertise_prompt_history %}
+    <details style="margin-top:8px">
+      <summary>#{{ revision.id }} · {{ revision.created_at }}{% if expertise_prompt_active and revision.id == expertise_prompt_active.id %} · Active{% endif %}</summary>
+      <pre style="white-space:pre-wrap;overflow-wrap:anywhere">{{ revision.content }}</pre>
+      <small style="overflow-wrap:anywhere">SHA-256 : {{ revision.sha256 }}</small>
+      {% if not expertise_prompt_active or revision.id != expertise_prompt_active.id %}
+        <form data-prompt-action="activate" method="post" action="{{ path('profile_expertise_prompt_save') }}">
+          <input type="hidden" name="revision" value="{{ revision.id }}">
+          <button type="submit" class="secondary">Activer #{{ revision.id }}</button>
+        </form>
+      {% endif %}
+    </details>
+  {% else %}
+    <p>Aucune révision.</p>
+  {% endfor %}
+  <p id="expertise-prompt-status" role="status" aria-live="polite"></p>
+</section>
+<script>
+(() => {
+  const panel = document.getElementById('profile-expertise-prompt');
+  const status = document.getElementById('expertise-prompt-status');
+  let busy = false;
+  panel.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!form.matches('form[data-prompt-action]')) return;
+    event.preventDefault();
+    if (busy) return;
+    busy = true;
+    const buttons = Array.from(panel.querySelectorAll('button[type="submit"]'));
+    buttons.forEach(button => button.disabled = true);
+    status.textContent = 'Enregistrement…';
+    try {
+      const body = new URLSearchParams(new FormData(form));
+      body.set('action', form.dataset.promptAction);
+      const response = await fetch(form.action, {method:'POST', credentials:'same-origin', headers:{'X-EZS-Expertise-Prompt':'save'}, body});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Enregistrement refusé.');
+      window.location.reload();
+    } catch (error) {
+      status.textContent = error.message || 'Échec de la requête.';
+      busy = false;
+      buttons.forEach(button => button.disabled = false);
+    }
+  });
+})();
+</script>

@@ -34,7 +34,7 @@ final class ServiceStateLedger
     /** Atomic one-time import. Existing DB values are never overwritten. */
     public function import(array $services, string $origin='legacy-import'):void
     {
-        $allowed=['root','dev','lab','assistant','prod','prod_maintenance'];
+        $allowed=['root','dev','lab','prod','prod_maintenance'];
         foreach($services as $service=>$state){
             if(!in_array($service,$allowed,true))throw new \InvalidArgumentException('EZS_LEDGER_UNKNOWN_SERVICE');
             $states=$service==='prod_maintenance'?['ON','OFF']:['RUNNING','STOPPED'];
@@ -53,7 +53,7 @@ final class ServiceStateLedger
     {
         if($actor==='')throw new \InvalidArgumentException('EZS_LEDGER_ACTOR_REQUIRED');
         $states=$service==='prod_maintenance'?['ON','OFF']:['RUNNING','STOPPED'];
-        if(!in_array($service,['root','dev','lab','assistant','prod','prod_maintenance'],true)||!in_array($desired,$states,true))throw new \InvalidArgumentException('EZS_LEDGER_REQUEST_INVALID');
+        if(!in_array($service,['root','dev','lab','prod','prod_maintenance'],true)||!in_array($desired,$states,true))throw new \InvalidArgumentException('EZS_LEDGER_REQUEST_INVALID');
         $this->db->beginTransaction();
         try{
             $q=$this->db->prepare('SELECT desired FROM intents WHERE service=?');$q->execute([$service]);

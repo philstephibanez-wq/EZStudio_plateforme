@@ -22,7 +22,7 @@ final class ProfilerExportController
         $token = trim((string) $request->query->get('token', ''));
 
         $out = ["=== EZSTUDIO DIAGNOSTIC EXPORT ===", "UTC: " . gmdate('c'), "App: " . $appName, "Token: " . ($token ?: 'AUCUN'), ""];
-        $logs = [$projectDir . '/var/log/' . $appName . '/dev.log', $projectDir . '/apps/ezs_assistant/runtime/worker.log', $projectDir . '/apps/ezs_assistant/runtime/worker.err.log'];
+        $logs = [$projectDir . '/var/log/' . $appName . '/dev.log'];
         $qDir = $projectDir . '/apps/ezs_lab/var/logs/profile-queue';
         if (is_dir($qDir)) {
             $ql = glob($qDir . '/*.log') ?: [];

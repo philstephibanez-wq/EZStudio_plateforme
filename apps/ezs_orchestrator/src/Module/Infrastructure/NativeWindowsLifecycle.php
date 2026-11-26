@@ -14,7 +14,7 @@ final class NativeWindowsLifecycle
         'ezscore_dev' => ['port'=>8602,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezstudio_dev','args'=>'-b 127.0.0.1:8602'],
         'ezscore_preview' => ['port'=>8862,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezstudio_dev','args'=>'-b 127.0.0.1:8862'],
         'lab' => ['port'=>8701,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezs_lab','args'=>'-b 127.0.0.1:8701'],
-        'assistant' => ['port'=>8713,'exe'=>self::php_cgi(),'cwd'=>dirname(__DIR__, 4) . '/apps/ezs_assistant','args'=>'-b 127.0.0.1:8713'],
+
     ]; }
     /** PROD : un seul Caddy expose les trois facades, deux FastCGI distincts.
      * Le backend Symfony conserve APP_ENV=prod / APP_DEBUG=0 et son SSO. */
@@ -258,7 +258,7 @@ final class NativeWindowsLifecycle
         [$processes,$ports]=$this->observations();
         foreach (['processes.json'=>['php_pid','caddy_pid'],
                   'app-backends.json'=>['dev_pid','preview_pid'],
-                  'lab-assistant.json'=>['lab.pid','assistant.pid']] as $file=>$keys) {
+                  'lab-assistant.json'=>['lab.pid']] as $file=>$keys) {
             $path=$this->runtime.'/'.$file;
             if(!is_file($path)) continue;
             $state=json_decode((string)file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
@@ -495,7 +495,7 @@ final class NativeWindowsLifecycle
         return [
             'dev' => ['ezscore_dev', 'ezscore_preview'],
             'lab' => ['lab'],
-            'assistant' => ['assistant'],
+
         ];
     }
 

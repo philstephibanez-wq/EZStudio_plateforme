@@ -46,7 +46,7 @@ try {
     $lifecycle = new NativeWindowsLifecycle();
     $groups = NativeWindowsLifecycle::groups();
     // Recheck live state before EACH mutation; never trust a stale first snapshot.
-    foreach (['dev', 'lab', 'assistant'] as $group) {
+    foreach (['dev', 'lab'] as $group) {
         $wanted = $expected[$group] ?? null;
         if (!in_array($wanted, [DesiredServiceState::RUNNING, DesiredServiceState::STOPPED], true)) {
             throw new RuntimeException('EZS_RECONCILE_INTENT_INVALID_' . $group);

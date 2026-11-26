@@ -35,14 +35,6 @@
               <details open><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8000 · HTTP <span id="tech-http-lab">—</span></dd><dt>Backend</dt><dd>8000 · <strong id="lab-backend">Non mesuré</strong></dd><dt>Autorité Orchestrator</dt><dd>Lecture seule depuis cette interface</dd><dt>Action</dt><dd>Démarrer / Arrêter indisponibles</dd><dt>État complémentaire</dt><dd>Service LAB : état HTTP/TCP ci-dessus. Gestion des jobs dans Ordonnanceur.</dd></dl></details>
             </div>
           </section>
-          <section class="card ezs-server-card border-success" aria-labelledby="assistant-title">
-            <div class="card-header d-flex justify-content-between align-items-center"><h2 id="assistant-title" class="h6 mb-0">Assistant</h2><span id="state-assistant" class="badge text-bg-secondary">Inconnu</span></div>
-            <div class="card-body">
-              <div class="ezs-server-summary"><div>Interface <strong>8000</strong></div><div>HTTP <strong id="http-assistant">—</strong><span class="ms-2 small text-body-secondary">Soft : <strong id="soft-assistant">Non mesuré</strong></span></div><div>TCP <strong id="tcp-assistant">—</strong></div></div>
-              <div class="ezs-server-actions"><a class="btn btn-outline-success btn-sm" href="http://assistant.ezstudio.local:8000/" target="_blank" rel="noopener noreferrer">Ouvrir Assistant</a></div>
-              <details open><summary>Détails techniques</summary><dl class="small mt-2 mb-0 ezs-tech-grid"><dt>Façade</dt><dd>8000 · HTTP <span id="tech-http-assistant">—</span></dd><dt>Backend</dt><dd>8000 · FrankenPHP</dd><dt>Autorité Orchestrator</dt><dd>Lecture seule des sondes GET</dd><dt>Action</dt><dd>Aucun dispatch ni claim depuis cette interface</dd><dt>État complémentaire</dt><dd>Web : {% if assistant_readiness.web %}<span class="badge text-bg-success">Prêt</span>{% else %}<span class="badge text-bg-secondary">Indisponible</span>{% endif %} · Inférence locale retirée</dd></dl></details>
-            </div>
-          </section>
         </div>
     </main>
 {% endblock %}

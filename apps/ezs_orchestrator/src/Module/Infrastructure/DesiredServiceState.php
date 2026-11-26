@@ -5,7 +5,7 @@ namespace Ezs\Web\Module\Infrastructure;
 /** L'intention de l'operateur prime toujours sur les sondes. */
 final class DesiredServiceState
 {
-    public const GROUPS=['root','dev','lab','assistant','prod'];
+    public const GROUPS=['root','dev','lab','prod'];
     public const RUNNING='RUNNING';
     public const STOPPED='STOPPED';
     private readonly string $path;
@@ -24,7 +24,7 @@ final class DesiredServiceState
             throw new \RuntimeException('EZS_DESIRED_STATE_INVALID');
         $services=array_fill_keys(self::GROUPS,self::STOPPED);
         foreach($data['services'] as $name=>$state){
-            if($name==='assistant_ai' && in_array($state,[self::RUNNING,self::STOPPED],true)) continue; // legacy field retired on next write
+            if(in_array($name,['assistant','assistant_ai'],true) && in_array($state,[self::RUNNING,self::STOPPED],true)) continue; // legacy field retired on next write
             if(!array_key_exists($name,$services)||!in_array($state,[self::RUNNING,self::STOPPED],true))
                 throw new \RuntimeException('EZS_DESIRED_STATE_INVALID_ENTRY');
             $services[$name]=$state;

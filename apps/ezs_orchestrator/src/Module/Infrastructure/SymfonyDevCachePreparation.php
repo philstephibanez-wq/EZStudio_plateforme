@@ -35,7 +35,7 @@ final class SymfonyDevCachePreparation
     {
         foreach ($roots as $root) {
             if (!is_string($root) || !in_array($root, [
-                dirname(__DIR__, 4) . '/apps/orchestrator', dirname(__DIR__, 4) . '/apps/ezstudio_dev', dirname(__DIR__, 4) . '/apps/ezs_lab', dirname(__DIR__, 4) . '/apps/ezs_assistant'
+                dirname(__DIR__, 4) . '/apps/orchestrator', dirname(__DIR__, 4) . '/apps/ezstudio_dev', dirname(__DIR__, 4) . '/apps/ezs_lab'
             ], true)) throw new \RuntimeException('EZS_CACHE_ROOT_NOT_ALLOWED');
             if ($runner !== null) { $runner($root); continue; }
             if (!is_file($root.'/bin/console')) throw new \RuntimeException('EZS_CACHE_CONSOLE_MISSING_'.$root);

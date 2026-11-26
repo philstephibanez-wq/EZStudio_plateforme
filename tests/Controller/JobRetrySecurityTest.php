@@ -41,15 +41,15 @@ final class JobRetrySecurityTest extends WebTestCase
     public function testLabRestRetryClientRequiresConfiguredToken(): void
     {
         // The retry must fail closed; it must never create or read LAB SQLite.
-        $old=$_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']??null;
+        $old=$_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']??null;
         $oldWorker=$_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']??null;
         try {
-            unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN'],$_SERVER['EZSTUDIOLAB_ASSISTANT_TOKEN'],$_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN'],$_SERVER['EZSTUDIO_ANALYSIS_WORKER_TOKEN']);
-            putenv('EZSTUDIOLAB_ASSISTANT_TOKEN');putenv('EZSTUDIO_ANALYSIS_WORKER_TOKEN');
+            unset($_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN'],$_SERVER['EZSTUDIO_ANALYSIS_WORKER_TOKEN'],$_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN'],$_SERVER['EZSTUDIO_ANALYSIS_WORKER_TOKEN']);
+            putenv('EZSTUDIO_ANALYSIS_WORKER_TOKEN');putenv('EZSTUDIO_ANALYSIS_WORKER_TOKEN');
             $svc=new LabRetryClient(new MockHttpClient());
             $this->assertSame('lab_retry_token_not_configured',$svc->request('prepare',368,1,'lab',['job'=>'profile','analysis_job_id'=>1])['reason']);
         } finally {
-            if ($old!==null) $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']=$old;
+            if ($old!==null) $_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']=$old;
             if ($oldWorker!==null) $_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']=$oldWorker;
         }
     }
@@ -61,7 +61,7 @@ final class JobRetrySecurityTest extends WebTestCase
         $em=$container->get(EntityManagerInterface::class);
         $qm=$container->get(QueueManager::class);
         $lf=$container->get(LockFactory::class);
-        $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']='test_token';
+        $_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']='test_token';
         $calls=[];
         $pauseFile=QueueBarrierPaths::pause(dirname(__DIR__, 2));
         $this->assertTrue(QueueBarrierPaths::isTest());
@@ -109,7 +109,7 @@ final class JobRetrySecurityTest extends WebTestCase
             if ($ownsPause) unlink($pauseFile);
             if ($job!==null) $conn->executeStatement('DELETE FROM job_queue WHERE id=?',[(int)$job->getId()]);
             $conn->executeStatement('UPDATE job_queue SET status=substr(status,?) WHERE substr(status,1,?)=?',[strlen($prefix)+1,strlen($prefix),$prefix]);
-            unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']);
+            unset($_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']);
         }
     }
 
@@ -120,7 +120,7 @@ final class JobRetrySecurityTest extends WebTestCase
         $em=$container->get(EntityManagerInterface::class);
         $qm=$container->get(QueueManager::class);
         $lf=$container->get(LockFactory::class);
-        $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']='test_token';
+        $_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']='test_token';
         $calls=[];
         $pauseFile=QueueBarrierPaths::pause(dirname(__DIR__, 2));
         $this->assertTrue(QueueBarrierPaths::isTest());
@@ -159,13 +159,13 @@ final class JobRetrySecurityTest extends WebTestCase
             if ($ownsPause) unlink($pauseFile);
             if ($job!==null) $conn->executeStatement('DELETE FROM job_queue WHERE id=?',[(int)$job->getId()]);
             $conn->executeStatement('UPDATE job_queue SET status=substr(status,?) WHERE substr(status,1,?)=?',[strlen($prefix)+1,strlen($prefix),$prefix]);
-            unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']);
+            unset($_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']);
         }
     }
 
     public function testLabRestRetryClientContract(): void
     {
-        $_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']='test_token';
+        $_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']='test_token';
         try {
             $http=new MockHttpClient(function(string $method,string $url,array $options): MockResponse {
                 $this->assertSame('POST',$method);
@@ -174,6 +174,6 @@ final class JobRetrySecurityTest extends WebTestCase
             });
             $svc=new LabRetryClient($http);
             $this->assertTrue($svc->request('prepare',368,1,'lab',['job'=>'profile','analysis_job_id'=>1])['ok']);
-        } finally { unset($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN']); }
+        } finally { unset($_ENV['EZSTUDIO_ANALYSIS_WORKER_TOKEN']); }
     }
 }
