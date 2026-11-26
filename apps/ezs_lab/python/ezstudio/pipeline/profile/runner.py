@@ -384,6 +384,12 @@ def main() -> int:
         duration,
     )
     profile_view = _profile_view(module_registry_result)
+    # E04 R1: additive contract projection; original module outputs remain authoritative.
+    from items_projection import load_policy, project_scientific_items
+    policy = load_policy(Path(__file__).resolve().parents[4] / "contracts")
+    profile_view["scientific_items"] = project_scientific_items(
+        characteristics, profile_view, module_registry_result.get("consensus"), policy,
+    )
     forensic_event("projection.interpreted", {"characteristics": characteristics,
         "tagging": tagging, "warnings": warnings, "profile_view": profile_view})
 

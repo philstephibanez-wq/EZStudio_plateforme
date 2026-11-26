@@ -1,0 +1,67 @@
+{
+  "schema": "ezstudio.profile.projection.v1",
+  "source_contract": "ezstudio.profile.items.v1",
+  "instrument_families": {
+    "keyboards": [
+      "piano",
+      "electric piano",
+      "organ",
+      "synthesizer"
+    ],
+    "guitars": [
+      "acoustic guitar",
+      "electric guitar"
+    ],
+    "basses": [
+      "bass guitar",
+      "acoustic bass"
+    ],
+    "strings": [
+      "violin",
+      "cello",
+      "harp",
+      "mandolin",
+      "ukulele"
+    ],
+    "percussion": [
+      "drum kit",
+      "snare drum",
+      "kick drum",
+      "cymbal"
+    ],
+    "brass": [
+      "trumpet",
+      "trombone"
+    ],
+    "woodwinds": [
+      "saxophone",
+      "flute",
+      "clarinet"
+    ],
+    "free_reed": [
+      "harmonica",
+      "accordion"
+    ]
+  },
+  "generic_instruments": {
+    "keyboard": "keyboards",
+    "string section": "strings",
+    "percussion": "percussion",
+    "brass section": "brass",
+    "guitar": "guitars"
+  },
+  "vocal_roles": {
+    "backing_vocals": "backing",
+    "vocal_harmonies": "harmony",
+    "choir": "choir"
+  },
+  "spoken_labels": {
+    "voice": [
+      "spoken voice"
+    ],
+    "audioset": [
+      "speech",
+      "narration, monologue"
+    ]
+  }
+}
