@@ -26,7 +26,10 @@
                         <option value="waiting" {{ f.state == 'waiting' ? 'selected' }}>Enregistré (en attente)</option>
                         <option value="progressing" {{ f.state == 'progressing' ? 'selected' }}>En progression</option>
                         <option value="cancelling" {{ f.state == 'cancelling' ? 'selected' }}>Annulation en cours</option>
-                        <option value="ended_ko" {{ f.state == 'ended_ko' ? 'selected' }}>Erreur bloquante</option>
+                        <option value="blocking" {{ f.state == 'blocking' ? 'selected' }}>Erreur bloquante</option>
+                        <option value="ended_ok" {{ f.state == 'ended_ok' ? 'selected' }}>Terminés OK</option>
+                        <option value="ended_ko" {{ f.state == 'ended_ko' ? 'selected' }}>Terminés KO</option>
+                        <option value="cancelled" {{ f.state == 'cancelled' ? 'selected' }}>Annulés</option>
                     </select></div>
                 <div class="col-auto"><label class="form-label small text-body-secondary mb-1">Acteur</label>
                     <select name="actor" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -64,7 +67,10 @@
                 <p><strong>{{ global_queue.jobs|length }}</strong> affichés (max {{ f.limit }})
                     — en attente : <strong>{{ global_queue.counts.waiting|default(0) }}</strong>
                     — en progression : <strong>{{ global_queue.counts.progressing|default(0) }}</strong>
-                    — erreur bloquante : <strong>{{ global_queue.counts.ended_ko|default(0) }}</strong>
+                    — erreur bloquante : <strong>{{ global_queue.counts.blocking|default(0) }}</strong>
+                     — terminés OK : <strong>{{ global_queue.counts.ended_ok|default(0) }}</strong>
+                     — terminés KO : <strong>{{ global_queue.counts.ended_ko|default(0) }}</strong>
+                     — annulés : <strong>{{ global_queue.counts.cancelled|default(0) }}</strong>
                 </p>
                 {% set has_any_error = global_queue.jobs|filter(j => j.error_message is not empty)|length > 0 %}
                 <div class="table-responsive">
@@ -137,7 +143,7 @@ document.getElementById('deleteJobModal')?.addEventListener('show.bs.modal', fun
     const KEY = 'ezs.orchestrator.jobs.filters.v1';
     const names = ['state', 'actor', 'category', 'item', 'limit'];
     const allowed = {
-        state: ['all','active','waiting','progressing','cancelling','ended_ko'],
+        state: ['all','active','waiting','progressing','cancelling','ended_ko','ended_ok','cancelled','blocking'],
         actor: ['all','lab','assistant'],
         category: ['all','Analyse','Expertise'],
         item: ['all','Profile','Stems','Chords','Lyrics'],

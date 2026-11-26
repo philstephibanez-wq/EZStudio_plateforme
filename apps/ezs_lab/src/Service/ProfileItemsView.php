@@ -35,7 +35,7 @@ final class ProfileItemsView
     {
         $rows=[];
         foreach (['1','1a','1b','1c','2','3','4','5','6','7','8','9'] as $id) {
-            $item=$result['items'][$id]; $v=$item['value']; $parts=[];
+            $item=$result['items'][$id]; $v=$item['value']; $parts=[]; $lines=[];
             $literal=static fn($x)=>['text'=>(string)$x,'translate'=>false];
             $key=static fn($x)=>['text'=>$x,'translate'=>true];
             if ($item['state'] !== 'known') $parts[]=$key('state_'.$item['state']);
@@ -50,19 +50,24 @@ final class ProfileItemsView
                 case '4':
                     if($v['primary_bpm']!==null){$parts[]=$literal($v['primary_bpm'].' BPM');$parts[]=$key('unit_'.$v['beat_unit']);} else $parts[]=$key('primary_unknown');
                     if($v['tracker_bpm']!==null){$parts[]=$key('tracker');$parts[]=$literal($v['tracker_bpm'].' BPM');} break;
-                case '5': $parts[]=$literal($v['tonic'].' '.$v['mode']); break;
-                case '6': foreach($v as $genre) $parts[]=$literal(implode(' / ',array_filter([$genre['family'],$genre['genre'],$genre['subgenre']],static fn($x)=>$x!==null))); break;
+                case '5': $parts[]=$literal($v['tonic'].' '.$v['mode']); $lines[]=[['text'=>$v['tonic'],'translate'=>false,'taxonomy'=>true],['text'=>$v['mode'],'translate'=>false,'taxonomy'=>true]]; break;
+                case '6': foreach($v as $genre) {
+                    $labels=array_values(array_unique(array_filter([$genre['family'],$genre['genre'],$genre['subgenre']],static fn($x)=>$x!==null)));
+                    $parts[]=$literal(implode(' / ',$labels));
+                    $lines[]=array_map(static fn($x)=>['text'=>$x,'translate'=>false,'taxonomy'=>true],$labels);
+                } break;
                 case '7': case '8': case '9':
-                    $parts[]=$key('coverage_'.$v['coverage']);
-                    foreach($v['entries'] as $part){
+                    $parts[]=$key('coverage_'.$v['coverage']); $lines[]=[$parts[0]];
+                    foreach($v['entries'] as $part){ $start=count($parts);
                         if($id==='9') $parts[]=$literal($part['instrument']??$part['family']);
                         else {$parts[]=$key('role_'.$part['role']);$parts[]=$key('delivery_'.$part['delivery']);$parts[]=$key('articulation_'.$part['articulation']); if($part['languages']!==null) $parts[]=$literal(implode(', ',$part['languages']));}
                         $parts[]=$key('presence_'.$part['presence']);
+                        $line=array_slice($parts,$start); if($id==='9') $line[0]['taxonomy']=true; $lines[]=$line;
                     } break;
             }
             $confidence=$item['confidence'];
-            if($confidence['kind']==='calibrated') $parts[]=$literal(sprintf('%.1f %%',100*$confidence['value']));
-            $rows[]=['label'=>'item_'.$id,'parts'=>$parts,'detail'=>'confidence_'.$confidence['kind']];
+            if($confidence['kind']==='calibrated') { $parts[]=$literal(sprintf('%.1f %%',100*$confidence['value'])); if($lines!==[]) $lines[]=[$parts[count($parts)-1]]; }
+            $rows[]=['label'=>'item_'.$id,'parts'=>$parts,'lines'=>$lines?:[$parts],'detail'=>'confidence_'.$confidence['kind']];
         }
         return $rows;
     }

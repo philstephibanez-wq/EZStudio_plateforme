@@ -11,7 +11,7 @@ final class GlobalQueueDashboard
     public static function read(?string $path = null, array $filters = []): array
     {
         $path ??= dirname(__DIR__, 5) . (\App\Service\QueueBarrierPaths::isTest() ? '/var/orchestrator_test.sqlite' : '/data/databases/EZS_Orchestrator.sqlite');
-        $stateFilter = in_array((string) ($filters['state'] ?? 'all'), ['all', 'active', 'waiting', 'progressing', 'cancelling', 'ended_ko'], true) ? (string) $filters['state'] : 'all';
+        $stateFilter = in_array((string) ($filters['state'] ?? 'all'), ['all', 'active', 'waiting', 'progressing', 'cancelling', 'ended_ko', 'ended_ok', 'cancelled', 'blocking'], true) ? (string) $filters['state'] : 'all';
         $actorFilter = in_array((string) ($filters['actor'] ?? 'all'), ['all', 'lab', 'assistant'], true) ? (string) $filters['actor'] : 'all';
         $categoryFilter = in_array((string) ($filters['category'] ?? 'all'), ['all', 'Analyse', 'Expertise'], true) ? (string) $filters['category'] : 'all';
         $itemFilter = in_array((string) ($filters['item'] ?? 'all'), ['all', 'Profile', 'Stems', 'Chords', 'Lyrics'], true) ? (string) $filters['item'] : 'all';
@@ -41,8 +41,7 @@ final class GlobalQueueDashboard
                 }
             }
 
-            // EZS_FIFO_ACTIVE_RETRY_R1B: Orchestrator is an active queue, NOT
-            // a historical catalogue. Show one blocker (if any) and live jobs.
+            // EZS_FIFO_ACTIVE_RETRY_R1B: Show active jobs first and terminal history in read-only mode.
             $pausePath = \App\Service\QueueBarrierPaths::pause(dirname(__DIR__, 5));
             $blockedId = 0;
             if (is_file($pausePath)) {
@@ -54,24 +53,19 @@ final class GlobalQueueDashboard
                 }
                 $blockedId = $pause['global_job_id'];
             }
+            $counts['blocking'] = $blockedId > 0 ? 1 : 0;
             $sql = "SELECT id, source, status, COALESCE(progress, 0) AS progress, COALESCE(has_error, 0) AS has_error, error_message, COALESCE(attempts, 0) AS attempts, payload, created_at, updated_at
                     FROM job_queue
-                    WHERE status IN ('waiting','progressing','cancelling')
-                      OR (id = :blocked_for_terminal AND status = 'ended' AND has_error = 1)
-                    ORDER BY CASE WHEN id = :blocked_for_order THEN 0 WHEN status IN ('progressing','cancelling') THEN 1 ELSE 2 END,
-                             created_at ASC, id ASC
-                    LIMIT 500";
+                    WHERE status IN ('waiting','progressing','cancelling','ended','cancelled')
+                    ORDER BY CASE WHEN id = :blocked_for_order THEN 0 WHEN status IN ('progressing','cancelling') THEN 1 WHEN status = 'waiting' THEN 2 ELSE 3 END,
+                             CASE WHEN status IN ('waiting','progressing','cancelling') THEN created_at END ASC,
+                             CASE WHEN status IN ('waiting','progressing','cancelling') THEN id END ASC,
+                             updated_at DESC, id DESC";
             $query = $db->prepare($sql);
-            $query->execute(['blocked_for_terminal' => $blockedId, 'blocked_for_order' => $blockedId]);
-            $rawRows = $query->fetchAll(PDO::FETCH_ASSOC);
-            // History stays in LAB / Assistant. Hide historical counts.
-            $counts['ended'] = 0;
-            $counts['ended_ok'] = 0;
-            $counts['ended_ko'] = $blockedId > 0 ? 1 : 0;
-            $counts['cancelled'] = 0;
+            $query->execute(['blocked_for_order' => $blockedId]);
             $rows = [];
 
-            foreach ($rawRows as $r) {
+            while ($r = $query->fetch(PDO::FETCH_ASSOC)) {
                 $actor = (string) ($r['source'] ?? 'orchestrator');
                 // EZS_QUEUE_FILTER_BLOCKER_R1E: the blocker is globally visible in the alert,
                 // but table rows must obey the chosen actor filter without exception.
@@ -82,9 +76,11 @@ final class GlobalQueueDashboard
                 $hasError = ((int) ($r['has_error'] ?? 0)) === 1;
 
                 if ($stateFilter === 'active' && !in_array($state, ['waiting', 'progressing', 'cancelling'], true)) { continue; }
-                // Only the current blocking KO belongs to the active read model's
-                // ended_ko filter; terminal history stays in the source application.
-                if ($stateFilter === 'ended_ko' && !($state === 'ended' && $hasError && (int) $r['id'] === $blockedId)) { continue; }
+                // Blocking KO and terminal history use separate filters.
+                if ($stateFilter === 'blocking' && !($state === 'ended' && $hasError && (int) $r['id'] === $blockedId)) { continue; }
+                if ($stateFilter === 'ended_ko' && !($state === 'ended' && $hasError)) { continue; }
+                if ($stateFilter === 'ended_ok' && !($state === 'ended' && !$hasError)) { continue; }
+                if ($stateFilter === 'cancelled' && $state !== 'cancelled') { continue; }
                 if (in_array($stateFilter, ['waiting','progressing','cancelling'], true) && $state !== $stateFilter) { continue; }
 
                 $payload = json_decode((string) ($r['payload'] ?? '{}'), true);

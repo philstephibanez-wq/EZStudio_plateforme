@@ -58,7 +58,9 @@
   </td>
 
   {% for key in ['profile','stems','chords','lyrics'] %}
-    {% set s = attribute(song, key) %}
+    {% set available = attribute(song, key) %}
+    {% set attempt = available.latest_attempt|default(null) %}
+    {% set s = key == 'profile' and attempt and attempt.state != 'legacy_fifo' ? attempt : available %}
     <td>
       {% if s.job_status == 'cancelling' or s.state == 'cancelling' %}
         <span class="ezs-badge ezs-badge--state-cancelling" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : annulation en cours' : 'Annulation en cours' }}</span>
@@ -79,6 +81,7 @@
       {% else %}
         <span class="badge">—</span>
       {% endif %}
+      {% if key == 'profile' and available.state == 'done' and s.run_id != available.run_id %}<div class="meta">Analyse précédente prête{% if available.version %} · {{ available.version|replace({'PROFILE.':''}) }}{% endif %}</div>{% endif %}
     </td>
   {% endfor %}
 
