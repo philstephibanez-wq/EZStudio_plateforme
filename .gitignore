@@ -30,4 +30,8 @@ __pycache__/
 *.py[cod]
 
 # EZStudio - local persistent data (audio, SQLite, backups)
-/data/
+/data/*
+!/data/schemas/
+/data/schemas/*
+!/data/schemas/EZS_Lab.sql
+!/data/schemas/EZS_Orchestrator.sql
