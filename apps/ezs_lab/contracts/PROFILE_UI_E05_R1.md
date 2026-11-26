@@ -1,0 +1,3 @@
+# E05 R1 — lecture du contrat PROFILE dans le tableau existant
+
+Lecture synchrone locale en lecture seule via le script E04, timeout de 10 secondes, sans inférence ni écriture. Le Python est celui de PROFILE (EZSTUDIO_PROFILE_PYTHON ou chemin historique). jsonschema doit être disponible dans cet interpréteur. Aucun changement partagé CSS/JS/Twig ; un domaine de traduction FR/EN dédié. Les anciens runs gardent le tableau historique explicitement séparé, en plus des ITEMS canoniques non analysés. En cas d'erreur de lecture, message explicite sans fallback. Crédits en lecture seule ; aucune édition documentaire ajoutée. Les autres éléments du formulaire restent inchangés. Validation visuelle, performance réelle et service Symfony à qualifier sur MAIN. Aucun commit requis.

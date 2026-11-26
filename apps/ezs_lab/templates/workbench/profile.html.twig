@@ -111,6 +111,28 @@
       <progress id="profile-step-progress" value="{{ selected_profile_run and selected_profile_run.state == 'done' ? 100 : 0 }}" max="100" style="width:100%;height:8px;margin-top:4px"></progress>
     </div>
     {% if selected_profile_run %}
+      <details id="profile-canonical-results" open>
+        <summary style="cursor:pointer;font-size:11px;font-weight:600">PROFILE</summary>
+        {% if profile_items_view.status in ['ready','historical','pending'] %}
+        <table class="prof-tbl">
+          <thead><tr><th>Dimension</th><th>Résultat LAB</th><th>Détail</th></tr></thead>
+          <tbody>
+          {% for row in profile_items_view.rows %}
+            <tr><td><strong>{{ row.label|trans({}, 'ezs_profile_items', ezs_pipeline_locale) }}</strong></td><td>{% for part in row.parts %}{{ part.translate ? part.text|trans({}, 'ezs_profile_items', ezs_pipeline_locale) : part.text }}{% if not loop.last %} · {% endif %}{% endfor %}</td><td class="meta">{{ row.detail|trans({}, 'ezs_profile_items', ezs_pipeline_locale) }}</td></tr>
+          {% else %}
+            {% for item_id in ['1','1a','1b','1c','2','3','4','5','6','7','8','9'] %}
+              <tr><td><strong>{{ ('item_' ~ item_id)|trans({}, 'ezs_profile_items', ezs_pipeline_locale) }}</strong></td><td>—</td><td class="meta">{{ 'state_not_analyzed'|trans({}, 'ezs_profile_items', ezs_pipeline_locale) }}</td></tr>
+            {% endfor %}
+          {% endfor %}
+          </tbody>
+        </table>
+      {% elseif profile_items_view.status == 'error' %}
+        <p class="meta" role="alert">{{ 'contract_error'|trans({}, 'ezs_profile_items', ezs_pipeline_locale) }}</p>
+      {% endif %}
+      </details>
+      {% if profile_items_view.status in ['historical','pending'] %}
+        <details id="profile-legacy-results" style="margin-top:24px">
+          <summary style="cursor:pointer;font-size:11px;font-weight:600">{{ ('legacy_' ~ profile_items_view.status)|trans({}, 'ezs_profile_items', ezs_pipeline_locale) }}</summary>
       {% set p = selected_profile_run.metrics %}{% set pv = selected_profile_run.diagnostics.profile_view ?? {} %}{% set vox = pv.vocal_profile.dimensions ?? {} %}
       <table class="prof-tbl">
         <thead><tr><th>Dimension</th><th>Résultat LAB</th><th>Détail</th></tr></thead>
@@ -132,6 +154,8 @@
           <tr><td><strong>Chœur</strong></td><td>{{ vox.choir.decision ?? '—' }}</td><td class="meta">choir</td></tr>
         </tbody>
       </table>
+        </details>
+      {% endif %}
       {% set completed_modules = selected_profile_run.diagnostics.module_registry.modules ?? [] %}
       {% if completed_modules is not empty or selected_song %}
         <details class="ezs-tech-pipeline" id="profile-modules-details" style="margin-top:24px"><summary id="profile-modules-summary" style="cursor:pointer;font-size:11px;font-weight:600">Logique : Pipeline des {{ completed_modules|length }} moteurs · run #{{ selected_profile_run.id }}</summary>

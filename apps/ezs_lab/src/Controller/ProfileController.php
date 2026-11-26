@@ -5,6 +5,7 @@ namespace EZSLab\Controller;
 use EZSLab\Service\AnalysisRunRegistry;
 use EZSLab\Service\ProfileExecutionService;
 use EZSLab\Service\ProfileFrenchSummary;
+use EZSLab\Service\ProfileItemsView;
 use EZSLab\Service\ProfileValidationService;
 use EZSLab\Service\WorkbenchCatalog;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,6 +30,7 @@ final class ProfileController extends AbstractController
         ProfileExecutionService $execution,
         ProfileFrenchSummary $summary,
         ProfileValidationService $validation,
+        ProfileItemsView $itemsView,
     ): Response {
         $song = $catalog->selectedSong($this->songId($request));
         $runs = [];
@@ -69,6 +71,7 @@ final class ProfileController extends AbstractController
             'selected_profile_run' => $selected,
             'profile_job' => $selected ? $execution->jobForRun((int)$selected['id']) : null,
             'profile_summary' => $selected ? $summary->build($selected) : null,
+            'profile_items_view' => $itemsView->build($selected),
             'profile_validation_subjects' => $selected
                 ? $validation->subjectsForRun($selected)
                 : [],
