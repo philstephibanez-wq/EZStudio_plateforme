@@ -330,7 +330,7 @@ def main() -> int:
 
     preset_loader = PresetLoader(Path(__file__).resolve().parents[4] / "presets")
     loaded_phase_preset = preset_loader.load_phase(
-        "profile/profile-r3b35c-compat.v2b.json"
+        "profile/profile-r3b35c-compat.v2c.json"
     )
     from profile_forensic_probe import event as forensic_event
     forensic_event("preset.loaded", {"id": loaded_phase_preset.value.id,

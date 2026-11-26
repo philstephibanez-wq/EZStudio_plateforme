@@ -15,6 +15,7 @@ for _bootstrap_path in (
 from typing import Any
 from module import ModuleConfig
 from module_registry import ModuleRegistry
+from producer_policy import from_phase_preset
 from ezstudio.runtime.execution_plan import ExecutionPlanner
 from ezstudio.runtime.preset_loader import LoadedPreset, PhasePreset
 from ezstudio.runtime.module_config import load_module_config
@@ -52,7 +53,7 @@ def build_registry_from_phase_preset(
         raise ValueError(f"profile_phase_required:{loaded.value.phase}")
     roots={"ai_models_root":ai_models_root.resolve(),
            "profile_models_root":profile_models_root.resolve()}
-    reg=ModuleRegistry()
+    reg=ModuleRegistry(producer_policy=from_phase_preset(loaded))
     # A module config is resolved exactly once, before running any scientific module.
     # It is immutable for this run and is also used by the SQLite capture manifest.
     preset_root = loaded.path.parent.parent

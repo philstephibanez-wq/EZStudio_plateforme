@@ -184,6 +184,8 @@ def _dimension(
     *,
     direct_engine_min: int = 2,
     allow_single_high_rank_clap: bool = False,
+    high_rank_clap_max: int = 3,
+    allow_accepted_audioset_override: bool = True,
 ) -> dict[str, Any]:
     direct = [item for item in evidence if item.get("role") == "direct"]
     direct_modules: set[str] = set()
@@ -202,11 +204,11 @@ def _dimension(
         if (
             item.get("family") == "voice"
             and isinstance(item.get("rank"), int)
-            and int(item["rank"]) <= 3
+            and int(item["rank"]) <= high_rank_clap_max
         ):
             high_rank_clap = True
 
-    if accepted_audioset or len(direct_modules) >= direct_engine_min:
+    if (allow_accepted_audioset_override and accepted_audioset) or len(direct_modules) >= direct_engine_min:
         decision = "present"
     elif allow_single_high_rank_clap and high_rank_clap:
         decision = "possible"
@@ -293,4 +295,34 @@ def build_vocal_profile(semantic: dict[str, Any]) -> dict[str, Any]:
             "harmonies and choir are distinct concepts. Related vocal labels "
             "are preserved as evidence but cannot by themselves confirm choir."
         ),
+    }
+
+
+def build_declared_vocal_profile(semantic: dict[str, Any], producer_policy: dict[str, Any]) -> dict[str, Any]:
+    """New preset only: direct role evidence is distinct from generic singing/speech."""
+    from producer_policy import validate_policy, policy_sha256
+
+    config = validate_policy(producer_policy)["vocals"]
+    dimensions = {}
+    for name, role in config["roles"].items():
+        evidence = [row for row in _clap_voice_evidence(semantic, set(role["clap_direct"]))
+                    if row.get("module") == "semantic.clap-open-vocabulary"]
+        evidence += _audioset_evidence(semantic, set(role["audioset_direct"]), set(role["audioset_related"]))
+        dimensions[name] = _dimension(
+            name, evidence, direct_engine_min=config["minimum_direct_engines"],
+            allow_single_high_rank_clap=role["allow_single_high_rank_clap"],
+            high_rank_clap_max=config["high_rank_clap_max"],
+            allow_accepted_audioset_override=False,
+        )
+    return {
+        "schema": "ezstudio.profile.vocal-profile.v1",
+        "status": "experimental",
+        "calibrated": False,
+        "usable_for_stems": False,
+        "dimensions": dimensions,
+        "choir_decision": dimensions["choir"]["decision"],
+        "backing_vocals_decision": dimensions["backing_vocals"]["decision"],
+        "abstain": all(row["decision"] == "inconclusive" for row in dimensions.values()),
+        "producer_policy_sha256": policy_sha256(producer_policy),
+        "note": "Uncalibrated role hypotheses; generic singing, speech and background music do not establish a vocal role or articulation.",
     }

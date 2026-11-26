@@ -6,11 +6,13 @@ from typing import Any, Callable
 
 from module import ModuleContext, ModuleConfig, run_module
 from optimization_guard import run_with_probe
-from canonical_profile import build_genre_hierarchy, build_vocal_profile
+from canonical_profile import build_genre_hierarchy, build_vocal_profile, build_declared_vocal_profile
+from producer_policy import validate_policy, policy_sha256
 
 
 class ModuleRegistry:
-    def __init__(self) -> None:
+    def __init__(self, producer_policy=None) -> None:
+        self._producer_policy = validate_policy(producer_policy) if producer_policy is not None else None
         self._entries: list[
             tuple[ModuleConfig, Callable[[ModuleContext], dict[str, Any]]]
         ] = []
@@ -99,7 +101,8 @@ class ModuleRegistry:
         return {
             "schema": "ezstudio.preset.phase.v1",
             "phase": "profile",
-            "pipeline_revision": "profile-r3b35c-canonical-genre-vocals",
+            "pipeline_revision": ("profile-r3b35c-canonical-genre-vocals" if self._producer_policy is None else "profile-e04r3-" + policy_sha256(self._producer_policy)),
+            **({"producer_policy": validate_policy(self._producer_policy)} if self._producer_policy is not None else {}),
             "modules": modules,
         }
 
@@ -162,7 +165,7 @@ class ModuleRegistry:
             "schema": "ezstudio.profile.modules.v1",
             "modules": records,
             "families": dict(by_family),
-            "consensus": build_consensus(records),
+            "consensus": build_consensus(records, self._producer_policy),
         }
 
 
@@ -245,15 +248,17 @@ _INSTRUMENT_CANONICAL = {
 }
 
 
-def _canonical_instrument(label: str) -> str | None:
+def _canonical_instrument(label: str, aliases=None) -> str | None:
     key = " ".join(str(label).casefold().replace("_", " ").split())
-    if key in _INSTRUMENT_CANONICAL:
-        return _INSTRUMENT_CANONICAL[key]
+    mapping = _INSTRUMENT_CANONICAL if aliases is None else aliases
+    if key in mapping:
+        return mapping[key]
     return None
 
 
 def _build_instrumentation_consensus(
     records: list[dict[str, Any]],
+    producer_policy=None,
 ) -> dict[str, Any]:
     """Cross-engine instrumentation evidence, intentionally uncalibrated.
 
@@ -263,6 +268,10 @@ def _build_instrumentation_consensus(
     candidate. This is an experimental PROFILE output until human benchmarking
     proves it reliable enough for STEMS.
     """
+    # The None path is retained for explicitly legacy presets/callers only.
+    config = ({"clap_top_k": 6, "audioset_top_k": 25, "minimum_engine_support": 2,
+               "candidate_limit": 12, "weak_limit": 20, "aliases": _INSTRUMENT_CANONICAL}
+              if producer_policy is None else validate_policy(producer_policy)["instrumentation"])
     evidence: dict[str, list[dict[str, Any]]] = defaultdict(list)
     seen_module_label: set[tuple[str, str]] = set()
 
@@ -272,10 +281,10 @@ def _build_instrumentation_consensus(
         module_id = str(record.get("id") or "")
 
         if module_id == "semantic.clap-open-vocabulary":
-            rows = _semantic_rows(record, "instrumentation")[:6]
+            rows = _semantic_rows(record, "instrumentation")[:config["clap_top_k"]]
             source_family = "clap_instrumentation"
         elif module_id in {"semantic.panns-cnn14", "semantic.passt-audioset"}:
-            rows = _semantic_rows(record, "audioset")[:25]
+            rows = _semantic_rows(record, "audioset")[:config["audioset_top_k"]]
             source_family = "audioset"
         else:
             continue
@@ -284,7 +293,7 @@ def _build_instrumentation_consensus(
             if not isinstance(row, dict):
                 continue
             source_label = str(row.get("label") or "").strip()
-            canonical = _canonical_instrument(source_label)
+            canonical = _canonical_instrument(source_label, config["aliases"])
             if canonical is None:
                 continue
             dedupe = (module_id, canonical)
@@ -319,7 +328,7 @@ def _build_instrumentation_consensus(
                 "source_count": len(sources),
                 "rank_consensus": round(reciprocal_rank, 6),
                 "sources": sources,
-                "decision": "candidate" if support >= 2 else "weak",
+                "decision": "candidate" if support >= config["minimum_engine_support"] else "weak",
             }
         )
 
@@ -339,9 +348,9 @@ def _build_instrumentation_consensus(
         "method": "canonical-label-rank-support-v1",
         "calibrated": False,
         "usable_for_stems": False,
-        "candidate_min_engine_support": 2,
-        "candidates": candidates[:12],
-        "weak": weak[:20],
+        "candidate_min_engine_support": config["minimum_engine_support"],
+        "candidates": candidates[:config["candidate_limit"]],
+        "weak": weak[:config["weak_limit"]],
         "abstain": len(candidates) == 0,
         "note": (
             "Experimental mix-level instrumentation. No calibrated probability; "
@@ -734,7 +743,7 @@ def _build_tempo_metric_consensus(
         "source": metric.get("source"),
     }
 
-def build_consensus(records: list[dict[str, Any]]) -> dict[str, Any]:
+def build_consensus(records: list[dict[str, Any]], producer_policy=None) -> dict[str, Any]:
     semantic_records = [
         record
         for record in records
@@ -1035,7 +1044,7 @@ def build_consensus(records: list[dict[str, Any]]) -> dict[str, Any]:
         and record.get("status") == "ok"
     ]
 
-    instrumentation = _build_instrumentation_consensus(records)
+    instrumentation = _build_instrumentation_consensus(records, producer_policy)
     choirs = _build_choir_consensus(records)
     tempo_metric = _build_tempo_metric_consensus(records)
     tuning_record = _record_by_id(
@@ -1053,7 +1062,7 @@ def build_consensus(records: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "semantic": semantic,
         "genre_hierarchy": build_genre_hierarchy(semantic),
-        "vocal_profile": build_vocal_profile(semantic),
+        "vocal_profile": (build_vocal_profile(semantic) if producer_policy is None else build_declared_vocal_profile(semantic, producer_policy)),
         "instrumentation": instrumentation,
         "choirs": choirs,
         "tempo_metric": tempo_metric,
@@ -1078,6 +1087,7 @@ def build_consensus(records: list[dict[str, Any]]) -> dict[str, Any]:
             "confidence_is_not_calibrated_probability": True,
             "semantic_acceptance_threshold": 0.60,
             "instrumentation_status": "experimental",
+            **({"producer_policy": validate_policy(producer_policy), "producer_policy_sha256": policy_sha256(producer_policy)} if producer_policy is not None else {}),
             "instrumentation_usable_for_stems": False,
             "choirs_status": "experimental",
             "choirs_usable_for_stems": False,
