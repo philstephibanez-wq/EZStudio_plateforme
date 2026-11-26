@@ -23,7 +23,7 @@
 <section class="card">
   <h2>État du système</h2>
   <div class="grid">
-    <div><strong>Modèle CUDA</strong><p id="engine-state">Vérification…</p><p id="engine-model" class="small">—</p></div>
+    <div><strong>Inférence locale</strong><p>Retirée</p></div>
     <div><strong>Run LAB</strong><p id="run-state">Aucun run reçu</p></div>
     <div><strong>Résultat métier</strong><p id="result-state">Aucune contre-expertise effectuée</p></div>
   </div>
@@ -61,28 +61,4 @@
   <p role="status">Moteur non raccordé. Aucun fournisseur de recherche généraliste n'est configuré dans ce runtime.</p>
   <p class="small">Conformément au contrat #11, aucune recherche sur un catalogue unique ne remplace la découverte ouverte des ressources. Aucun résultat ni source ne sont inventés.</p>
 </section>
-<script>
-(function () {
-    'use strict';
-    const el = (id) => document.getElementById(id);
-    function log(message) {
-        const li = document.createElement('li');
-        li.textContent = new Date().toLocaleTimeString('fr-FR') + ' · ' + message;
-        el('journal').appendChild(li);
-    }
-    async function runtime() {
-        try {
-            const response = await fetch('/api/backoffice/inference', {cache: 'no-store'});
-            const data = await response.json();
-            el('engine-state').textContent = data.state || 'INDISPONIBLE';
-            el('engine-model').textContent = data.model || 'Modèle non identifié';
-            log(data.ok ? 'Sonde CUDA opérationnelle.' : 'Sonde CUDA indisponible.');
-        } catch (error) {
-            el('engine-state').textContent = 'INDISPONIBLE';
-            log('Impossible de consulter la sonde CUDA.');
-        }
-    }
-    runtime();
-}());
-</script>
 {% endblock %}

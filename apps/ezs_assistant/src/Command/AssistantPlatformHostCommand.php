@@ -9,7 +9,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(name: 'assistant:platform:host', description: 'Cycle de vie natif WinSW 2 de FrankenPHP et de Llama')]
+#[AsCommand(name: 'assistant:platform:host', description: 'Ancien hote WinSW retire ; utiliser bin/ezs.ps1')]
 final class AssistantPlatformHostCommand extends Command
 {
     public function __construct(private readonly AssistantPlatformHost $host) { parent::__construct(); }

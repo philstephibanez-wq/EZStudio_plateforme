@@ -855,7 +855,7 @@ SQL;
         }
 
         if ((string)$job['kind'] === 'assistant.profile.review') {
-            $request['expertise_payload'] = (new ProfileExternalReviewService($this))->assertionsForRun((int)$job['scientific_run_id']);
+            throw new \RuntimeException('expertise_locale_suspendue');
         }
 
         $tmpRoot = rtrim(

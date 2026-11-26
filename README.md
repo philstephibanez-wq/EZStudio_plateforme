@@ -29,7 +29,7 @@ H:\EZStudio_plateforme\
 | Application (`APP_ID`) | URL locale (`:8000`) | Namespace PHP | Base de données / État | Statut |
 | :--- | :--- | :--- | :--- | :--- |
 | **Orchestrator** (`orchestrator`) | `http://ezstudio.local` | `Ezs\Web\` | `var/ezstudio_state/orchestrator/` | Actif |
-| **EZS_Lab** (`ezs_lab`) | `http://ezstudio.local` | `EZSLab\` | `data/benchmark.sqlite` | Actif |
+| **EZS_Lab** (`ezs_lab`) | `http://ezstudio.local` | `EZSLab\` | `data/databases/EZS_Lab.sqlite` | Actif |
 | **EZS_Assistant** (`ezs_assistant`) | `http://ezstudio.local` | `EZSAssistant\` | `var/ezstudio_state/assistant/` | Actif |
 | **EZStudio DEV** (`ezstudio_dev`) | `http://ezstudio.local` | `EZStudioDev\` | `data/ezstudio_dev.sqlite` | DEV active |
 | **EZStudio PROD** (`ezstudio`) | `http://ezstudio.local:8000` | `EZStudio\` | `data/ezstudio.sqlite` | **PROD figée** |

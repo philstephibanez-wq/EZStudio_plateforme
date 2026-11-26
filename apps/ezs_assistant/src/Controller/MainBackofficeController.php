@@ -39,18 +39,10 @@ final class MainBackofficeController extends AbstractController
     #[Route('/api/backoffice/inference', name: 'assistant_main_inference', methods: ['GET'])]
     public function inference(): JsonResponse
     {
-        // Local native llama.cpp Vulkan endpoint. Monitoring must be read-only.
-        $health = $this->readJson('http://127.0.0.1:8720/health');
-        $ready = ($health['status'] ?? null) === 'ok';
-        $models = $ready ? $this->readJson('http://127.0.0.1:8720/v1/models') : null;
-        $model = $models['data'][0]['id'] ?? null;
         return $this->json([
-            'ok' => $ready,
-            'state' => $ready ? 'READY' : 'UNAVAILABLE',
-            'engine' => 'llama.cpp Vulkan NVIDIA MAIN',
-            'model' => is_string($model) ? $model : null,
-            'musical_verdict' => null,
-        ], $ready ? 200 : 503);
+            'ok' => false, 'state' => 'DISABLED', 'engine' => null,
+            'model' => null, 'musical_verdict' => null,
+        ]);
     }
 
     #[Route('/api/backoffice/recordings', name: 'assistant_main_recordings', methods: ['GET'])]

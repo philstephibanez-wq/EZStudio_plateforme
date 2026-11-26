@@ -17,9 +17,6 @@ final class AssistantPlatformHost
 
     private int $webPid = 0;
     private bool $stopRequested = false;
-    private ?AssistantProfileWorkerProcess $profileWorker = null;
-
-    public function __construct(private readonly AssistantLlamaLifecycle $llama) {}
 
     /** WinSW 2.12 forwards Ctrl+C to the PHP console process on SCM STOP.
      *  Signal the verified FrankenPHP child process group; never use a force kill.
@@ -28,7 +25,6 @@ final class AssistantPlatformHost
     {
         if ($this->stopRequested) return true;
         $this->stopRequested = true;
-        $this->profileWorker?->requestStop();
         $this->log('WINSW_STOP_SIGNAL='.$event.' WEB_PID='.$this->webPid);
         if ($this->webPid < 1 || $this->identity($this->webPid) === null) {
             $this->log('STOP_SIGNAL_WEB_NOT_ATTESTED');
@@ -85,6 +81,14 @@ final class AssistantPlatformHost
     }
 
     public function start(): int
+    {
+        // The former WinSW entry point is not the unified platform launcher.
+        // Refuse the legacy host; use bin/ezs.ps1 on MAIN.
+        $this->log('LEGACY_HOST_RETIRED_USE_CANONICAL_LAUNCHER');
+        return 3;
+    }
+
+    private function legacyWebLifecycle(): int
     {
         if (!is_file(self::web_exe()) || !is_file(self::web_cfg())) {
             $this->log('START_REFUSED_MISSING_WEB_FILES');
@@ -144,32 +148,7 @@ final class AssistantPlatformHost
             return 3;
         }
         $this->log('WEB_STARTED pid='.$pid);
-        // Web and the Assistant health endpoint must be up before invoking Llama.
-        // This wait happens ONCE at startup. No periodic monitoring/restarts.
-        $ready = false;
-        for ($i=0; $i<40; ++$i) {
-            $s = proc_get_status($proc);
-            if (!$s['running']) break;
-            if ($this->assistantWebReady()) { $ready = true; break; }
-            sleep(1);
-        }
-        if ($ready && !$this->stopRequested) {
-            // WinSW should have marked the PHP host service Running by now.
-            $result = $this->llama->run();
-            $this->log('LLAMA_START_RETURN_CODE='.$result);
-            if ($result === 0 && !$this->stopRequested) {
-                // Same WinSW service owns WEB, Llama and PROFILE; no task or second queue.
-                try {
-                    $this->profileWorker = new AssistantProfileWorkerProcess();
-                    $started = $this->profileWorker->start();
-                    $this->log('PROFILE_WORKER_START='.($started ? 'OK' : 'REFUSED_OR_FAILED'));
-                } catch (\Throwable $e) {
-                    $this->log('PROFILE_WORKER_START_EXCEPTION '.get_class($e));
-                }
-            }
-        } else {
-            $this->log('ASSISTANT_WEB_NOT_READY_LLAMA_NOT_STARTED');
-        }
+        // Web-only host; the retired expertise worker is not launched here.
         // Never block in proc_close while WinSW is delivering CTRL+C. On Windows,
         // the registered PHP console handler must be given VM execution points.
         // This is a lifetime wait ONLY: no service health polling or restarts.
@@ -184,18 +163,8 @@ final class AssistantPlatformHost
             usleep(200000);
         } while (true);
         proc_close($proc); // No longer a blocking process wait.
-        $profileDrained = $this->profileWorker?->drain() ?? true;
-        $this->log('PROFILE_WORKER_DRAIN='.($profileDrained ? 'OK' : 'PENDING'));
         $plannedStop = $this->stopRequested;
         $this->log('WEB_EXIT_CODE='.$exit.' PLANNED_STOP='.($plannedStop ? 'YES' : 'NO'));
-        if ($profileDrained) {
-            $llamaStop = $this->llama->stopOwned();
-            $this->log('LLAMA_STOP_RETURN_CODE='.$llamaStop);
-        } else {
-            // Do not kill inference while a claimed expertise may still be running.
-            $llamaStop = 2;
-            $this->log('LLAMA_STOP_DEFERRED_ACTIVE_PROFILE');
-        }
         // Only remove state that still belongs to our web process.
         $recorded = $this->readState();
         if ($recorded !== null && $recorded['pid'] === $pid && $recorded['created'] === $identity) {
@@ -204,15 +173,7 @@ final class AssistantPlatformHost
         } else {
             $this->log('STATE_CLEANUP_REFUSED_IDENTITY_CHANGED');
         }
-        return ($profileDrained && $llamaStop === 0 && ($plannedStop || $exit === 0)) ? 0 : 2;
-    }
-
-    private function assistantWebReady(): bool
-    {
-        $context = stream_context_create(['http'=>['timeout'=>1]]);
-        $body = @file_get_contents('http://127.0.0.1:8713/api/health',false,$context);
-        $json = is_string($body) ? json_decode($body,true) : null;
-        return is_array($json) && ($json['ok']??false)===true && ($json['service']??'')==='EZStudioLab Assistant';
+        return ($plannedStop || $exit === 0) ? 0 : 2;
     }
 
     private function readState(): ?array

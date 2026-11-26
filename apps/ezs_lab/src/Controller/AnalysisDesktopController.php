@@ -9,7 +9,6 @@ use EZSLab\Service\DistributedAnalysisLeaseService;
 use EZSLab\Service\ChordsExecutionService;
 use EZSLab\Service\LabAnalysisTokenGuard;
 use EZSLab\Service\ProfileExecutionService;
-use EZSLab\Service\ProfileExternalReviewService;
 use EZSLab\Service\StemsExecutionService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,87 +24,10 @@ final class AnalysisDesktopController extends AbstractController
         private readonly Database $db,
         private readonly DistributedAnalysisLeaseService $distributed,
         private readonly ProfileExecutionService $profileExecution,
-        private readonly ProfileExternalReviewService $profileExternalReview,
         private readonly ChordsExecutionService $chordsExecution,
         private readonly StemsExecutionService $stemsExecution,
     ) {}
 
-    #[Route('/profile/reviews/queue', name: 'lab_internal_profile_review_queue', methods: ['GET'])]
-    public function profileReviewQueue(Request $request): JsonResponse
-    {
-        $this->guard->assertAuthorized($request);
-        $limit = filter_var(
-            $request->query->get('limit', 100),
-            FILTER_VALIDATE_INT,
-            ['options' => ['min_range' => 1, 'max_range' => 500]]
-        );
-        if ($limit === false) {
-            return $this->json(['error' => 'limit_must_be_1_500'], 422);
-        }
-
-        $reviews = $this->profileExternalReview->queue((int)$limit);
-        return $this->json([
-            'schema' => 'ezstudio.profile-review-queue.v1',
-            'count' => count($reviews),
-            'reviews' => $reviews,
-        ]);
-    }
-
-    #[Route('/profile/reviews/latest', name: 'lab_internal_profile_review_latest', methods: ['GET'])]
-    public function latestProfileReview(Request $request): JsonResponse
-    {
-        $this->guard->assertAuthorized($request);
-        $rawRunId = $request->query->get('run_id');
-        $runId = null;
-        if ($rawRunId !== null) {
-            $runId = filter_var($rawRunId, FILTER_VALIDATE_INT,
-                ['options' => ['min_range' => 1]]);
-            if ($runId === false) {
-                return $this->json(['error' => 'run_id_invalid'], 422);
-            }
-        }
-        return $this->json(['ok'=>true,
-            'item'=>$this->profileExternalReview->latestReviewForDisplay($runId)]);
-    }
-
-    #[Route('/profile/reviews/run/{id<\d+>}', name: 'lab_internal_profile_review_run', methods: ['GET'])]
-    public function profileReviewRun(Request $request, int $id): JsonResponse
-    {
-        $this->guard->assertAuthorized($request);
-        $item = $this->profileExternalReview->reviewItemForRun($id);
-        if ($item === null) return $this->json(['error'=>'profile_run_not_available'],404);
-        return $this->json(['item'=>$item]);
-    }
-
-    #[Route('/profile/reviews/run/{id<\d+>}/final-assertions', name: 'lab_internal_profile_final_assertions', methods: ['GET'])]
-    public function profileFinalAssertions(Request $request, int $id): JsonResponse
-    {
-        $this->guard->assertAuthorized($request);
-        try {
-            $data = $this->profileExternalReview->assertionsForRun($id);
-            return $this->json(['schema'=>'ezstudio.profile-final-assertions.v1',
-                'run_id'=>$id,'count'=>$data['final_assertions_count'],
-                'assertions'=>$data['final_assertions']]);
-        } catch (\RuntimeException $e) {
-            return $this->json(['error'=>$e->getMessage()],409);
-        }
-    }
-
-    #[Route('/profile/reviews', name: 'lab_internal_profile_review_submit', methods: ['POST'])]
-    public function profileReviewSubmit(Request $request): JsonResponse
-    {
-        $this->guard->assertAuthorized($request);
-        try {
-            $revision = $this->profileExternalReview->save($request->toArray());
-            return $this->json([
-                'schema' => 'ezstudio.profile-review-submit.v1',
-                'ok' => true,
-                'revision' => $revision,
-            ]);
-        } catch (\InvalidArgumentException|\RuntimeException $e) {
-            return $this->json(['error' => $e->getMessage()], 422);
-        }
-    }
     #[Route('/hello', name: 'lab_internal_analysis_hello', methods: ['POST'])]
     public function hello(Request $request): JsonResponse
     {

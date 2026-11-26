@@ -196,7 +196,7 @@ def main() -> int:
     parser.add_argument(
         "--db",
         default=None,
-        help="SQLite path. Defaults to <repo>/data/benchmark.sqlite.",
+        help="SQLite path. Defaults to <platform>/data/databases/EZS_Lab.sqlite.",
     )
     parser.add_argument(
         "--base-url",
@@ -228,7 +228,9 @@ def main() -> int:
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
-    db = Path(args.db).resolve() if args.db else repo / "data" / "benchmark.sqlite"
+    db = Path(args.db).resolve() if args.db else repo.parents[1] / "data" / "databases" / "EZS_Lab.sqlite"
+    if db != (repo.parents[1] / "data" / "databases" / "EZS_Lab.sqlite").resolve():
+        raise RuntimeError(f"noncanonical_lab_database:{db}")
     if not db.is_file():
         raise RuntimeError(f"database_not_found:{db}")
 

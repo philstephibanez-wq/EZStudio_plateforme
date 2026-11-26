@@ -58,22 +58,6 @@ final class ProfileScientificExportController extends AbstractController
             }
             $scientific[$key] = $this->scrub($value, $redactions, 'run.'.$key);
         }
-        $reviews = [];
-        if ($this->tableExists($pdo, 'profile_external_revisions')) {
-            $q = $pdo->prepare('SELECT id,run_id,revision_key,reviewer,status,identity_json,sources_json,consensus_json,comparison_json,confidence,schema_version,created_at,updated_at FROM profile_external_revisions WHERE run_id=? ORDER BY id');
-            $q->execute([$id]);
-            foreach ($q->fetchAll(\PDO::FETCH_ASSOC) as $record) {
-                foreach (['identity_json','sources_json','consensus_json','comparison_json'] as $key) {
-                    try { $record[$key] = json_decode((string)$record[$key], true, 512, JSON_THROW_ON_ERROR); }
-                    catch (\JsonException $e) { $missing[] = 'expertise.'.($record['id'] ?? 'unknown').'.'.$key.':invalid_json'; $record[$key] = null; }
-                }
-                $reviews[] = $this->scrub($record, $redactions, 'expertise');
-            }
-            if (!$reviews) $missing[] = 'expertise:aucune_revision';
-        } else {
-            $missing[] = 'profile_external_revisions:table_absente';
-        }
-
         $preset = $this->presetSnapshot($pdo, $id, $missing, $redactions);
         $artifactList = [];
         $profileDocument = null;
@@ -108,19 +92,17 @@ final class ProfileScientificExportController extends AbstractController
         }
 
         $manifest = [
-            'schema' => 'ezstudio.profile-scientific-export.v1',
+            'schema' => 'ezstudio.profile-scientific-export.v2',
             'generated_at_utc' => gmdate('c'),
             'run_id' => $id,
             'item' => 'profile',
             'audio_sha256' => $run['audio_sha256'] ?? null,
-            'revision_ids' => array_column($reviews, 'id'),
-            'included' => ['scientific_run.json','expertise_revisions.json','preset_snapshot.json','artifact_registry.json'],
+            'included' => ['scientific_run.json','preset_snapshot.json','artifact_registry.json'],
             'missing_or_unavailable' => array_values(array_unique($missing)),
             'redaction_count' => count($redactions),
             'notes' => [
                 'Export manuel en lecture seule. Pas de reanalyse, pas de publication GitHub.',
                 'Aucun binaire audio, stem ou modele.',
-                'Consensus documentaire et exactitude musicale independante sont deux mesures distinctes.',
                 'Un artefact absent est signale, jamais reconstruit.',
             ],
         ];
@@ -135,7 +117,6 @@ final class ProfileScientificExportController extends AbstractController
         try {
             $files = [
                 'scientific_run.json' => $scientific,
-                'expertise_revisions.json' => $reviews,
                 'preset_snapshot.json' => $preset,
                 'artifact_registry.json' => $artifactList,
                 'manifest.json' => $manifest,
@@ -154,7 +135,7 @@ final class ProfileScientificExportController extends AbstractController
         $response = new BinaryFileResponse($tmp);
         $response->deleteFileAfterSend(true);
         $response->headers->set('Content-Type', 'application/zip');
-        $response->headers->set('Content-Disposition', 'attachment; filename="EZS_PROFILE_ANALYSE_EXPERTISE_RUN_'. $id .'.zip"');
+        $response->headers->set('Content-Disposition', 'attachment; filename="EZS_PROFILE_ANALYSE_RUN_'. $id .'.zip"');
         $response->headers->set('Cache-Control', 'no-store, private');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         return $response;

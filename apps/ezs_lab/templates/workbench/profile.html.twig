@@ -64,7 +64,7 @@
     </div>
     {% if selected_profile_run %}
       <form method="post" action="{{ path('profile_scientific_export', {id: selected_profile_run.id}) }}" style="margin:0">
-        <button type="submit" class="secondary" title="Télécharger les résultats PROFILE et les expertises enregistrées">Exporter analyse + expertise</button>
+        <button type="submit" class="secondary" title="Télécharger les résultats scientifiques PROFILE">Exporter analyse</button>
       </form>
     {% endif %}
   </div>
@@ -183,155 +183,7 @@
 .prof-tbl th,.prof-tbl td{height:36px;padding-top:4px;padding-bottom:4px;vertical-align:middle;white-space:nowrap}
 .prof-tbl .ana-cell{max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
-<section class="card" id="part-3-expertise">
-    <div class="prof-bar">
-      <div><span class="badge">3 · Expertise IA</span> <h2 style="display:inline-block;margin-left:6px">Expertise documentaire &amp; preuves</h2></div>
-      <div class="prof-actions">
-        {% if selected_profile_run and selected_profile_run.state == 'done' %}
-          <button type="button" id="profile-ai-run-button" disabled title="Nouvelles expertises IA locales suspendues">Expertise suspendue</button>
-          <button type="button" class="secondary" id="profile-ai-cancel-button" disabled>Annuler</button>
-        {% endif %}
-        {% set revs = profile_external_revisions ?? [] %}
-        {% set history_revs = song_external_revisions ?? [] %}
-        <select id="expertise-history-select" style="font-size:11px">
-          {% if history_revs is not empty and revs is empty %}<option value="" selected>Historique des expertises</option>{% endif %}{% for rev in history_revs %}<option value="exp-rev-{{ rev.id }}" data-run="{{ rev.run_id }}" {{ revs is not empty and selected_profile_run and rev.run_id == selected_profile_run.id and rev.id == (revs|first).id ? 'selected' : '' }}>#{{ rev.id }} (run #{{ rev.run_id }}) · {{ rev.status }}</option>{% else %}<option>Aucune expertise</option>{% endfor %}
-        </select>
-      </div>
-    </div>
 
-    {% if selected_profile_run and selected_profile_run.state == 'done' %}
-      <div id="profile-ai-request" class="prof-prog-box" data-url="{{ path('profile_ai_review_status', {id: selected_profile_run.id}) }}" data-action="{{ path('profile_ai_review_request', {id: selected_profile_run.id}) }}" data-cancel-url="{{ path('profile_ai_review_cancel', {id: selected_profile_run.id}) }}">
-        <div class="row" style="justify-content:space-between;font-size:11px"><span id="profile-ai-request-state" class="meta">Prêt</span><span id="profile-ai-step-current" class="meta"></span></div>
-        <progress id="profile-ai-progress" max="100" value="0" style="width:100%;height:8px;margin-top:4px"></progress>
-
-      </div>
-    {% endif %}
-
-    <div id="profile-ai-revisions">
-    {% set sum = profile_summary ?? {} %}
-    {% set vox = sum.voices ?? {} %}
-    {% set base_rows = [
-      {'keys':['duration','duree'], 'label':'Durée', 'lab': (sum.duration is defined and sum.duration is not null ? ((sum.duration / 60)|round(0,'floor') ~ ':' ~ '%02d'|format((sum.duration % 60)|round(0,'floor'))) : '—')},
-      {'keys':['tempo'], 'label':'Tempo', 'lab': (sum.tempo is defined and sum.tempo is not null ? (sum.tempo|number_format(2) ~ ' BPM') : '—')},
-      {'keys':['meter','mesure'], 'label':'Mesure', 'lab': sum.meter ?? '—'},
-      {'keys':['key','tonalite'], 'label':'Tonalité', 'lab': sum.key ?? '—'},
-      {'keys':['genre'], 'label':'Genre', 'lab': sum.genre ?? '—'}
-    ] %}
-    {# R2.2 : mêmes instruments, même ordre, que le tableau Analyse LAB du run affiché. #}
-    {% set aligned_instruments = selected_profile_run ? (selected_profile_run.diagnostics.profile_view.instrumentation.candidates ?? []) : [] %}
-    {% for inst in aligned_instruments %}
-      {% set idx = loop.index0 %}
-      {% set base_rows = base_rows|merge([{'keys':['instruments:' ~ idx, 'instrument:' ~ idx], 'label':'Instrument ' ~ (idx + 1), 'lab': inst.label ?? '—'}]) %}
-    {% else %}
-      {# Le tableau Analyse LAB affiche également une ligne unique « Instruments » sans candidats. #}
-      {% if selected_profile_run %}
-        {% set base_rows = base_rows|merge([{'keys':['instruments'], 'label':'Instruments', 'lab':'—'}]) %}
-      {% endif %}
-    {% endfor %}
-    {% set base_rows = base_rows|merge([
-      {'keys':['lead_vocal','voix_principale'], 'label':'Voix principale', 'lab': vox.lead.decision ?? vox.lead ?? '—'},
-      {'keys':['backing_vocals','voix_accompagnement'], 'label':'Voix accomp.', 'lab': vox.backing.decision ?? vox.backing ?? '—'},
-      {'keys':['vocal_harmonies','harmonies_vocales'], 'label':'Harmonies', 'lab': vox.harmonies.decision ?? vox.harmonies ?? '—'},
-      {'keys':['choir','choeurs'], 'label':'Chœur', 'lab': vox.choir.decision ?? vox.choir ?? '—'}
-    ]) %}
-
-    {% set panels_list = revs is not empty ? revs : [{'id': 0, 'comparison': {'final_verification': {'assertions': []}}}] %}
-    {% for revision in panels_list %}
-      {% set fv = revision.comparison.final_verification ?? {} %}{% set assertions = fv.assertions ?? [] %}
-      <div class="exp-rev-panel" id="exp-rev-{{ revision.id }}" style="{{ not loop.first ? 'display:none' : '' }}">
-        {% set doc_profile = revision.comparison.documentary_profile.profile ?? null %}
-        {% if doc_profile and (doc_profile.provisional.items ?? {}) is not empty %}
-          {% include 'workbench/_documentary_profile.html.twig' with {'doc_profile': doc_profile} only %}
-        {% else %}
-        <table class="prof-tbl">
-          <thead><tr><th>Dimension</th><th>LAB</th><th>Verdict</th><th>Externe</th><th>Analyse &amp; Sources</th></tr></thead>
-          <tbody>
-            {% for row_def in base_rows %}
-              {% set found = null %}
-              {% for item in assertions %}
-                {% if item.key in row_def.keys and found is null %}
-                  {% set found = item %}
-                {% endif %}
-              {% endfor %}
-              {% set v = found.verdict ?? 'non_trouve' %}
-              {% set badge_cls = v == 'bon' ? 'ok' : (v == 'faux' ? 'warn' : '') %}
-              {% set web_item = null %}
-              {% for web_row in (fv.web_investigation.items ?? []) %}
-                {% if web_row.key in row_def.keys and web_item is null %}{% set web_item = web_row %}{% endif %}
-              {% endfor %}
-              {% set search_failure = (web_item.status ?? '') == 'error' or (fv.web_investigation.status ?? '') == 'error' %}
-              {% set badge_lbl = v == 'bon' ? 'BON' : (v == 'faux' ? 'FAUX' : (found is null ? 'SANS EXPERTISE' : (search_failure ? 'RECHERCHE EN ERREUR' : 'NON VÉRIFIÉ'))) %}
-              {% set v_desc = v == 'bon' ? 'BON : une source indépendante confirme directement l’analyse LAB.' : (v == 'faux' ? 'FAUX : une source indépendante contredit l’analyse LAB.' : (search_failure ? 'Recherche Web en erreur ; aucune conclusion documentaire possible.' : 'Vérification documentaire insuffisante ; ce statut ne signifie pas absence de recherche.')) %}
-              {% set v_detail = found.reason ?? found.documentary_observation.reason ?? (revs is empty ? 'Aucune révision d’expertise enregistrée pour ce run.' : 'En attente de vérification sur ce point.') %}
-              {% set raw_ref = found.reference_value ?? found.documentary_observation.reference_value ?? '' %}
-              {% set disp_ref = (row_def.label == 'Durée' and raw_ref matches '/^[0-9.]+$/') ? ((raw_ref / 60)|round(0,'floor') ~ ':' ~ '%02d'|format((raw_ref % 60)|round(0,'floor'))) : (raw_ref ?: '—') %}
-              <tr>
-                <td><strong>{{ row_def.label }}</strong></td>
-                <td>{{ ((found.lab_value ?? null) ?: ((found.value ?? null) ?: row_def.lab))|replace({'pr?sent':'présent','ind?termin?':'indéterminé'}) }}</td>
-                <td><span class="badge {{ badge_cls }} v-badge-tip" tabindex="0">{{ badge_lbl }}<span class="v-badge-pop"><strong>{{ v_desc }}</strong><br><span style="color:#94a3b8">{{ v_detail }}</span></span></span></td>
-                <td>{{ disp_ref }}</td>
-                <td class="ana-cell" style="font-size:11px" title="{{ v_detail }}">
-                  {% for citation in (found.sources ?? []) %}
-                    {% if citation.url is defined and citation.url starts with 'https://' %}<a href="{{ citation.url }}" target="_blank" rel="noopener noreferrer" title="Preuve retenue : {{ citation.url }}">[P{{ loop.index }}]</a> {% endif %}
-                  {% endfor %}
-                  {% set consulted = [] %}
-                  {% for url in (web_item.citation_urls ?? []) %}
-                    {% if url starts with 'https://' and url not in consulted %}
-                      {% set consulted = consulted|merge([url]) %}
-                    {% endif %}
-                  {% endfor %}
-                  {% if consulted is not empty %}
-                    <span class="meta" style="font-size:10px">Documents consultés (non nécessairement probants) :</span>
-                    {% for url in consulted|slice(0, 12) %}<a href="{{ url }}" target="_blank" rel="noopener noreferrer" title="Document consulté, non certifié comme preuve">[D{{ loop.index }}]</a> {% endfor %}
-                  {% endif %}
-                  {% if search_failure %}<span class="meta"> · Recherche indisponible ({{ web_item.reason ?? fv.web_investigation.reason ?? 'erreur technique' }})</span>{% endif %}
-                  <span class="meta" style="font-size:10.5px">{{ v_detail }}</span>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% endif %}
-        {% set expertise_engine_steps = revision.comparison.engine_steps ?? [] %}
-        {% set ezs_expertise_locale = app.request.attributes.get('_locale') ?: 'fr' %}
-        {% set ezs_expertise_engine_keys = {
-          'identity_resolver': 'ezs.profile.engine.identity_resolver',
-          'recording_duration': 'ezs.profile.engine.recording_duration',
-          'public_source_research': 'ezs.profile.engine.public_source_research',
-          'review_payload_builder': 'ezs.profile.engine.review_payload_builder',
-          'independent_verifier': 'ezs.profile.engine.independent_verifier',
-          'assertion_web_investigator': 'ezs.profile.engine.assertion_web_investigator',
-          'local_ai_document_review': 'ezs.profile.engine.local_ai_document_review',
-          'documentary_verdict_merger': 'ezs.profile.engine.documentary_verdict_merger',
-          'documentary_payload_enricher': 'ezs.profile.engine.documentary_payload_enricher',
-          'ai_draft_payload_enricher': 'ezs.profile.engine.ai_draft_payload_enricher',
-          'lab_revision_submit': 'ezs.profile.engine.lab_revision_submit'
-        } %}
-        {% set r8_engine_labels = {"r8_structured_sources": "Sources structurées", "r8_item_tempo": "Tempo", "r8_item_duration": "Durée", "r8_item_meter": "Mesure", "r8_item_key": "Tonalité", "r8_item_genre": "Genre", "r8_item_instrument": "Instrumentation", "r8_item_lead_vocal": "Voix principale", "r8_item_backing_vocals": "Voix accomp.", "r8_item_vocal_harmonies": "Harmonies vocales", "r8_item_choir": "Chœur", "r8_item_year": "Année", "r8_archive": "Archivage documentaire", "lab_revision_submit": "Persistance LAB"} %}
-        <details class="expertise-pipeline-details ezs-tech-pipeline" style="margin-top:24px">
-          <summary class="expertise-pipeline-summary" style="cursor:pointer;font-size:11px;font-weight:600">{{ 'ezs.profile.pipeline.history'|trans({'%count%': expertise_engine_steps|length, '%id%': revision.id}, 'ezs_profile', ezs_expertise_locale) }}</summary>
-          <table class="prof-tbl" style="margin-top:4px">
-            {{ ezs_pipeline.header(ezs_pipeline_locale) }}
-            <tbody class="expertise-pipeline-rows">
-              {% for engine_step in expertise_engine_steps %}
-                  {% set ezs_engine_id = engine_step.engine ?? '' %}
-                  {% set ezs_engine_key = ezs_expertise_engine_keys[ezs_engine_id] ?? null %}
-                  {# The persisted device is accepted only from explicit engine execution evidence. #}
-                  {% set ezs_device = engine_step.device ?? null %}
-                  {% set ezs_device = ezs_device not in ['OK','DEGRADED','ERROR','FAILED','RUNNING'] ? ezs_device : null %}
-                  {% set ezs_status = (engine_step.status ?? '')|lower %}
-                  {% set ezs_status_key = ezs_status in ['ok','completed','degraded','error','failed','skipped','running','pending','blocked'] ? 'ezs.profile.status.' ~ ezs_status : 'ezs.profile.status.unknown' %}
-                  {{ ezs_pipeline.row(loop.index, ezs_engine_key ? ezs_engine_key|trans({}, 'ezs_profile', ezs_expertise_locale) : (r8_engine_labels[ezs_engine_id] ?? (ezs_engine_id ? ezs_engine_id|replace({'_':' '})|capitalize : '—')), ezs_engine_id ? ezs_engine_id|replace({'_':' '})|title : '—', ezs_device, ezs_status_key|trans({}, 'ezs_profile', ezs_expertise_locale), engine_step.duration_ms is defined and engine_step.duration_ms is not null ? engine_step.duration_ms / 1000 : null, ezs_engine_id) }}
-              {% else %}
-                <tr><td colspan="6" class="meta">{{ 'ezs.profile.table.no_details'|trans({}, 'ezs_profile', ezs_expertise_locale) }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </details>
-      </div>
-    {% endfor %}
-    </div>
-  </section>
 </div>
 
 <div class="card" style="margin-top:8px;position:relative">
@@ -340,7 +192,7 @@
     <span id="copy-diag-status" style="display:none;font-size:11px;font-weight:600;color:#4ade80">✓ Copié</span>
   </div>
   <details><summary style="cursor:pointer;font-size:12px;font-weight:600;line-height:22px">4 · Diagnostic PROFILE (dump Twig brut)</summary>
-    <pre id="diag-json-pre" style="font-size:11px;max-height:360px;overflow:auto;margin-top:8px">{{ {'selected_song': selected_song, 'selected_profile_run': selected_profile_run ? {'id': selected_profile_run.id, 'public_id': selected_profile_run.public_id, 'state': selected_profile_run.state, 'engine_name': selected_profile_run.engine_name, 'engine_version': selected_profile_run.engine_version} : null, 'profile_summary': profile_summary, 'profile_external_revisions': profile_external_revisions}|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_UNICODE')) }}</pre>
+    <pre id="diag-json-pre" style="font-size:11px;max-height:360px;overflow:auto;margin-top:8px">{{ {'selected_song': selected_song, 'selected_profile_run': selected_profile_run ? {'id': selected_profile_run.id, 'public_id': selected_profile_run.public_id, 'state': selected_profile_run.state, 'engine_name': selected_profile_run.engine_name, 'engine_version': selected_profile_run.engine_version} : null, 'profile_summary': profile_summary}|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_UNICODE')) }}</pre>
   </details>
 </div>
 <script>
@@ -372,58 +224,6 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
 </script>
 <script>
 (function(){
-  document.getElementById('expertise-history-select')?.addEventListener('change',function(){
-    const choice=this.options[this.selectedIndex];
-    const sourceRun=Number(choice?.dataset.run||0);
-    const currentRun={{ selected_profile_run ? selected_profile_run.id : 0 }};
-    if(sourceRun>0 && sourceRun!==currentRun) {
-      const url=new URL(window.location.href);
-      url.searchParams.set('song', String({{ selected_song ? selected_song.id : 0 }}));
-      url.searchParams.set('run', String(sourceRun));
-      url.searchParams.set('expertise', this.value.replace('exp-rev-', ''));
-      window.location.assign(url.toString());
-      return;
-    }
-    document.querySelectorAll('.exp-rev-panel').forEach(el=>el.style.display='none');
-    const t=document.getElementById(this.value); if(t) t.style.display='';
-  });
-  // Restore a historical expertise selection after changing its source run.
-  const requestedRevision=new URLSearchParams(window.location.search).get('expertise');
-  if(requestedRevision && /^\d+$/.test(requestedRevision)) {
-    const history=document.getElementById('expertise-history-select');
-    const value='exp-rev-'+requestedRevision;
-    if(history && Array.from(history.options).some(o=>o.value===value) && document.getElementById(value)) {
-      history.value=value;
-      document.querySelectorAll('.exp-rev-panel').forEach(el=>el.style.display='none');
-      document.getElementById(value).style.display='';
-    }
-  }
-  const root=document.getElementById('profile-ai-request'), btn=document.getElementById('profile-ai-run-button'), cancelBtn=document.getElementById('profile-ai-cancel-button'), state=document.getElementById('profile-ai-request-state'), prog=document.getElementById('profile-ai-progress');
-  let activeJob=0, activeLocalJob=0, wasActive=false;
-  const ezsExpertiseLocale = {{ (app.request.attributes.get('_locale') ?: 'fr')|json_encode|raw }};
-  const stepNames={
-    'engine.identity_resolver': {{ ('ezs.profile.engine.identity_resolver'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.recording_duration': {{ ('ezs.profile.engine.recording_duration'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.public_source_research': {{ ('ezs.profile.engine.public_source_research'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.review_payload_builder': {{ ('ezs.profile.engine.review_payload_builder'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.independent_verifier': {{ ('ezs.profile.engine.independent_verifier'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.assertion_web_investigator': {{ ('ezs.profile.engine.assertion_web_investigator'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.local_ai_document_review': {{ ('ezs.profile.engine.local_ai_document_review'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.documentary_verdict_merger': {{ ('ezs.profile.engine.documentary_verdict_merger'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.documentary_payload_enricher': {{ ('ezs.profile.engine.documentary_payload_enricher'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.ai_draft_payload_enricher': {{ ('ezs.profile.engine.ai_draft_payload_enricher'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    'engine.lab_revision_submit': {{ ('ezs.profile.engine.lab_revision_submit'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-  };
-  const r8StepNames={"engine.r8_structured_sources": "Sources structurées", "engine.r8_item_tempo": "Tempo", "engine.r8_item_duration": "Durée", "engine.r8_item_meter": "Mesure", "engine.r8_item_key": "Tonalité", "engine.r8_item_genre": "Genre", "engine.r8_item_instrument": "Instrumentation", "engine.r8_item_lead_vocal": "Voix principale", "engine.r8_item_backing_vocals": "Voix accomp.", "engine.r8_item_vocal_harmonies": "Harmonies vocales", "engine.r8_item_choir": "Chœur", "engine.r8_item_year": "Année", "engine.r8_archive": "Archivage documentaire", "engine.lab_revision_submit": "Persistance LAB"};
-  const ezsLiveStates = {
-    completed: {{ ('ezs.profile.live.completed'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    failed: {{ ('ezs.profile.live.failed'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    blocked: {{ ('ezs.profile.live.blocked'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    observed: {{ ('ezs.profile.live.observed'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    running: {{ ('ezs.profile.live.running'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-    pending: {{ ('ezs.profile.live.pending'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }},
-  };
-  const ezsLiveSummaryTemplate = {{ ('ezs.profile.pipeline.live'|trans({}, 'ezs_profile', app.request.attributes.get('_locale') ?: 'fr'))|json_encode(constant('JSON_UNESCAPED_UNICODE'))|raw }};
   const ezsPipelineStatus = {
     ok: {{ ('ezs.profile.status.ok'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
     completed: {{ ('ezs.profile.status.completed'|trans({}, 'ezs_profile', ezs_pipeline_locale))|json_encode|raw }},
@@ -459,82 +259,6 @@ document.getElementById('copy-diag-btn')?.addEventListener('click', async functi
       const key=/tonal|key/.test(n)?'tonality':/beat|rhythm/.test(n)?'rhythm':/meter/.test(n)?'meter':/tuning/.test(n)?'tuning':/clap|passt|panns/.test(n)?'semantic':/mert|embedding/.test(n)?'embedding':/descriptor/.test(n)?'descriptors':'processing';
       return ezsLabStepLabels[key];
     }
-  // Un seul contrat de colonnes pour Analyse et Expertise (historique + direct).
-  // L'historique HTML est conservé et restauré après une tentative terminée.
-  function renderPipeline(item){
-    const panel=Array.from(document.querySelectorAll('.exp-rev-panel')).find(el=>el.style.display!=='none');
-    const details=panel?.querySelector('.expertise-pipeline-details');
-    const summary=details?.querySelector('.expertise-pipeline-summary');
-    const tbody=details?.querySelector('.expertise-pipeline-rows');
-    if(!details||!summary||!tbody)return;
-    if(tbody.dataset.historicalHtml===undefined){
-      // Contenu initial serveur (moteurs historiques persistés).
-      tbody.dataset.historicalHtml=tbody.innerHTML;
-      summary.dataset.historicalText=summary.textContent;
-    }
-    const status=String(item?.status||'idle');
-    const active=['queued','running','cancelling'].includes(status);
-    if(!active){
-      if(tbody.dataset.mode==='live'){
-        tbody.innerHTML=tbody.dataset.historicalHtml;
-        summary.textContent=summary.dataset.historicalText;
-        tbody.dataset.mode='history';
-      }
-      return;
-    }
-    const steps=Array.isArray(item?.checkpoints)?item.checkpoints.filter(e=>e&&typeof e.event_key==='string'):[];
-    const liveNames=steps.some(e=>/engine\.(start\.)?r8_/.test(e.event_key)) || !steps.length ? r8StepNames : stepNames;
-    const allowed=Object.keys(liveNames);
-    const map=new Map();
-    for(const entry of steps){
-      const normalized=entry.event_key.replace('engine.start.','engine.');
-      if(allowed.includes(normalized))map.set(entry.event_key,entry);
-    }
-    const local=Number(item?.analysis_job_id||0);
-    const global=Number(item?.job_id||0);
-    summary.textContent=ezsLiveSummaryTemplate.replace('%count%',String(allowed.length)).replace('%id%',String(local||'—')).replace('%job%',global?String(global):'—');
-    tbody.dataset.mode='live';
-    details.open=true;
-    tbody.replaceChildren();
-    for(const [index,key] of allowed.entries()){
-      const ev=map.get(key), started=map.get(key.replace('engine.','engine.start.'));
-      const state=ev ? (ev.outcome==='ok'?ezsLiveStates.completed:ev.outcome==='failed'?ezsLiveStates.failed:ev.outcome==='blocked'?ezsLiveStates.blocked:ezsLiveStates.observed) : started?ezsLiveStates.running:ezsLiveStates.pending;
-      // Les étapes sans checkpoint terminé ne sont jamais présentées comme finies.
-      const observedDevice = ev?.detail?.device ?? started?.detail?.device ?? null;
-      ezsPipelineAppendRow(tbody,index+1,liveNames[key],key.replace('engine.','').replace(/_/g,' ').replace(/(^| )([a-z])/g,(m,a,b)=>a+b.toUpperCase()),observedDevice,state,null);
-    }
-  }
-  function setFsm(s){ const busy=(s==='running'||s==='queued'||s==='cancelling'); btn.disabled=true; if(cancelBtn){cancelBtn.disabled=!busy || s==='cancelling';} }
-  function render(item){
-    activeJob=Number(item?.job_id||0); activeLocalJob=Number(item?.analysis_job_id||0); const s=item?.status||'idle'; if(s==='running'||s==='queued') wasActive=true; setFsm(s);
-    const pct=s==='completed'?100:(Number.isFinite(Number(item?.progress))?Math.round(Number(item.progress)):0);
-    prog.value=pct; renderPipeline(item);
-    const stepLabel = item?.current_stage ? (r8StepNames[item.current_stage] || stepNames[item.current_stage] || item.current_stage.replace(/^engine\./, '').replace(/_/g,' ')) : '';
-    const started = item?.step_started_at ? Date.parse(item.step_started_at) : NaN;
-    const elapsed = Number.isFinite(started) && started <= Date.now() ? ' · '+Math.floor((Date.now()-started)/1000)+' s' : '';
-    const currentStep = document.getElementById('profile-ai-step-current');
-    if (currentStep) currentStep.textContent = stepLabel ? stepLabel + elapsed : '';
-    state.dataset.ezsJobState=s;
-    document.getElementById("profile-ai-progress").dataset.ezsJobState=s;
-    state.textContent=(s==='completed'?'Terminée':s==='running'?'En cours ('+pct+'%)':s==='queued'?'En attente':s==='cancelling'?'Annulation en cours':s==='cancelled'?'Annulée':s==='error'?'Erreur':'Nouvelles expertises suspendues')+(item?.queue_id?' · #'+item.queue_id : item?.job_id?' · LAB #'+item.job_id:'')+(item?.message?' · '+item.message:'');
-    if(wasActive && s==='completed'){ wasActive=false; window.location.reload(); }
-  }
-  async function poll(){ try{ const r=await fetch(root.dataset.url,{credentials:'same-origin',cache:'no-store'}); if(r.ok){const j=await r.json(); render(j.request);} }catch(_){} }
-  if (root && btn && state && prog) {
-  cancelBtn?.addEventListener('click',async()=>{
-      if(!activeJob||!activeLocalJob||!root.dataset.cancelUrl){state.textContent='Annulation indisponible : identité du job manquante';return;}
-      setFsm('cancelling');state.textContent='Annulation demandée…';
-      try {
-        const response=await fetch(root.dataset.cancelUrl,{method:'POST',credentials:'same-origin',
-          headers:{'X-EZS-Profile-AI-Action':'cancel','Content-Type':'application/json','Accept':'application/json'},
-          body:JSON.stringify({job_id:activeJob,analysis_job_id:activeLocalJob})});
-        const payload=await response.json();
-        if(!response.ok||payload.ok!==true)throw new Error(payload.error||('HTTP '+response.status));
-        render(payload.request);await poll();
-      } catch(error){state.textContent='Erreur annulation : '+error.message;setFsm('running');}
-    });
-  poll(); setInterval(poll,2500);
-  }
   // Suivi temps reel de la barre de progression Analyse LAB (profile_oneshot_status)
   const labUrl = {{ selected_song ? path('profile_oneshot_status', {id: selected_song.id})|json_encode|raw : '""' }};
   const labCancelPattern = {{ path('profile_once_cancel', {id: 999999999})|json_encode|raw }};

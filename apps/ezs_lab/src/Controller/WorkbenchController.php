@@ -49,7 +49,6 @@ final class WorkbenchController extends AbstractController
         return $this->render('workbench/home.html.twig', [
             'songs' => $songs,
             'queue_active' => $queue['active'],
-            'expertise_by_song' => $queue['expertise_by_song'],
         ]);
     }
 
@@ -78,34 +77,6 @@ final class WorkbenchController extends AbstractController
             'profile_all_queued'=>$queued,
             'profile_all_skipped_active'=>$skippedActive,
             'profile_all_skipped_source'=>$skippedMissingSource,
-        ]));
-    }
-
-    #[Route('/profile/expertise-all', name: 'profile_expertise_all', methods: ['POST'])]
-    public function expertiseAllProfiles(Request $request, \EZSLab\Service\ProfileAiRequestService $aiQueue, CatalogService $catalog): Response
-    {
-        $site = (string)$request->headers->get('Sec-Fetch-Site','');
-        $origin = (string)$request->headers->get('Origin','');
-        $referer = (string)$request->headers->get('Referer','');
-        $base = $request->getSchemeAndHttpHost();
-        if (($site !== '' && $site !== 'same-origin') || ($origin !== '' && $origin !== $base)
-            || ($site === '' && $origin === '' && !str_starts_with($referer,$base.'/'))) {
-            return new Response('Origine du formulaire refusée.',403);
-        }
-        if (\App\Service\ProfileExpertiseAdmission::SUSPENDED) {
-            return new Response('Nouvelles expertises IA locales suspendues.',409);
-        }
-        $queued = 0; $skippedActive = 0; $skippedMissing = 0;
-        foreach ($catalog->songs() as $song) {
-            $runId = (int)($song['profile']['run_id'] ?? $song['latest_run_id'] ?? 0);
-            if ($runId <= 0) { ++$skippedMissing; continue; }
-            try { $aiQueue->enqueue($runId); ++$queued; }
-            catch (\RuntimeException) { ++$skippedActive; }
-        }
-        return new RedirectResponse($this->generateUrl('workbench_home', [
-            'expertise_all_queued'=>$queued,
-            'expertise_all_skipped_active'=>$skippedActive,
-            'expertise_all_skipped_missing'=>$skippedMissing,
         ]));
     }
 

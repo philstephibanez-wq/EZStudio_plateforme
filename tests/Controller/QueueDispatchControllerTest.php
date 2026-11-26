@@ -157,9 +157,9 @@ class QueueDispatchControllerTest extends WebTestCase
 
             $cmdFile = dirname(__DIR__, 2) . '/apps/ezs_orchestrator/src/Command/QueueConsumeCommand.php';
             $cmdSource = (string) file_get_contents($cmdFile);
-            $this->assertStringContainsString("'EZSTUDIOLAB_ASSISTANT_BASE_URL'", $cmdSource);
-            $this->assertStringContainsString('lab.ezstudio.local:8000', $cmdSource);
-            $this->assertStringContainsString("'EZSTUDIOLAB_ASSISTANT_TOKEN'", $cmdSource);
+            $this->assertStringNotContainsString('profile_ai_requests_worker.py', $cmdSource);
+            $this->assertStringNotContainsString('profile_direct_job.py', $cmdSource);
+            $this->assertStringContainsString('expertise_locale_suspendue', $cmdSource);
         } finally {
             $this->purgeTestRows();
             $this->restoreParkedRows($em);

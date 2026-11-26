@@ -85,18 +85,5 @@ class AnalysisApiClient:
         return self.request("POST", f"/internal/analysis/desktop/distributed/jobs/{int(job_id)}/cancelled", {"worker_id": worker_id, "lease_token": lease_token})
 
 
-    def profile_review_queue(self, *, limit: int = 100) -> list[dict[str, Any]]:
-        effective = max(1, min(500, int(limit)))
-        payload = self.request("GET", f"/internal/analysis/desktop/profile/reviews/queue?limit={effective}")
-        reviews = payload.get("reviews") or []
-        if not isinstance(reviews, list):
-            raise AnalysisApiError("profile_review_queue_not_list")
-        return [row for row in reviews if isinstance(row, dict)]
-
-    def submit_profile_review(self, payload: dict[str, Any]) -> dict[str, Any]:
-        if not isinstance(payload, dict):
-            raise AnalysisApiError("profile_review_payload_must_be_object")
-        return self.request("POST", "/internal/analysis/desktop/profile/reviews", payload)
-
     def distributed_fail(self, job_id: int, worker_id: str, lease_token: str, error: str) -> dict[str, Any]:
         return self.request("POST", f"/internal/analysis/desktop/distributed/jobs/{int(job_id)}/fail", {"worker_id": worker_id, "lease_token": lease_token, "error": str(error)[:400]})

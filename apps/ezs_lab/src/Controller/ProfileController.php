@@ -5,7 +5,6 @@ namespace EZSLab\Controller;
 use EZSLab\Service\AnalysisRunRegistry;
 use EZSLab\Service\ProfileExecutionService;
 use EZSLab\Service\ProfileFrenchSummary;
-use EZSLab\Service\ProfileExternalReviewService;
 use EZSLab\Service\ProfileValidationService;
 use EZSLab\Service\WorkbenchCatalog;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -30,8 +29,6 @@ final class ProfileController extends AbstractController
         ProfileExecutionService $execution,
         ProfileFrenchSummary $summary,
         ProfileValidationService $validation,
-        ProfileExternalReviewService $externalReview,
-        \EZSLab\Service\Database $db,
     ): Response {
         $song = $catalog->selectedSong($this->songId($request));
         $runs = [];
@@ -61,50 +58,8 @@ final class ProfileController extends AbstractController
             }
         }
 
-        // All historical expertise entries belong to this song, not only the selected run.
-        $songRevisions = [];
-        foreach ($runs as $historicalRun) {
-            foreach ($externalReview->revisionsForRun((int)$historicalRun['id']) as $revision) {
-                $songRevisions[] = $revision;
-            }
-        }
-        usort($songRevisions, static fn(array $a, array $b): int => (int)$b['id'] <=> (int)$a['id']);
-
-        // EZS_R1H_ACTIVE_RUN: select the run of the currently executing expertise,
-        // but never override a historical run explicitly requested by the user.
-        if (!$request->query->has('run') && $selected === null && $song && $runs !== []) {
-            $songIds = array_values(array_unique(array_filter(array_map('intval',
-                $song['song_ids'] ?? [(int)$song['id']]), static fn(int $id): bool => $id > 0)));
-            if ($songIds !== []) {
-                $marks = implode(',', array_fill(0, count($songIds), '?'));
-                $stmt = $db->pdo()->prepare("SELECT scientific_run_id FROM analysis_jobs
-                    WHERE song_id IN ($marks) AND kind='assistant.profile.review'
-                    AND dispatch_owner='lab' AND status IN ('running','cancelling','queued')
-                    ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'cancelling' THEN 1 ELSE 2 END,
-                             id ASC LIMIT 1");
-                $stmt->execute($songIds);
-                $activeRunId = (int)($stmt->fetchColumn() ?: 0);
-                foreach ($runs as $candidate) {
-                    if ($activeRunId > 0 && (int)$candidate['id'] === $activeRunId) {
-                        $selected = $candidate;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Without an explicit run selection, open the run owning the latest
-        // expertise of this song. Never hide historical expertise just because
-        // the most recent scientific run has not yet been reviewed.
         if ($selected === null && $runs !== []) {
-            $latestExpertiseRunId = (int)($songRevisions[0]['run_id'] ?? 0);
-            foreach ($runs as $candidate) {
-                if ((int)$candidate['id'] === $latestExpertiseRunId) {
-                    $selected = $candidate;
-                    break;
-                }
-            }
-            $selected ??= $runs[0];
+            $selected = $runs[0];
         }
 
         return $this->render('workbench/profile.html.twig', [
@@ -114,8 +69,6 @@ final class ProfileController extends AbstractController
             'selected_profile_run' => $selected,
             'profile_job' => $selected ? $execution->jobForRun((int)$selected['id']) : null,
             'profile_summary' => $selected ? $summary->build($selected) : null,
-            'profile_external_revisions' => $selected ? $externalReview->revisionsForRun((int)$selected['id']) : [],
-            'song_external_revisions' => $songRevisions,
             'profile_validation_subjects' => $selected
                 ? $validation->subjectsForRun($selected)
                 : [],

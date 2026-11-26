@@ -83,7 +83,7 @@ final class NativeSiteLifecycle
             'ALREADY_RUNNING_OR_STALE_OWNER_REFUSED','OWNER_RECORD_INVALID',
             'START_PROCESS_NOT_FOUND','PLATFORM_DELEGATE_MISSING',
             'ASSISTANT_CANONICAL_SCRIPT_MISSING','ASSISTANT_INTENT_MISSING',
-            'ASSISTANT_START_LLAMA_CONTRACT_INVALID','ASSISTANT_STOP_LLAMA_CONTRACT_INVALID'] as $token) {
+            'ASSISTANT_LEGACY_SITE_RETIRED_USE_EZS'] as $token) {
             if (preg_match('/(?<![A-Z0-9_])'.preg_quote($token,'/').'(?![A-Z0-9_])/', $stderr) === 1) {
                 return $token;
             }

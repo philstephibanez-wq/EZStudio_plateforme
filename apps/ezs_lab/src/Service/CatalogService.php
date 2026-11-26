@@ -68,38 +68,6 @@ final class CatalogService
                 }
             }
 
-            // PROFILE R3E: computed from the latest active PROFILE run only.
-            // A previous run's review must never mark a newer run as reviewed.
-            $group['profile_ai_reviewed'] = false;
-            $group['profile_ai_revision_id'] = null;
-            $group['profile_ai_status'] = 'none';
-            $profileRunId = (int)($group['profile']['run_id'] ?? 0);
-            if ($profileRunId > 0 && $group['profile']['state'] === 'done'
-                && $this->tableExists('profile_external_revisions')) {
-                $reviewStmt = $this->db->pdo()->prepare(
-                    'SELECT id, status, consensus_json, comparison_json
-                     FROM profile_external_revisions
-                     WHERE run_id=? ORDER BY id DESC'
-                );
-                $reviewStmt->execute([$profileRunId]);
-                foreach ($reviewStmt->fetchAll() as $revision) {
-                    $consensus = json_decode((string)$revision['consensus_json'], true);
-                    $comparison = json_decode((string)$revision['comparison_json'], true);
-                    $ai = is_array($consensus) ? ($consensus['assistant_ai'] ?? []) : [];
-                    $detail = is_array($comparison) ? ($comparison['assistant_ai'] ?? []) : [];
-                    if (($ai['status'] ?? '') !== 'completed') {
-                        continue;
-                    }
-                    // A completed consultative AI review counts as reviewed,
-                    // even when no independent documentary dimension is scored.
-                    // Keep the latest scientific run restriction above.
-                    $group['profile_ai_reviewed'] = true;
-                    $group['profile_ai_revision_id'] = (int)$revision['id'];
-                    $group['profile_ai_status'] = (string)$revision['status'];
-                    break;
-                }
-            }
-
             // Compatibility with historical benchmark CHORDS.
             if ($group['chords']['state'] === 'none') {
                 $legacy = $this->latestBenchmarkState($group['song_ids']);

@@ -9,7 +9,6 @@
   <a class="button" href="{{ path('workbench_import') }}">Importer une chanson</a>
 </div>
 
-{% if app.request.query.get('expertise_all_queued') is not null %}<div class="card"><strong>Tout expertiser</strong> — {{ app.request.query.get('expertise_all_queued') }} job(s) ajouté(s), {{ app.request.query.get('expertise_all_skipped_active')|default(0) }} déjà actif(s), {{ app.request.query.get('expertise_all_skipped_missing')|default(0) }} sans analyse disponible.</div>{% endif %}
 {% if app.request.query.get('profile_all_queued') is not null %}
 <div class="card">
   <strong>Tout analyser</strong> —
@@ -34,16 +33,6 @@
         data-confirm="Lancer une nouvelle analyse PROFILE sur toutes les chansons du catalogue ? Les jobs PROFILE déjà actifs seront ignorés."
         style="display:inline">
     <button type="submit" class="secondary">Tout analyser</button>
-  </form>
-  <button type="button" class="secondary" disabled title="Nouvelles expertises IA locales suspendues">Tout expertiser (suspendu)</button>
-  <form method="post" action="{{ path('profile_corpus_export') }}" class="catalog-profile-export-form" style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap">
-    <label for="profile-export-count" class="meta">Expertises/chanson</label>
-    <select id="profile-export-count" name="revisions" aria-label="Nombre d'expertises par chanson" title="Nombre de révisions d'expertise par chanson">
-      <option value="2">2 dernières</option>
-      <option value="5" selected>5 dernières</option>
-      <option value="all">Toutes</option>
-    </select>
-    <button type="submit" class="secondary" title="Exporter les dernières expertises et les analyses PROFILE associées">Exporter tous les PROFILE</button>
   </form>
 </div>
 
@@ -89,21 +78,6 @@
         <span class="badge">Configuré</span>
       {% else %}
         <span class="badge">—</span>
-      {% endif %}
-      {% if key == 'profile' %}
-          {% set expertise = expertise_by_song[song.id] ?? {active: [], latest: null} %}
-          {% if expertise.active is not empty %}
-            {% set cancellingExpertise = expertise.active|filter(j => j.status == 'cancelling') %}
-            {% set activeExpertise = expertise.active|filter(j => j.status == 'running') %}
-            {% set expertiseState = cancellingExpertise is not empty ? 'cancelling' : (activeExpertise is not empty ? 'progressing' : 'waiting') %}
-            <div class="meta" data-analysis-active="1">
-              <span class="ezs-badge ezs-badge--state-{{ expertiseState }}">Expertise : {{ expertiseState == 'cancelling' ? 'annulation en cours' : (expertiseState == 'progressing' ? 'en cours' : 'en attente') }}</span>
-            </div>
-          {% elseif expertise.latest is not null %}
-            <div class="meta"><span class="ezs-badge ezs-badge--state-{{ expertise.latest.status == 'error' ? 'ko' : (expertise.latest.status == 'completed' ? 'ok' : (expertise.latest.status == 'cancelled' ? 'cancelled' : 'waiting')) }}">Expertise : {{ expertise.latest.status == 'completed' ? 'terminée' : (expertise.latest.status == 'error' ? 'erreur' : (expertise.latest.status == 'cancelled' ? 'annulée' : 'en attente')) }}</span></div>
-          {% elseif not (song.profile_ai_reviewed ?? false) %}
-            <div class="meta">Expertise : non demandée</div>
-          {% endif %}
       {% endif %}
     </td>
   {% endfor %}

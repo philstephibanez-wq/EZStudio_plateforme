@@ -194,51 +194,9 @@ error>[Job #%d] ended (KO): %s
         $internalToken = (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '');
         $baseUrl = (string) ($_ENV['ORCHESTRATOR_BASE_URL'] ?? $_SERVER['ORCHESTRATOR_BASE_URL'] ?? 'http://orchestrator.ezstudio.local:8000');
 
-        if ($source === 'assistant') {
-            if ($type === 'profile.review') {
-                $jobId = (int) ($payload['job_id'] ?? 0);
-                $runId = (int) ($payload['run_id'] ?? 0);
-                if (!($jobId > 0) || !($runId > 0)) {
-                    throw new \RuntimeException('invalid_assistant_review_parameters');
-                }
-                $script = $platformRoot . '/apps/ezs_assistant/runtime/profile_ai_requests_worker.py';
-                $labTok = (string) ($_ENV['EZSTUDIOLAB_ASSISTANT_TOKEN'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_TOKEN'] ?? getenv('EZSTUDIOLAB_ASSISTANT_TOKEN') ?: '');
-                if ($labTok === '' && is_file($platformRoot . '/apps/ezs_lab/.env.local')) {
-                    foreach (file($platformRoot . '/apps/ezs_lab/.env.local', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $ln) {
-                        if (str_starts_with($ln, 'EZSTUDIO_ANALYSIS_WORKER_TOKEN=')) {
-                            $labTok = trim(substr($ln, 31), " \t\n\r\0\x0B\"'");
-                            break;
-                        }
-                    }
-                }
-                // R1G: required MAIN-owned declarative preset. No implicit fallback.
-                $reviewPresetPath = $platformRoot . '/apps/ezs_lab/presets/assistant/profile-baseline-1.json';
-                if (!is_file($reviewPresetPath) || !is_readable($reviewPresetPath)) {
-                    throw new \RuntimeException('review_main_preset_unavailable');
-                }
-                // R1I: verify or reconcile an exact global/LAB receipt before GO.
-                // Global and LAB SQLite are read separately; only a proven missing LAB
-                // receipt is recoverable. All other mismatches fail closed.
-                $receiptGuard = $platformRoot . '/scripts/ezs_expertise_receipt_guard_r1i.py';
-                if (!is_file($receiptGuard)) {
-                    throw new \RuntimeException('expertise_receipt_guard_missing');
-                }
-                $guardBackup = rtrim(sys_get_temp_dir(), '/\\') . '/EZS_EXPERTISE_RECEIPT_GUARD_R1I';
-                $this->runSubprocess($id, [$python, '-B', $receiptGuard,
-                    '--root', $platformRoot, '--backup-dir', $guardBackup,
-                    '--ensure', (string)$id], $platformRoot, [], 90, $output);
-                $this->runSubprocess($id, [$python, '-B', '-u', $script, '--once', '--job-id', (string) $jobId, '--run-id', (string) $runId], $platformRoot . '/apps/ezs_assistant', ['EZSTUDIOLAB_REVIEW_PRESET_PATH' => $reviewPresetPath, 'ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZSTUDIOLAB_ASSISTANT_BASE_URL' => (string) ($_ENV['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? $_SERVER['EZSTUDIOLAB_ASSISTANT_BASE_URL'] ?? getenv('EZSTUDIOLAB_ASSISTANT_BASE_URL') ?: 'http://lab.ezstudio.local:8000'), 'EZSTUDIOLAB_ASSISTANT_TOKEN' => $labTok, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 1800, $output);
-                return;
-            }
-            if ($type === 'profile.direct_research') {
-                $jobId = (string) ($payload['job_id'] ?? '');
-                if (!preg_match('/^[a-f0-9]{32}$/', $jobId)) {
-                    throw new \RuntimeException('invalid_assistant_job_id');
-                }
-                $script = $platformRoot . '/apps/ezs_assistant/runtime/profile_direct_job.py';
-                $this->runSubprocess($id, [$python, $script, '--run', $jobId], $platformRoot . '/apps/ezs_assistant', ['ORCHESTRATOR_JOB_ID' => (string) $id, 'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: ''), 'EZS_QUEUE_INTERNAL_TOKEN' => (string) ($_ENV['EZS_QUEUE_INTERNAL_TOKEN'] ?? $_SERVER['EZS_QUEUE_INTERNAL_TOKEN'] ?? getenv('EZS_QUEUE_INTERNAL_TOKEN') ?: '')], 600, $output);
-                return;
-            }
+        // Former expertise jobs must fail closed; never launch a legacy worker.
+        if ($source === 'assistant' && in_array($type, ['profile.review', 'profile.direct_research'], true)) {
+            throw new \RuntimeException('expertise_locale_suspendue');
         }
 
         if ($source === 'lab') {

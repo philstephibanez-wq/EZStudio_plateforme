@@ -6,16 +6,15 @@ param(
 $ErrorActionPreference = 'Stop'
 $root=(Resolve-Path "$PSScriptRoot\..").Path
 $native=Join-Path $root 'bin\ezs_native_site.ps1'
-$assistant=Join-Path $root 'bin\ezs_assistant_stack.ps1'
 $exe='H:\FRANKENPHP\bin\frankenphp.exe'
 if ($Site -eq 'prod' -and $Action -eq 'Stop') {
     throw 'PROD_STOP_PROTECTED_REFUSED'
 }
-$target=if($Site -eq 'assistant'){$assistant}else{$native}
+if ($Site -eq 'assistant') { throw 'ASSISTANT_LEGACY_SITE_RETIRED_USE_EZS' }
+$target=$native
 if(!(Test-Path -LiteralPath $target -PathType Leaf)) {throw ('PLATFORM_DELEGATE_MISSING '+$target)}
 # Verify a native PHP configuration without launching any process.
-# The Assistant delegates its own Llama lifecycle to canonical start.ps1 and stop.ps1.
-if($Site -ne 'assistant' -and $Action -in @('Preflight','Start')) {
+if($Action -in @('Preflight','Start')) {
     $config=Join-Path $root ('config\frankenphp\Caddyfile.'+$Site+'.native')
     if(!(Test-Path -LiteralPath $exe -PathType Leaf)) {throw 'FRANKENPHP_EXE_MISSING'}
     if(!(Test-Path -LiteralPath $config -PathType Leaf)) {throw 'CADDY_CONFIG_MISSING'}
@@ -36,7 +35,7 @@ if($Site -ne 'assistant' -and $Action -in @('Preflight','Start')) {
     if($adaptExitCode -ne 0){throw ('FRANKENPHP_ADAPT_FAILED '+$Site+' exit='+$adaptExitCode)}
 }
 $args=@('-NoProfile','-ExecutionPolicy','Bypass','-File',$target,'-Action',$Action)
-if($Site -ne 'assistant'){$args+=@('-Site',$Site)}
+$args+=@('-Site',$Site)
 & powershell.exe @args
 if($LASTEXITCODE -ne 0){throw ('PLATFORM_'+$Site.ToUpperInvariant()+'_'+$Action.ToUpperInvariant()+'_FAILED_'+$LASTEXITCODE)}
 Write-Host ('EZS_PLATFORM_'+$Site.ToUpperInvariant()+'_'+$Action.ToUpperInvariant()+'_OK')
