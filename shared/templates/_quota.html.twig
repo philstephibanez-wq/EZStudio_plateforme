@@ -1,0 +1,31 @@
+{% set qd = 'ezs_quota' %}
+<div data-ezs-quota data-status="{{ path('ezs_quota_status') }}" data-save="{{ path('ezs_quota_observation') }}" style="display:inline-flex;position:relative">
+<a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer" style="color:inherit">{{ 'title'|trans({},qd,'fr') }}</a>
+<template>
+<link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+<style>:host{display:inline-flex;position:relative;font:12px Arial,sans-serif;color:#e5edf5}.qpanel{position:absolute;right:0;top:calc(100% + 6px);width:min(360px,calc(100vw - 24px));max-height:70vh;overflow:auto;background:#18232e;z-index:1200;font-size:12px}.qpanel[hidden],form[hidden]{display:none!important}.progress{height:5px}@media(max-width:700px){.qpanel{position:fixed;top:65px;right:10px}}
+:host{font:12px/1.4 Arial,Segoe UI,sans-serif;color:#e5edf5}
+[data-bs-theme]{color:#e5edf5;line-height:1.4;font:inherit}
+[data-toggle]{background:#141e28!important;color:#e5edf5!important;border:1px solid #415164!important;border-radius:5px!important;padding:7px 10px!important;font:12px/1.4 Arial,sans-serif!important;white-space:nowrap;cursor:pointer}
+[data-toggle]:hover,[data-toggle][aria-expanded=true]{background:#263545!important;border-color:#65a5d6!important}
+.qpanel{box-sizing:border-box!important;width:min(410px,calc(100vw - 24px));padding:14px!important;border:1px solid #415164!important;border-radius:6px!important;box-shadow:0 10px 24px #0008!important;color:#e5edf5!important;line-height:1.4!important}
+.qpanel *{box-sizing:border-box}.qpanel [hidden]{display:none!important}.qpanel .d-flex{display:flex!important;align-items:center;gap:8px}.qpanel .justify-content-between{justify-content:space-between!important}
+.qpanel [data-scope]{padding:9px 0!important;border-top:1px solid #415164!important}.qpanel .progress{height:5px!important;background:#344351;border-radius:3px;margin:5px 0!important;overflow:hidden}.qpanel .progress-bar{height:100%}.qpanel .text-body-secondary{color:#a5b7c8!important}
+.qpanel button:not(.btn-close){font:12px/1.4 Arial,sans-serif!important;padding:5px 8px!important;border:1px solid #415164!important;border-radius:4px!important;color:#e5edf5!important;background:#223344!important;cursor:pointer}.qpanel button.btn-primary{background:#17384b!important;border-color:#228bc6!important}.qpanel button:disabled{opacity:.5;cursor:default!important}.qpanel .btn-close{width:24px;height:24px;flex-shrink:0;cursor:pointer}.qpanel a{color:#6ac9ff!important;text-decoration:underline!important}
+.qpanel fieldset{margin:0 0 10px!important;padding:0!important;border:0!important;min-width:0}.qpanel legend{float:none!important;width:auto!important;margin:0 0 5px!important;font:600 12px/1.4 Arial,sans-serif!important}.qfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:8px}.qfields label{display:block;font:12px/1.4 Arial,sans-serif!important;min-width:0}.qfields input{display:block;width:100%;min-width:0;box-sizing:border-box!important;background:#202a35!important;color:#e5edf5!important;border:1px solid #415164!important;border-radius:4px!important;font:12px/1.4 Arial,sans-serif!important;padding:5px 6px!important;color-scheme:dark;margin-top:3px}.qpanel p{margin:0 0 10px!important}.qpanel [data-message]:not(:empty){margin-top:8px}.qpanel button:focus-visible,.qpanel input:focus-visible,[data-toggle]:focus-visible{outline:2px solid #7ac5ff;outline-offset:2px}
+</style>
+<div data-bs-theme="dark">
+<button class="btn btn-sm btn-outline-light" type="button" data-toggle aria-expanded="false">{{ 'title'|trans({},qd,'fr') }} <span data-short>—</span></button>
+<section class="qpanel border rounded shadow p-3" hidden>
+<div class="d-flex justify-content-between align-items-center mb-2"><strong>{{ 'title'|trans({},qd,'fr') }}</strong><button type="button" data-close class="btn-close" aria-label="{{ 'close'|trans({},qd,'fr') }}"></button></div>
+<div data-summary>
+{% for scope in ['five_hours','weekly','application'] %}
+<div data-scope="{{ scope }}" class="border-top py-2"><div class="d-flex justify-content-between"><strong>{{ scope|trans({},qd,'fr') }}</strong><span data-state>—</span></div><div class="d-flex justify-content-between"><span>{{ 'used'|trans({},qd,'fr') }} <b data-used>—</b></span><span>{{ 'remaining'|trans({},qd,'fr') }} <b data-remaining>—</b></span></div><div class="progress my-1"><div class="progress-bar bg-secondary" style="width:0%"></div></div><div>{{ 'reset'|trans({},qd,'fr') }} : <span data-reset>—</span></div><div class="text-body-secondary">{{ 'observed'|trans({},qd,'fr') }} : <span data-observed>—</span></div></div>
+{% endfor %}
+<div class="small text-warning" data-alert role="status"></div>
+<div class="d-flex gap-2 flex-wrap"><button class="btn btn-sm btn-outline-light" data-edit type="button" disabled>{{ 'edit'|trans({},qd,'fr') }}</button><a class="link-info" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">{{ 'usage'|trans({},qd,'fr') }}</a></div>
+</div>
+<form hidden class="mt-2"><p>{{ 'help'|trans({},qd,'fr') }}</p>{% for scope in ['five_hours','weekly','application'] %}<fieldset data-input="{{ scope }}" class="mb-2"><legend class="small fw-bold">{{ scope|trans({},qd,'fr') }}</legend><div class="qfields"><label class="d-block">{{ 'remaining'|trans({},qd,'fr') }} (%)<input class="form-control form-control-sm" type="number" min="0" max="100" step="0.01"></label><label class="d-block">{{ 'reset'|trans({},qd,'fr') }}<input class="form-control form-control-sm" type="datetime-local"></label></div></fieldset>{% endfor %}<button class="btn btn-primary btn-sm" type="submit">{{ 'save'|trans({},qd,'fr') }}</button> <button type="button" class="btn btn-sm btn-outline-light" data-cancel>{{ 'close'|trans({},qd,'fr') }}</button></form><div data-message role="status"></div>
+</section></div></template>
+<span hidden data-messages {% for k in ['unknown','stale','normal','low','critical','exhausted','error','saved','alert'] %}data-{{ k }}="{{ k|trans({},qd,'fr') }}" {% endfor %}></span>
+</div><script src="/shared/js/ezs-quota.js?v=1b" defer></script>

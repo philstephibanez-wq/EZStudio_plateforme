@@ -38,6 +38,7 @@
       <small class="ezs-app-version">{% if displayed_version in ['', '?', '—', 'inconnue'] %}Version inconnue{% elseif displayed_version starts with 'v' %}{{ displayed_version }}{% else %}v{{ displayed_version }}{% endif %}</small>
     </a>
     {{ header_nav|raw }}
+    {% include '@shared/_quota.html.twig' %}
     <div class="ezs-app-locale">
       <span id="ezs-locale-label-{{ header_id }}">Langue</span>
       <details class="ezs-locale-picker" aria-labelledby="ezs-locale-label-{{ header_id }}" title="Seule la version française est disponible">

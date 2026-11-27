@@ -7,6 +7,7 @@
         <span><strong>Ordonnanceur</strong> — ordonnancement agnostique (waiting / progressing % / ended)</span>
         <span class="text-body-secondary">Actualisation toutes les 4 s (onglet visible)</span>
     </div>
+    <div class="alert alert-warning py-2 mb-3" data-ezs-quota-alert hidden role="status"></div>
     {% if flash_error is defined and flash_error is not empty %}<div class="alert alert-danger py-2 mb-3" role="alert">{{ flash_error }}</div>{% endif %}
     {% if queue_paused_on_error|default(false) %}
     <div class="alert alert-danger" role="alert"><strong>FILE SUSPENDUE APRÈS UN JOB KO</strong> — aucun nouveau GO ne sera attribué, y compris après redémarrage EZS. Les jobs en attente sont conservés. {# EZS_FIFO_ACTIVE_RETRY_R1B #}Corrigez la cause, puis cliquez sur « Relancer » sur le seul job KO bloquant ; il repart en priorité et débloque la FIFO après succès.</div>

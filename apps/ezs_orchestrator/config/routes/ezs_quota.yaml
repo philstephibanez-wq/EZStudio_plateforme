@@ -1,0 +1,3 @@
+ezs_quota:
+    resource: '../../../../shared/src/Quota/QuotaController.php'
+    type: attribute

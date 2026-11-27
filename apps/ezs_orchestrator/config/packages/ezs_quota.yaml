@@ -1,0 +1,7 @@
+framework:
+    translator:
+        paths: ['%kernel.project_dir%/shared/translations']
+services:
+    Shared\Quota\QuotaController:
+        arguments: ['%kernel.project_dir%', '%kernel.environment%']
+        tags: ['controller.service_arguments']
