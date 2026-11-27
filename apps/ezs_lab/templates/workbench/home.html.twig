@@ -27,6 +27,7 @@
 </style>
 
 <div class="catalog-batch-toolbar">
+  {% include 'workbench/_expertise_action.html.twig' with {expertise_export_url: path('profile_expertise_export'), expertise_label: 'Expertiser TOUT PROFILE', expertise_mode: 'collective'} only %}
   <form method="post"
         action="{{ path('profile_analyze_all') }}"
         class="catalog-profile-all-form"
@@ -60,7 +61,9 @@
   {% for key in ['profile','stems','chords','lyrics'] %}
     {% set available = attribute(song, key) %}
     {% set attempt = available.latest_attempt|default(null) %}
-    {% set s = key == 'profile' and attempt and attempt.state != 'legacy_fifo' ? attempt : available %}
+    {# A completed PROFILE is the catalogue result; only an active attempt may supersede its badge. #}
+    {% set active_attempt = attempt and attempt.state in ['queued','running','cancelling'] %}
+    {% set s = key == 'profile' and attempt and attempt.state != 'legacy_fifo' and (active_attempt or available.state != 'done') ? attempt : available %}
     <td>
       {% if s.job_status == 'cancelling' or s.state == 'cancelling' %}
         <span class="ezs-badge ezs-badge--state-cancelling" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : annulation en cours' : 'Annulation en cours' }}</span>
@@ -73,7 +76,7 @@
       {% elseif s.state == 'running' %}
         <span class="ezs-badge ezs-badge--state-progressing" data-analysis-active="1">{{ key == 'profile' ? 'Analyse : en cours' : 'En cours' }}</span>
       {% elseif s.state == 'cancelled' or s.job_status == 'cancelled' %}
-        <span class="ezs-badge ezs-badge--state-cancelled">{{ key == 'profile' ? 'Analyse : annulée' : 'Annulé' }}</span>
+        {% if key == 'profile' %}<span class="badge">—</span>{% else %}<span class="ezs-badge ezs-badge--state-cancelled">Annulé</span>{% endif %}
       {% elseif s.state == 'error' %}
         <span class="ezs-badge ezs-badge--state-ko">Erreur</span>
       {% elseif s.state == 'configured' %}

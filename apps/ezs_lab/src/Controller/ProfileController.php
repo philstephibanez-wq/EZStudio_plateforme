@@ -62,7 +62,14 @@ final class ProfileController extends AbstractController
         }
 
         if ($selected === null && $runs !== []) {
-            $selected = $runs[0];
+            // Prefer the newest completed scientific result, not a cancelled attempt.
+            foreach ($runs as $candidate) {
+                if (($candidate['state'] ?? null) === 'done') {
+                    $selected = $candidate;
+                    break;
+                }
+            }
+            $selected ??= $runs[0];
         }
 
         return $this->render('workbench/profile.html.twig', [

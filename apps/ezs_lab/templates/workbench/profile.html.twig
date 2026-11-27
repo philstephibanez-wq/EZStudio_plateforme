@@ -67,11 +67,10 @@
         <span class="meta">#{{ selected_song.id }}{% if selected_profile_run and selected_profile_run.metrics.duration_seconds is defined %} · {{ selected_profile_run.metrics.duration_seconds|number_format(1) }} s{% endif %}</span>
       {% else %}<h1>PROFILE</h1>{% endif %}
     </div>
-    {% if selected_profile_run %}
-      <form method="post" action="{{ path('profile_scientific_export', {id: selected_profile_run.id}) }}" style="margin:0">
-        <button type="submit" class="secondary" title="Télécharger les résultats scientifiques PROFILE">Exporter analyse</button>
-      </form>
-    {% endif %}
+    <div class="prof-actions">
+      {% if selected_song %}{% include 'workbench/_expertise_action.html.twig' with {expertise_export_url: path('profile_expertise_export', {song: selected_song.id}), expertise_label: 'Expertiser', expertise_mode: 'individual'} only %}{% endif %}
+
+    </div>
   </div>
 </section>
 <script>
