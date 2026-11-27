@@ -67,6 +67,16 @@
         const saved = JSON.parse(localStorage.getItem(key) || '[]');
         return Array.isArray(saved) ? saved.filter(valid) : [];
     }
+    async function queueRequest(fields) {
+        const response = await fetch(button.dataset.profileChatgpt, {
+            method: 'POST',
+            headers: {'X-EZS-Expertise': 'chatgpt'},
+            body: new URLSearchParams({song: button.dataset.song, run: button.dataset.run, ...fields}),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'FIFO indisponible.');
+        return data;
+    }
     let reports = [];
     try { reports = readReports(); } catch {}
     function showReferences(data) {
@@ -187,42 +197,21 @@
         showStage();
         const timer = setInterval(showStage, 1000);
         try {
-            const body = new URLSearchParams({song: button.dataset.song, run: button.dataset.run});
-            const response = await fetch(button.dataset.profileChatgpt, {
-                method: 'POST', credentials: 'same-origin',
-                headers: {'X-EZS-Expertise': 'chatgpt'}, body,
-            });
-            let data;
-            if ((response.headers.get('Content-Type') || '').includes('application/x-ndjson')) {
-                const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-                let pending = '';
+            let data = await queueRequest({});
+            if (data.queue_id) {
+                stage = 'En attente dans la FIFO';
                 while (true) {
-                    const chunk = await reader.read();
-                    if (chunk.done) break;
-                    pending += chunk.value;
-                    const lines = pending.split('\n');
-                    pending = lines.pop();
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
-                        const event = JSON.parse(line);
-                        if (Object.hasOwn(labels, event.stage)) {
-                            stage = labels[event.stage];
-                            active = order.indexOf(event.stage);
-                            draw(active);
-                            showStage();
-                        } else if (event.reference) {
-                            showReferences(event.reference);
-                        } else {
-                            data = event;
-                        }
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    const state = await queueRequest({queue: data.queue_id, revision: data.revision});
+                    if (state.result) {
+                        data = state.result;
+                        break;
                     }
+                    if (!['waiting', 'progressing', 'cancelling'].includes(state.status)) {
+                        throw new Error('Expertise interrompue. Vérifie le job dans l’Orchestrator.');
+                    }
+                    stage = state.status === 'progressing' ? 'Expertise ChatGPT' : 'En attente dans la FIFO';
                 }
-                if (!data) throw new Error('Réponse interrompue à l’étape « ' + stage + ' ».');
-            } else {
-                data = await response.json();
-            }
-            if (!response.ok || String(data.run) !== button.dataset.run) {
-                throw new Error(data.error || 'Résultat indisponible pour cette analyse.');
             }
             if (!valid(data)) throw new Error('Rapport invalide.');
             renderReport(data);
@@ -247,4 +236,11 @@
             revision.disabled = !reports.length;
         }
     });
+    queueRequest({read: '1'}).then(data => {
+        if (valid(data) && !button.disabled && !reports.some(report => report.jsonl === data.jsonl)) {
+            reports.push(data);
+            renderReport(data);
+            choices();
+        }
+    }).catch(() => {});
 })();

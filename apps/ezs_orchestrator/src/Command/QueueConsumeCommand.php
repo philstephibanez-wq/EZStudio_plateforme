@@ -199,6 +199,16 @@ error>[Job #%d] ended (KO): %s
             throw new \RuntimeException('expertise_locale_suspendue');
         }
 
+        if ($source === 'lab' && $type === 'profile_chatgpt') {
+            $this->runSubprocess($id, [$php, $platformRoot.'/bin/console', 'lab:profile:expertise-job',
+                (string) $id, (string) ($payload['song_id'] ?? 0), (string) ($payload['run_id'] ?? 0),
+                (string) ($payload['prompt_revision_id'] ?? 0)], $platformRoot, [
+                    'APP_ID' => 'ezs_lab', 'ORCHESTRATOR_JOB_ID' => (string) $id,
+                    'ORCHESTRATOR_BASE_URL' => $baseUrl, 'EZS_QUEUE_INTERNAL_TOKEN' => $internalToken,
+                ], 620, $output);
+            return;
+        }
+
         if ($source === 'lab') {
             if ($type === 'profile') {
                 $analysisJobId = (int) ($payload['analysis_job_id'] ?? $payload['job_id'] ?? 0);

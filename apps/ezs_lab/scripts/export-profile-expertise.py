@@ -26,13 +26,15 @@ def clean(x):
 def encode(x):
     return json.dumps(x, ensure_ascii=False, allow_nan=False, separators=(',',':'))
 
-def records(db, song_id, assemble, root=ROOT, run_id=None):
+def records(db, song_id, assemble, root=ROOT, run_id=None, revision=None):
     db = Path(db).resolve(strict=True)
     with closing(sqlite3.connect(db.as_uri()+'?mode=ro', uri=True)) as c:
         c.row_factory = sqlite3.Row
         c.execute('PRAGMA query_only=ON')
         c.execute('BEGIN')
         prompt = c.execute('SELECT r.id,r.content,r.sha256,r.created_at FROM profile_expertise_prompt_revision r JOIN profile_expertise_prompt_active a ON a.revision_id=r.id WHERE a.id=1').fetchone()
+        if revision is not None:
+            prompt = c.execute('SELECT id,content,sha256,created_at FROM profile_expertise_prompt_revision WHERE id=?', (revision,)).fetchone()
         if prompt is None: raise ValueError('active_prompt_missing')
         if hashlib.sha256(prompt['content'].encode('utf-8')).hexdigest()!=prompt['sha256']: raise ValueError('prompt_hash_mismatch')
         if VALUE.search(prompt['content']): raise ValueError('sensitive_prompt_content')
@@ -74,11 +76,11 @@ def records(db, song_id, assemble, root=ROOT, run_id=None):
         c.rollback()
 
 def main():
-    parser=argparse.ArgumentParser(); parser.add_argument('--database',required=True,type=Path); parser.add_argument('--song',type=int); parser.add_argument('--run',type=int); a=parser.parse_args()
+    parser=argparse.ArgumentParser(); parser.add_argument('--database',required=True,type=Path); parser.add_argument('--song',type=int); parser.add_argument('--run',type=int); parser.add_argument('--revision',type=int); a=parser.parse_args()
     if a.song is not None and a.song<1: parser.error('invalid song')
     sys.path.insert(0,str(ROOT/'python/ezstudio/pipeline/profile'))
     from result_projection import assemble
     # Complete before sending output: no partial download on fatal errors.
-    output='\n'.join(encode(r) for r in records(a.database,a.song,assemble,run_id=a.run))+'\n'
+    output='\n'.join(encode(r) for r in records(a.database,a.song,assemble,run_id=a.run,revision=a.revision))+'\n'
     sys.stdout.buffer.write(output.encode('utf-8'))
 if __name__=='__main__': main()

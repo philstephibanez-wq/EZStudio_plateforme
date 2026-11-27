@@ -54,6 +54,13 @@ CREATE TABLE IF NOT EXISTS songs (
     profile_documentary_json TEXT DEFAULT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_songs_sha ON songs(audio_sha256);
+CREATE TABLE IF NOT EXISTS profile_chatgpt_results (
+    song_id INTEGER NOT NULL,
+    source_run_id INTEGER NOT NULL,
+    prompt_revision_id INTEGER NOT NULL,
+    jsonl TEXT NOT NULL,
+    PRIMARY KEY(song_id, source_run_id, prompt_revision_id)
+);
 
 CREATE TABLE IF NOT EXISTS benchmark_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -45,9 +45,15 @@ class QueueManager
         $songId = $payload['song_id'] ?? null;
         if ($jobType === '' || $songId === null || $songId === '' || !is_scalar($songId)) { return null; }
         $conn = $this->entityManager->getConnection();
+        $expertise = $jobType === 'profile_chatgpt';
+        $identity = $expertise ? " AND CAST(json_extract(payload, '$.run_id') AS INTEGER) = :run AND CAST(json_extract(payload, '$.prompt_revision_id') AS INTEGER) = :revision" : '';
+        $parameters = ['source' => $source, 'job_type' => $jobType, 'song_id' => (string) $songId];
+        if ($expertise) {
+            $parameters += ['run' => (int) ($payload['run_id'] ?? 0), 'revision' => (int) ($payload['prompt_revision_id'] ?? 0)];
+        }
         $id = $conn->fetchOne(
-            "SELECT id FROM job_queue WHERE source = :source AND status IN ('waiting', 'progressing', 'cancelling') AND COALESCE(json_extract(payload, '$.job'), json_extract(payload, '$.phase'), json_extract(payload, '$.type')) = :job_type AND CAST(json_extract(payload, '$.song_id') AS TEXT) = :song_id ORDER BY id ASC LIMIT 1",
-            ['source' => $source, 'job_type' => $jobType, 'song_id' => (string) $songId]
+            "SELECT id FROM job_queue WHERE source = :source AND status IN ('waiting', 'progressing', 'cancelling') AND COALESCE(json_extract(payload, '$.job'), json_extract(payload, '$.phase'), json_extract(payload, '$.type')) = :job_type AND CAST(json_extract(payload, '$.song_id') AS TEXT) = :song_id $identity ORDER BY id ASC LIMIT 1",
+            $parameters
         );
         if ($id === false || $id === null) { return null; }
         $this->entityManager->clear();

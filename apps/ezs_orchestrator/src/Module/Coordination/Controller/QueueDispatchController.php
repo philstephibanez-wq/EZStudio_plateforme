@@ -91,6 +91,7 @@ final class QueueDispatchController extends AbstractController
             'waiting_cancel_authorized'=>$job->getStatus() === JobQueue::STATUS_CANCELLED && $job->getAttempts() === 0 && $job->getWorkerPid() === null && $job->getErrorMessage() === \App\Service\QueueWaitingCancellation::PENDING,
             'recovery_authorized'=>$job->getStatus() === JobQueue::STATUS_CANCELLING
                 && \App\Service\QueueCancellationRecovery::authorizedForJob(dirname(__DIR__, 6), $job),
+            'prompt_revision_id'=>(int)($payload['prompt_revision_id']??0),
             'scientific_run_id'=>(int)($payload['scientific_run_id']??0),
             'song_id'=>(int)($payload['song_id']??0),
         ];

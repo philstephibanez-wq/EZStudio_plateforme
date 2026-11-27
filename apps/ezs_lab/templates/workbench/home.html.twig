@@ -27,7 +27,9 @@
 </style>
 
 <div class="catalog-batch-toolbar">
-  {% include 'workbench/_expertise_action.html.twig' with {expertise_export_url: path('profile_expertise_export'), expertise_label: 'Expertiser TOUT PROFILE', expertise_mode: 'collective'} only %}
+  <button type="button" class="secondary" data-profile-expertise-all="{{ path('profile_expertise_chatgpt') }}">Expertiser TOUT PROFILE</button>
+  <span id="profile-expertise-all-status" class="meta" role="status"></span>
+  <script src="/js/ezs-profile-expertise-all.js?v=1" defer></script>
   <form method="post"
         action="{{ path('profile_analyze_all') }}"
         class="catalog-profile-all-form"
