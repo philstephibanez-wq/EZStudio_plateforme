@@ -26,7 +26,7 @@ def clean(x):
 def encode(x):
     return json.dumps(x, ensure_ascii=False, allow_nan=False, separators=(',',':'))
 
-def records(db, song_id, assemble, root=ROOT):
+def records(db, song_id, assemble, root=ROOT, run_id=None):
     db = Path(db).resolve(strict=True)
     with closing(sqlite3.connect(db.as_uri()+'?mode=ro', uri=True)) as c:
         c.row_factory = sqlite3.Row
@@ -49,7 +49,7 @@ def records(db, song_id, assemble, root=ROOT):
             identity = dict(song)
             if not re.fullmatch(r'[0-9a-fA-F]{64}',song['audio_sha256']): raise ValueError('invalid_audio_identity')
             base={'type':'profile','identity':clean(identity),'prompt_revision_id':prompt['id']}
-            run=c.execute("SELECT sr.*,sr.id AS run_id,s.title,s.artist,s.audio_sha256,s.profile_documentary_json FROM scientific_runs sr JOIN songs s ON s.id=sr.song_id WHERE s.audio_sha256=? AND sr.item='profile' AND sr.state='done' ORDER BY sr.id DESC LIMIT 1",(song['audio_sha256'],)).fetchone()
+            run=c.execute("SELECT sr.*,sr.id AS run_id,s.title,s.artist,s.audio_sha256,s.profile_documentary_json FROM scientific_runs sr JOIN songs s ON s.id=sr.song_id WHERE s.audio_sha256=? AND sr.item='profile' AND sr.state='done' AND (? IS NULL OR sr.id=?) ORDER BY sr.id DESC LIMIT 1",(song['audio_sha256'],run_id,run_id)).fetchone()
             if run is None:
                 counts['missing']+=1; yield dict(base,status='missing',reason='no_completed_profile'); continue
             try:
@@ -74,11 +74,11 @@ def records(db, song_id, assemble, root=ROOT):
         c.rollback()
 
 def main():
-    parser=argparse.ArgumentParser(); parser.add_argument('--database',required=True,type=Path); parser.add_argument('--song',type=int); a=parser.parse_args()
+    parser=argparse.ArgumentParser(); parser.add_argument('--database',required=True,type=Path); parser.add_argument('--song',type=int); parser.add_argument('--run',type=int); a=parser.parse_args()
     if a.song is not None and a.song<1: parser.error('invalid song')
     sys.path.insert(0,str(ROOT/'python/ezstudio/pipeline/profile'))
     from result_projection import assemble
     # Complete before sending output: no partial download on fatal errors.
-    output='\n'.join(encode(r) for r in records(a.database,a.song,assemble))+'\n'
+    output='\n'.join(encode(r) for r in records(a.database,a.song,assemble,run_id=a.run))+'\n'
     sys.stdout.buffer.write(output.encode('utf-8'))
 if __name__=='__main__': main()

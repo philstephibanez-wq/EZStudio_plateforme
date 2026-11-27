@@ -18,10 +18,15 @@ final class ProfileExpertiseExportController
         if ($song !== null && filter_var($song, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]) === false) {
             return new Response('Chanson invalide.', 400);
         }
+        $run = $request->query->get('run');
+        if ($run !== null && ($song === null || filter_var($run, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]) === false)) {
+            return new Response('Analyse invalide.', 400);
+        }
         $root = dirname(__DIR__, 2);
         $python = (string)(getenv('EZSTUDIO_PROFILE_PYTHON') ?: ($_SERVER['EZSTUDIO_PROFILE_PYTHON'] ?? '') ?: 'H:/Python/pythoncore-3.14-64/python.exe');
         $args = [$python, '-B', $root.'/scripts/export-profile-expertise.py', '--database', $db->path()];
         if ($song !== null) { $args[] = '--song'; $args[] = (string)(int)$song; }
+        if ($run !== null) { $args[] = '--run'; $args[] = (string)(int)$run; }
         try {
             $process = new Process($args, $root, ['PYTHONUTF8'=>'1','PYTHONIOENCODING'=>'utf-8']);
             $process->setTimeout(120);
