@@ -28,6 +28,6 @@ final class EzsFifoTrace
         $test = QueueBarrierPaths::isTest();
         $file = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . ($dir === sys_get_temp_dir() ? ($test ? 'ezs_fifo_trace_r1_test.jsonl' : 'ezs_fifo_trace_r1.jsonl') : ($test ? 'events_test.jsonl' : 'events.jsonl'));
         @file_put_contents($file, $json . "\n", FILE_APPEND | LOCK_EX);
-        error_log('[EZS_FIFO_TRACE_R1] ' . $json);
+        // R2: file-only trace; never feed a parent process pipe.
     }
 }

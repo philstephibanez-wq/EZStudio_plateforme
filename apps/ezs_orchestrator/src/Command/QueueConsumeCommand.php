@@ -109,7 +109,7 @@ info>[Job #%d]
                     if (!$terminal instanceof JobQueue || !$terminal->isTerminal()) {
                         throw new \RuntimeException('queue_success_terminal_commit_missing');
                     }
-                    if ($terminal->hasError()) {
+                    if ($terminal->hasError() || $terminal->getStatus() !== JobQueue::STATUS_ENDED) {
                         // A worker may already have finalized a failed job via REST.
                         // Never overwrite or announce that failure as a success.
                         throw new \RuntimeException('queue_worker_already_failed');
@@ -151,7 +151,7 @@ info>[Job #%d]
                             throw new \RuntimeException('queue_ko_pause_persist_failed', 0, $e);
                         }
                     }
-                    $terminal = $this->queueManager->markEnded($id, true, $e->getMessage());
+                    $terminal = $this->queueManager->markEnded($id, true, $code);
                     if (!$terminal instanceof JobQueue || !$terminal->isTerminal()) {
                         // Fail closed: never claim another job while this one might
                         // still own the unique global running slot.
@@ -244,6 +244,19 @@ string> $command @param array
 string,string> $env */
     private function runSubprocess(int $queueJobId, array $command, string $cwd, array $env, int $timeout, OutputInterface $output): void
     {
+        if (in_array('lab:profile:expertise-job', $command, true)) {
+            [$exitCode, $reason] = self::superviseProfileR2($command, $cwd, $env, $timeout,
+                function (int $pid) use ($queueJobId): void {
+                    $this->queueManager->attachWorkerPid($queueJobId, $pid);
+                    EzsFifoTrace::log('E2E_CHILD_SPAWN', ['global_job_id'=>$queueJobId,'result'=>'spawned']);
+                },
+                static function () use ($queueJobId): void {
+                    EzsFifoTrace::log('E2E_PROFILE_HEARTBEAT_R2', ['global_job_id'=>$queueJobId,'state'=>'progressing']);
+                });
+            EzsFifoTrace::log('E2E_CHILD_EXIT', ['global_job_id'=>$queueJobId,'exit_code'=>$exitCode,'reason'=>$reason]);
+            if ($exitCode !== 0) throw new \RuntimeException($reason ?? ('subprocess_exit_'.$exitCode));
+            return;
+        }
         $process = new Process($command, $cwd, $env);
         $process->setTimeout($timeout);
         $process->start();
@@ -292,6 +305,65 @@ string,string> $env */
                 $reason .= ' | ' . $queueErrorLine;
             }
             throw new \RuntimeException($reason);
+        }
+    }
+
+    // R2: direct process supervision for PROFILE expertise only. No pipe callback.
+    private static function superviseProfileR2(array $command, string $cwd, array $env, int $timeout, callable $onPid, callable $heartbeat): array
+    {
+        $out = tmpfile();
+        $err = tmpfile();
+        if (!is_resource($out) || !is_resource($err)) {
+            if (is_resource($out)) fclose($out);
+            if (is_resource($err)) fclose($err);
+            throw new \RuntimeException('profile_temp_open_failed');
+        }
+        $proc = null;
+        $pid = 0;
+        $exit = -1;
+        try {
+            $proc = proc_open($command, [0 => ['file', PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null', 'r'], 1 => $out, 2 => $err], $pipes, $cwd, array_replace(getenv(), $env), ['bypass_shell'=>true]);
+            if (!is_resource($proc)) throw new \RuntimeException('profile_spawn_failed');
+            $state = proc_get_status($proc);
+            $pid = (int)$state['pid'];
+            $onPid($pid);
+            $start = hrtime(true);
+            $next = 0;
+            while ($state['running']) {
+                $elapsed = (hrtime(true)-$start)/1e9;
+                if ($elapsed >= $timeout) throw new \RuntimeException('profile_supervision_timeout');
+                if ($elapsed >= $next) { $heartbeat(); $next = $elapsed+15; }
+                usleep(100000);
+                $state = proc_get_status($proc);
+            }
+            $exit = (int)$state['exitcode'];
+            $closed = proc_close($proc);
+            $proc = null;
+            if ($exit < 0) $exit = $closed;
+            // Never propagate raw output. Inspect bounded tails for explicit diagnostic only.
+            $safe = null;
+            foreach ([$out,$err] as $stream) {
+                $size = fstat($stream)['size'];
+                fseek($stream, max(0,$size-65536));
+                foreach (preg_split('/\r?\n/', (string)stream_get_contents($stream,65536)) as $line) {
+                    if (preg_match('/\AQUEUE_ERROR ProfileExpertise: (profile_[a-z0-9_]{1,90})\z/D', trim($line), $m)) $safe=$m[1];
+                }
+            }
+            return [$exit,$safe];
+        } finally {
+            if (is_resource($proc)) {
+                $state=proc_get_status($proc);
+                if ($state['running']) {
+                    if (PHP_OS_FAMILY === 'Windows' && $pid > 0) {
+                        // Numeric PID obtained from the owned process; no user-controlled shell text.
+                        @exec('taskkill /PID '.(int)$pid.' /T /F >NUL 2>&1');
+                    }
+                    @proc_terminate($proc,9);
+                }
+                proc_close($proc);
+            }
+            fclose($out);
+            fclose($err);
         }
     }
 

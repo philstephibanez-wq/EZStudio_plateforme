@@ -198,28 +198,19 @@ document.getElementById('deleteJobModal')?.addEventListener('show.bs.modal', fun
             const currentBadge = document.getElementById('queue-availability-badge');
             const nextBadge = documentCopy.getElementById('queue-availability-badge');
             if (currentBadge && nextBadge) currentBadge.replaceWith(document.importNode(nextBadge, true));
-            // EZS_R1H_FIFO_ALERT: a GO in progress excludes a blocking KO by FIFO contract.
+            // R2: manual retry does not remove the persisted FIFO barrier.
             // Keep the alert in sync with the fetched document instead of leaving stale HTML.
             const currentAlerts = Array.from(document.querySelectorAll('main .alert, main [role="alert"], main [id*="pause"], main [class*="pause"]'));
             const incomingAlerts = Array.from(documentCopy.querySelectorAll('main .alert, main [role="alert"], main [id*="pause"], main [class*="pause"]'));
             const suspended = el => (el.textContent || '').includes('FILE SUSPENDUE APRÈS UN JOB KO');
             const currentPause = currentAlerts.find(suspended);
             const nextPause = incomingAlerts.find(suspended);
-            const live = document.getElementById('queue-live-region');
-            const progresses = Array.from(live?.querySelectorAll('strong') || []);
-            const progressing = progresses.some(el =>
-                /en progression\s*:/i.test(el.previousSibling?.textContent || '') && Number(el.textContent.trim()) > 0);
+            // R2: the server barrier is authoritative even during manual retry.
             if (currentPause) {
-                currentPause.hidden = progressing || !nextPause;
-                if (!progressing && nextPause) currentPause.innerHTML = nextPause.innerHTML;
-            } else if (nextPause && !progressing) {
+                currentPause.hidden = !nextPause;
+                if (nextPause) currentPause.innerHTML = nextPause.innerHTML;
+            } else if (nextPause) {
                 document.querySelector('main .ezs-statusline')?.after(document.importNode(nextPause, true));
-            }
-            // The displayed blocking count is not allowed to contradict a running GO.
-            if (progressing && live) {
-                for (const n of Array.from(live.querySelectorAll('strong'))) {
-                    if (/erreur bloquante\s*:/i.test(n.previousSibling?.textContent || '')) n.textContent = '0';
-                }
             }
         } catch (_) {}
     }, 4000);
