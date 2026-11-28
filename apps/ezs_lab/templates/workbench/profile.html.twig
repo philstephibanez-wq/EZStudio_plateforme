@@ -221,7 +221,7 @@
       {% if selected_song and selected_profile_run and selected_profile_run.state == 'done' %}
         <button type="button" data-profile-chatgpt="{{ path('profile_expertise_chatgpt') }}" data-song="{{ selected_song.id }}" data-run="{{ selected_profile_run.id }}">Expertiser</button>
 
-        <script src="/js/ezs-profile-chatgpt.js?v=monitor-r1" defer></script>
+        <script src="/js/ezs-profile-chatgpt.js?v=reference-r1" defer></script>
       {% endif %}
       {% if selected_song %}{% include 'workbench/_expertise_action.html.twig' with {expertise_export_url: path('profile_expertise_export', {song: selected_song.id, run: selected_profile_run.id ?? null}|filter(v => v is not null)), expertise_label: 'Bridge Brave', expertise_mode: 'individual'} only %}{% endif %}
         {% if selected_song and selected_profile_run and selected_profile_run.state == 'done' %}
@@ -246,7 +246,7 @@
       <div data-expertise-spacer aria-hidden="true"></div>
       {% if profile_items_view.status in ['ready','historical','pending'] %}
       <table class="prof-tbl">
-        <thead><tr><th>Dimension</th><th>Verdict et justification</th><th>Sources</th></tr></thead>
+        <thead><tr><th>Dimension</th><th>Références documentaires / verdict</th><th>Sources</th></tr></thead>
         <tbody>
         {% set dimensions = profile_items_view.rows ? profile_items_view.rows|map(row => row.label) : ['item_1','item_1a','item_1b','item_1c','item_2','item_3','item_4','item_5','item_6','item_7','item_8','item_9'] %}
         {% for dimension in dimensions %}
@@ -284,6 +284,21 @@
 <style>
 .prof-tbl th,.prof-tbl td{height:36px;padding-top:4px;padding-bottom:4px;vertical-align:middle;white-space:nowrap}
 .prof-tbl .ana-cell{max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* EZS_PROFILE_TABLE_STYLE_R1 : mêmes règles pour les deux tableaux de résultats. */
+:is(#profile-canonical-results,#profile-expertise-table) .prof-tbl {
+    width:100%; table-layout:fixed; border-collapse:collapse; font-size:12px;
+}
+:is(#profile-canonical-results,#profile-expertise-table) .prof-tbl :is(th,td) {
+    box-sizing:border-box; padding:4px 6px; height:36px; vertical-align:middle;
+    text-align:left; white-space:normal; overflow-wrap:anywhere; word-break:normal;
+}
+:is(#profile-canonical-results,#profile-expertise-table) .prof-tbl :is(th,td):nth-child(1) {width:25%}
+:is(#profile-canonical-results,#profile-expertise-table) .prof-tbl :is(th,td):nth-child(2) {width:50%}
+:is(#profile-canonical-results,#profile-expertise-table) .prof-tbl :is(th,td):nth-child(3) {width:25%}
+#profile-expertise-table .prof-tbl td[data-verdict] {font:inherit; color:inherit}
+#profile-expertise-table .prof-tbl td[data-verdict] > span {color:var(--muted)}
+#profile-expertise-table .prof-tbl td[data-sources] {font-size:inherit}
+
 </style>
 
 </div>

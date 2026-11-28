@@ -101,6 +101,74 @@
         }
         alignTables();
     }
+    // EZS_PROFILE_REFERENCE_R1: read-only projection of the stored documentary report.
+    function decodeDocumentaryJsonl(raw) {
+        const allowed = new Set(['1','1a','1b','1c','2','3','4','5','6','7','8','9']);
+        const items = new Map(), duplicates = new Set();
+        let errors = 0;
+        let lines = raw.replace(/^\uFEFF/, '').trim().split(/\r?\n/);
+        if (/^```(?:jsonl|json|ndjson)?\s*$/i.test(lines[0]) && /^```\s*$/.test(lines.at(-1))) {
+            lines = lines.slice(1,-1);
+        }
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            let item;
+            try { item = JSON.parse(line); } catch (_) { errors++; continue; }
+            if (!item || typeof item !== 'object' || Array.isArray(item) || !allowed.has(item.item_id)
+                || !Object.hasOwn(item,'valeur') || !Array.isArray(item.sources)) { errors++; continue; }
+            if (items.has(item.item_id) || duplicates.has(item.item_id)) {
+                duplicates.add(item.item_id); items.delete(item.item_id); errors++; continue;
+            }
+            items.set(item.item_id,item);
+        }
+        return {items,duplicates,errors};
+    }
+    function referenceValue(id, value) {
+        if (value === null) return 'Non documenté';
+        if (typeof value === 'string') return value;
+        if (id === '2' && typeof value === 'number' && Number.isFinite(value)) return String(value) + ' s';
+        if (id === '4' && value && !Array.isArray(value) && typeof value === 'object'
+            && typeof value.bpm === 'number' && typeof value.unite === 'string') {
+            return String(value.bpm) + ' BPM · ' + value.unite;
+        }
+        if (Array.isArray(value)) return value.length ? value.map(v => referenceValue('',v)).join(' ; ') : 'Liste vide (référence)';
+        return JSON.stringify(value);
+    }
+    function renderDocumentaryJsonl(raw) {
+        const decoded = decodeDocumentaryJsonl(raw);
+        const allSources = new Set();
+        for (const row of table?.querySelectorAll('[data-expertise-item]') ?? []) {
+            const id = row.dataset.expertiseItem;
+            const item = decoded.items.get(id);
+            const cell = row.querySelector('[data-verdict]');
+            const sources = row.querySelector('[data-sources]');
+            cell.style.whiteSpace = 'normal'; cell.style.overflowWrap = 'anywhere';
+            sources.style.whiteSpace = 'normal'; sources.style.overflowWrap = 'anywhere';
+            cell.textContent = decoded.duplicates.has(id) ? 'Références multiples : conflit' : item ? referenceValue(id,item.valeur) : 'Non fourni dans la fiche';
+            if (item && typeof item.commentaire === 'string' && item.commentaire.trim()) {
+                const comment = document.createElement('span');
+                comment.textContent = item.commentaire;
+                cell.append(document.createElement('br'),comment);
+            }
+            sources.replaceChildren();
+            for (const url of new Set(item?.sources ?? [])) {
+                if (!https(url)) continue;
+                const link = document.createElement('a');
+                link.href = url; link.textContent = new URL(url).hostname;
+                link.title = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+                sources.append(link,document.createElement('br')); allSources.add(url);
+            }
+            if (!sources.childNodes.length) sources.textContent = '—';
+        }
+        if (decoded.errors) result.querySelector('[data-report-label]').textContent += ' · ' + decoded.errors + ' ligne(s) invalide(s) ou en conflit';
+        const list = result.querySelector('[data-report-sources]');
+        list.replaceChildren();
+        for (const url of allSources) {
+            const li = document.createElement('li'); const a = document.createElement('a');
+            a.href = url; a.textContent = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+            li.append(a); list.append(li);
+        }
+    }
     function renderReport(data) {
 
         result.querySelector('[data-report-label]').textContent =
@@ -110,10 +178,7 @@
             copyJsonl.disabled = false;
             copyStatus.textContent = '';
             result.querySelector('[data-report-sources]').replaceChildren();
-            for (const row of table?.querySelectorAll('[data-expertise-item]') ?? []) {
-                row.querySelector('[data-verdict]').textContent = '—';
-                row.querySelector('[data-sources]').textContent = '—';
-            }
+            renderDocumentaryJsonl(data.jsonl);
             alignTables();
             draw(order.length);
             return;
