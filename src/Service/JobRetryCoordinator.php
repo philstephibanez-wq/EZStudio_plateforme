@@ -53,6 +53,21 @@ final class JobRetryCoordinator
                 EzsFifoTrace::log('RETRY_PREPARE_RESULT',['global_job_id'=>$queueJobId,'attempt'=>$attempt,'result'=>($prepared['ok']??false)?'ok':'rejected','reason'=>(string)($prepared['reason']??'none')]);
             }
             if (!($prepared['ok']??false)) return ['ok'=>false,'reason'=>(string)($prepared['reason']??'retry_prepare_rejected'),'job'=>$job];
+            // EZS_PROFILE_FIFO_RETRY_R1: LAB verified identity without mutating state.
+            // No LAB receipt exists for this kind; the global retry is the sole write.
+            if ($type === 'profile_chatgpt') {
+                if (($prepared['reason'] ?? null) !== 'expertise_retry_readonly_verified') {
+                    return ['ok'=>false,'reason'=>'expertise_retry_contract_invalid','job'=>$job];
+                }
+                try {
+                    $retried=$this->queueManager->retry($queueJobId);
+                    if (!$retried instanceof JobQueue) throw new \RuntimeException('global_queue_retry_rejected');
+                    EzsFifoTrace::log('RETRY_QUEUE_COMMIT_OK',['global_job_id'=>$queueJobId,'attempt'=>$attempt]);
+                    return ['ok'=>true,'reason'=>'relance_acceptee','job'=>$retried];
+                } catch (\Throwable $e) {
+                    return ['ok'=>false,'reason'=>'echec_rearmement_central','job'=>$job];
+                }
+            }
             $reconciled=(bool)($prepared['reconciled']??false);
             try {
                 EzsFifoTrace::log('RETRY_QUEUE_COMMIT_START',['global_job_id'=>$queueJobId,'attempt'=>$attempt]);

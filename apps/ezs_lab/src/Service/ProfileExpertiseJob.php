@@ -93,8 +93,14 @@ final class ProfileExpertiseJob extends Command
             return Command::SUCCESS;
         }
 
+        $platform = dirname(__DIR__, 4);
+        require_once $platform.'/shared/src/Quota/AttemptLedger.php';
+        $ctx = \Shared\Quota\AttemptLedger::begin($platform, \Shared\Quota\AttemptLedger::isTest(), $id, $song, $run, $revision);
+        $outcome = 'failed'; $reason = 'worker_exception'; $stderr = '';
+        try {
         $python = getenv('EZS_CHATGPT_PYTHON') ?: ($_SERVER['EZS_CHATGPT_PYTHON'] ?? $_ENV['EZS_CHATGPT_PYTHON'] ?? '');
         if (!$python || !is_file($python)) {
+            $reason = 'python_missing';
             $output->writeln('EZS_CHATGPT_PYTHON_MISSING');
             return Command::FAILURE;
         }
@@ -108,6 +114,7 @@ final class ProfileExpertiseJob extends Command
         } catch (\Symfony\Component\Process\Exception\ProcessTimedOutException $error) {
             $timedOut = true;
         }
+        $stderr = $process->getErrorOutput();
         $data = json_decode($process->getOutput(), true);
         if ($timedOut || !$process->isSuccessful() || ($data['run'] ?? null) !== $run
             || ($data['prompt_revision'] ?? null) !== $revision || !is_string($data['jsonl'] ?? null)
@@ -116,7 +123,7 @@ final class ProfileExpertiseJob extends Command
             $stage = 'unknown';
             $code = 'python_exit';
             $stages = ['unknown', 'export', 'session_lock', 'registration', 'oauth', 'models', 'model_select', 'search', 'result'];
-            $codes = ['run_unavailable', 'revision_mismatch', 'template_invalid', 'lock_busy', 'model_unavailable', 'event_error', 'event_failed', 'event_incomplete', 'terminal_not_completed', 'stream_incomplete', 'empty_text', 'rate_limit_exceeded', 'insufficient_quota', 'usage_limit_reached', 'quota_exceeded', 'authentication_error', 'invalid_api_key', 'invalid_token', 'token_expired', 'permission_denied', 'access_denied', 'forbidden', 'model_not_found', 'server_error', 'internal_error', 'invalid_request_error', 'context_length_exceeded', 'content_filter', 'max_output_tokens', 'json_decode', 'timeout', 'export_subprocess', 'os_error', 'key_error', 'value_error', 'oauth_failure', 'unexpected', 'php_timeout', 'python_exit', 'invalid_stdout', 'invalid_run', 'invalid_revision', 'invalid_jsonl'];
+            $codes = ['subscription_sharing_usage_limit_exceeded', 'run_unavailable', 'revision_mismatch', 'template_invalid', 'lock_busy', 'model_unavailable', 'event_error', 'event_failed', 'event_incomplete', 'terminal_not_completed', 'stream_incomplete', 'empty_text', 'rate_limit_exceeded', 'insufficient_quota', 'usage_limit_reached', 'quota_exceeded', 'authentication_error', 'invalid_api_key', 'invalid_token', 'token_expired', 'permission_denied', 'access_denied', 'forbidden', 'model_not_found', 'server_error', 'internal_error', 'invalid_request_error', 'context_length_exceeded', 'content_filter', 'max_output_tokens', 'json_decode', 'timeout', 'export_subprocess', 'os_error', 'key_error', 'value_error', 'oauth_failure', 'unexpected', 'php_timeout', 'python_exit', 'invalid_stdout', 'invalid_run', 'invalid_revision', 'invalid_jsonl'];
             foreach (preg_split('/\r?\n/', $process->getErrorOutput()) as $line) {
                 if (preg_match('/\AEZS_STAGE ([a-z_]+)\z/D', $line, $m) && in_array($m[1], $stages, true)) {
                     $stage = $m[1];
@@ -138,6 +145,8 @@ final class ProfileExpertiseJob extends Command
             $output->writeln(sprintf('EZS_PROFILE_DIAG job=%d song=%d run=%d revision=%d exit=%d stage=%s code=%s',
                 $id, $song, $run, $revision, (int) ($process->getExitCode() ?? -1), $stage, $code));
             $output->writeln('QUEUE_ERROR ProfileExpertise: profile_'.$stage.'_'.$code);
+            $reason = $code;
+            $outcome = $code === 'subscription_sharing_usage_limit_exceeded' ? 'saturated' : 'failed';
             $output->writeln('EZS_CHATGPT_EXPERTISE_FAILED');
             return Command::FAILURE;
         }
@@ -145,7 +154,12 @@ final class ProfileExpertiseJob extends Command
             'INSERT INTO profile_chatgpt_results (song_id, source_run_id, prompt_revision_id, jsonl) VALUES (?, ?, ?, ?)
              ON CONFLICT(song_id, source_run_id, prompt_revision_id) DO NOTHING'
         );
+        $reason = 'persistence_failed';
         $stmt->execute([$song, $run, $revision, $data['jsonl']]);
+        $outcome = 'success'; $reason = null;
         return Command::SUCCESS;
+        } finally {
+            \Shared\Quota\AttemptLedger::finish($ctx, $outcome, $reason, $stderr);
+        }
     }
 }

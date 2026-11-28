@@ -72,7 +72,13 @@ final class ProfileController extends AbstractController
             $selected ??= $runs[0];
         }
 
+        $platform=dirname(__DIR__,4);
+        require_once $platform.'/shared/src/Quota/AttemptLedger.php';
+        $all=\Shared\Quota\AttemptLedger::rows($platform,\Shared\Quota\AttemptLedger::isTest());
+        $ids=$song ? ($song['song_ids'] ?? [(int)$song['id']]) : [];
+        $quotaRows=$all===null?null:array_values(array_filter($all,static fn($r)=>in_array($r['song'],$ids,true)));
         return $this->render('workbench/profile.html.twig', [
+            'quota_rows' => $quotaRows,
             'songs' => $catalog->songs(),
             'selected_song' => $song,
             'profile_runs' => $runs,

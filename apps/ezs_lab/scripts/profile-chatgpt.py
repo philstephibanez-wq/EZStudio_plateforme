@@ -12,7 +12,7 @@ import ezs_chatgpt_oauth as oauth
 # EZS_PROFILE_FIFO_R2_DIAG — finite diagnostic vocabulary; never log raw payloads.
 _EZS_STAGE = "unknown"
 _EZS_DIAG_EMITTED = False
-_EZS_REMOTE_CODES = frozenset(('empty_text', 'rate_limit_exceeded', 'insufficient_quota', 'usage_limit_reached', 'quota_exceeded', 'authentication_error', 'invalid_api_key', 'invalid_token', 'token_expired', 'permission_denied', 'access_denied', 'forbidden', 'model_not_found', 'server_error', 'internal_error', 'invalid_request_error', 'context_length_exceeded', 'content_filter', 'max_output_tokens', 'json_decode'))
+_EZS_REMOTE_CODES = frozenset(('subscription_sharing_usage_limit_exceeded', 'empty_text', 'rate_limit_exceeded', 'insufficient_quota', 'usage_limit_reached', 'quota_exceeded', 'authentication_error', 'invalid_api_key', 'invalid_token', 'token_expired', 'permission_denied', 'access_denied', 'forbidden', 'model_not_found', 'server_error', 'internal_error', 'invalid_request_error', 'context_length_exceeded', 'content_filter', 'max_output_tokens', 'json_decode'))
 
 
 def diagnostic(code):
@@ -120,6 +120,17 @@ def response(token, model, prompt):
 
     def consume(event):
         kind = event["type"]
+        if kind in {"response.completed", "response.failed", "response.incomplete"}:
+            final = event.get("response")
+            if isinstance(final, dict):
+                usage = final.get("usage")
+                usage = usage if isinstance(usage, dict) else {}
+                receipt = {k: usage.get(k) if type(usage.get(k)) is int and usage[k] >= 0 else None
+                           for k in ("input_tokens", "output_tokens", "total_tokens")}
+                import re
+                actual_model = final.get("model")
+                receipt["model"] = actual_model if isinstance(actual_model, str) and re.fullmatch(r"(?:gpt-[a-zA-Z0-9.-]{1,60}|o[1-9](?:-[a-zA-Z0-9.-]{1,60})?)", actual_model) else None
+                print("EZS_USAGE_R2 " + json.dumps(receipt), file=sys.stderr, flush=True)
         if kind in {"error", "response.failed", "response.incomplete"}:
             event_diagnostic(event, {"error": "event_error", "response.failed": "event_failed", "response.incomplete": "event_incomplete"}[kind])
             raise oauth.Failure("Réponse ChatGPT interrompue.")

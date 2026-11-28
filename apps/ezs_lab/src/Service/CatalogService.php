@@ -41,7 +41,11 @@ final class CatalogService
             $groups[$key]['song_ids'][] = (int)$song['id'];
         }
 
+        $platform=dirname(__DIR__,4);
+        require_once $platform.'/shared/src/Quota/AttemptLedger.php';
+        $attempts=\Shared\Quota\AttemptLedger::rows($platform,\Shared\Quota\AttemptLedger::isTest());
         foreach ($groups as &$group) {
+            $group['quota_stats']=\Shared\Quota\AttemptLedger::stats($attempts,$group['song_ids']);
             $this->db->reconcileStaleCancellingAnalysisJobsForSongs(
                 $group['song_ids'],
                 60

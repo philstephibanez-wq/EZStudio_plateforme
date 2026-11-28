@@ -48,6 +48,7 @@
   <th>STEMS</th>
   <th>CHORDS</th>
   <th>LYRICS</th>
+  <th>{{ 'catalog'|trans({},'ezs_quota','fr') }}</th>
   <th>Actions</th>
 </tr>
 </thead>
@@ -90,6 +91,7 @@
     </td>
   {% endfor %}
 
+  <td>{% set q = song.quota_stats %}{% if q is not null %}{{ q.attempts }} {{ 'attempts'|trans({},'ezs_quota','fr') }} · {{ q.measured }}/{{ q.attempts }} · {{ q.total_tokens ?? '—' }}{% if q.latest %} · {{ ('state_' ~ q.latest)|trans({},'ezs_quota','fr') }}{% endif %}{% else %}{{ 'error'|trans({},'ezs_quota','fr') }}{% endif %}<br><a href="{{ path('workbench_profile',{song:song.id}) }}">PROFILE</a></td>
   <td>
     <div class="catalog-actions">
       {% set actions = [
@@ -146,7 +148,7 @@
 </tr>
 {% else %}
 <tr>
-  <td colspan="6">
+  <td colspan="7">
     Aucune chanson dans le catalogue.
     <a href="{{ path('workbench_import') }}">Importer une chanson</a>
   </td>

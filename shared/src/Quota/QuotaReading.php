@@ -11,6 +11,13 @@ final class QuotaReading {
             if (!in_array($key,self::SCOPES,true)||!is_array($v)) throw new \InvalidArgumentException('scope');
             $n=$v['remaining']??null; $reset=$v['reset']??null;
             if ((!is_int($n)&&!is_float($n))||!is_finite((float)$n)||$n<0||$n>100) throw new \InvalidArgumentException('percent');
+            if (isset($v['relative'])) {
+                if ($reset!==null || !is_string($v['relative']) || !preg_match('/\A(?:(\d{1,2})j)?(?:(\d{1,2})h)?(?:(\d{1,2})m?)?\z/D',$v['relative'],$m) || $v['relative']==='') throw new \InvalidArgumentException('relative');
+                $d=(int)($m[1]??0); $h=(int)($m[2]??0); $min=(int)($m[3]??0);
+                $seconds=$d*86400+$h*3600+$min*60;
+                if ($min>=60||$seconds<=0||$seconds>31*86400) throw new \InvalidArgumentException('relative');
+                $reset=$now+$seconds;
+            }
             if ($reset!==null && (!is_int($reset)||$reset<=$now)) throw new \InvalidArgumentException('reset');
             $out[$key]=['remaining'=>$n,'reset'=>$reset,'observed'=>$now];
         }

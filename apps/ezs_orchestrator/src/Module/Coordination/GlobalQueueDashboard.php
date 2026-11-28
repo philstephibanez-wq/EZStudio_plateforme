@@ -116,6 +116,21 @@ final class GlobalQueueDashboard
                 if (count($rows) >= $limit) { break; }
             }
 
+            // Resolve missing labels once per page; no LAB database access here.
+            $ids=[];
+            foreach ($rows as $row) {
+                $id=$row['subject']->getPayload()['song_id']??null;
+                if ($row['actor']==='lab' && $row['label']===null && (is_int($id)||is_string($id)) && ctype_digit((string)$id) && (int)$id>0) $ids[]=(int)$id;
+            }
+            $query->closeCursor();
+            if ($ids && !\App\Service\QueueBarrierPaths::isTest()) {
+                $labels=QueueSongLabels::readSongs($ids);
+                foreach ($rows as &$row) {
+                    $id=$row['subject']->getPayload()['song_id']??null;
+                    if ($row['actor']==='lab' && $row['label']===null && (is_int($id)||is_string($id)) && ctype_digit((string)$id) && (int)$id>0) $row['label']=$labels[(int)$id]??null;
+                }
+                unset($row);
+            }
             return ['available' => true, 'reason' => null, 'jobs' => $rows, 'counts' => $counts, 'filters' => $activeFilters, 'observed_at' => time()];
         } catch (\Throwable) {
             return ['available' => false, 'reason' => 'queue_read_unavailable', 'jobs' => [], 'filters' => $activeFilters];

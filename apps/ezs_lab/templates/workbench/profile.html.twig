@@ -272,6 +272,8 @@
         <ul data-report-sources style="overflow-wrap:anywhere" hidden></ul>
       </section>
     {% endif %}
+    {% if selected_song %}<section class="card"><h2>{{ 'history'|trans({},'ezs_quota','fr') }}</h2>
+    {% if quota_rows is null %}{{ 'error'|trans({},'ezs_quota','fr') }}{% elseif quota_rows is empty %}{{ 'no_history'|trans({},'ezs_quota','fr') }}{% else %}<div class="table-responsive"><table class="table table-sm"><thead><tr>{% for k in ['date','job','run','revision','status','duration','model','input_tokens','output_tokens','tokens','error_code'] %}<th>{{ k|trans({},'ezs_quota','fr') }}</th>{% endfor %}</tr></thead><tbody>{% for r in quota_rows %}<tr><td>{{ r.started_at|date('d/m/Y H:i:s') }}</td><td>{{ r.job }}</td><td>{{ r.run }}</td><td>{{ r.revision }}</td><td>{{ ('state_' ~ r.status)|trans({},'ezs_quota','fr') }}</td><td>{{ r.duration_ms is null ? '—' : (r.duration_ms / 1000)|number_format(1) ~ ' s' }}</td><td>{{ r.model ?? '—' }}</td><td>{{ r.input_tokens ?? '—' }}</td><td>{{ r.output_tokens ?? '—' }}</td><td>{{ r.total_tokens ?? '—' }}</td><td>{{ r.error ?? '—' }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}</section>{% endif %}
     {% include 'workbench/_expertise_prompt.html.twig' %}
   </div>
   <style>

@@ -22,6 +22,11 @@ final class LabRetryService
     /** No database paths, engine output, audio, or source SQL is returned over REST. */
     public function prepare(array $request): array
     {
+        // EZS_PROFILE_FIFO_RETRY_R1: documentary expertise has no analysis_jobs row.
+        $payload = $request['payload'] ?? null;
+        if (is_array($payload) && ($payload['job'] ?? null) === 'profile_chatgpt') {
+            return $this->prepareDocumentary($request, $payload);
+        }
         $identity = $this->validate($request);
         $pdo = $this->database->pdo();
         $pdo->exec('BEGIN IMMEDIATE');
@@ -149,6 +154,31 @@ final class LabRetryService
             if (!$o || $o['state'] !== 'admitted' || (int)$o['global_job_id'] !== $identity['global_job_id']) throw new \DomainException('global_job_identity_conflict');
         }
         return ['ok'=>true,'queued'=>$job['status']==='queued' && (int)$job['progress']===0 && $job['error']===null];
+    }
+
+    private function prepareDocumentary(array $request, array $payload): array
+    {
+        if (($request['source'] ?? null) !== 'lab') throw new \InvalidArgumentException('retry_request_invalid');
+        foreach (['global_job_id','attempt'] as $key) {
+            if (!is_int($request[$key] ?? null) || $request[$key] < 1) throw new \InvalidArgumentException('retry_request_invalid');
+        }
+        foreach (['song_id','run_id','prompt_revision_id'] as $key) {
+            if (!is_int($payload[$key] ?? null) || $payload[$key] < 1) throw new \InvalidArgumentException('expertise_retry_identity_invalid');
+        }
+        if (isset($payload['analysis_job_id']) || isset($payload['job_id'])) throw new \InvalidArgumentException('expertise_retry_identity_invalid');
+        // Read-only validation against the exact admitted recording, run and historical prompt.
+        $row = $this->get($this->database->pdo(), <<<'SQL'
+SELECT s.audio_sha256, p.content FROM songs s
+JOIN songs origin ON origin.audio_sha256=s.audio_sha256
+JOIN scientific_runs r ON r.song_id=origin.id AND r.item='profile' AND r.state='done'
+JOIN profile_expertise_prompt_revision p ON p.id=?
+WHERE s.id=? AND r.id=? AND trim(s.title)<>'' AND trim(s.artist)<>''
+SQL, [$payload['prompt_revision_id'], $payload['song_id'], $payload['run_id']]);
+        if (!$row || !preg_match('/\A[0-9a-fA-F]{64}\z/D', (string)$row['audio_sha256'])
+            || !str_contains((string)$row['content'], '{titre}') || !str_contains((string)$row['content'], '{artiste}')) {
+            throw new \DomainException('expertise_retry_identity_conflict');
+        }
+        return ['ok'=>true,'reconciled'=>false,'reason'=>'expertise_retry_readonly_verified'];
     }
 
     private function validate(array $request): array

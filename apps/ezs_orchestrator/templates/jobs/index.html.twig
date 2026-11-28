@@ -88,12 +88,16 @@
                                 <td>{{ job.label ?: '—' }}</td>
                                 <td>{{ ezs.state_badge(job.state, job.has_error) }}</td>
                                 <td>
+                                    {% if job.category == 'Expertise' and job.state == 'progressing' and job.progress == 0 %}
+                                    <div class="d-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span><span class="small">En cours</span></div>
+                                    {% else %}
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="progress flex-grow-1" style="height: 8px;">
                                             <div class="progress-bar {{ job.has_error ? 'bg-danger' : (job.state == 'ended' ? 'bg-success' : 'bg-primary') }}" style="width: {{ job.progress }}%;"></div>
                                         </div>
                                         <span class="small text-nowrap">{{ job.progress }} %</span>
                                     </div>
+                                    {% endif %}
                                 </td>
                                 <td>{{ job.attempts }}</td>
                                 {% if has_any_error %}<td class="small">{% if job.error_message %}<span class="text-danger">{{ job.error_message }}</span>{% else %}<span class="text-body-secondary">—</span>{% endif %}</td>{% endif %}
