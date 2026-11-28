@@ -60,7 +60,7 @@ final class JobRetryCoordinator
                     return ['ok'=>false,'reason'=>'expertise_retry_contract_invalid','job'=>$job];
                 }
                 try {
-                    $retried=$this->queueManager->retry($queueJobId);
+                    $retried=$this->queueManager->retry($queueJobId, true);
                     if (!$retried instanceof JobQueue) throw new \RuntimeException('global_queue_retry_rejected');
                     EzsFifoTrace::log('RETRY_QUEUE_COMMIT_OK',['global_job_id'=>$queueJobId,'attempt'=>$attempt]);
                     return ['ok'=>true,'reason'=>'relance_acceptee','job'=>$retried];
@@ -71,7 +71,7 @@ final class JobRetryCoordinator
             $reconciled=(bool)($prepared['reconciled']??false);
             try {
                 EzsFifoTrace::log('RETRY_QUEUE_COMMIT_START',['global_job_id'=>$queueJobId,'attempt'=>$attempt]);
-                $retried=$this->queueManager->retry($queueJobId);
+                $retried=$this->queueManager->retry($queueJobId, true);
                 if (!$retried instanceof JobQueue) throw new \RuntimeException('global_queue_retry_rejected');
                 EzsFifoTrace::log('RETRY_QUEUE_COMMIT_OK',['global_job_id'=>$queueJobId,'attempt'=>$attempt]);
             } catch (\Throwable $e) {

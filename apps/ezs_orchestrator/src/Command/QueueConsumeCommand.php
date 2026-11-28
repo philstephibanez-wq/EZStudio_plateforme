@@ -31,6 +31,7 @@ final class QueueConsumeCommand extends Command
     protected function configure(): void
     {
         $this
+            ->addOption('seal-interrupted', null, InputOption::VALUE_NONE, 'Cloture KO sans execution')
             ->addOption('drain', null, InputOption::VALUE_NONE, 'Dépile tous les jobs en attente puis quitte')
             ->addOption('loop', null, InputOption::VALUE_NONE, 'Reste actif en boucle de scrutation');
     }
@@ -63,6 +64,8 @@ comment>Consumer already running.
         try {
             // Explicitly stopped cancellations are reconciled under the unique consumer lock.
             // No interrupted job is automatically retried.
+            $this->queueManager->recoverInterruptedJobs();
+            if ($input->getOption('seal-interrupted')) return Command::SUCCESS;
             do {
                 if (!$this->cancellationRecovery->reconcile($platformRoot)) {
                     if (!$loop) return Command::FAILURE;
@@ -252,7 +255,7 @@ string,string> $env */
         $queueErrorLine = null;
         $queueLineBuffer = ['out' => '', 'err' => ''];
         $process->wait(static function (string $type, string $buffer) use ($output,$queueJobId,&$queueErrorLine,&$queueLineBuffer): void {
-            $output->write($buffer);
+            // Child output is drained; only sanitized markers are journalled.
             $channel = $type === Process::ERR ? 'err' : 'out';
             $complete = preg_split('/\r?\n/', $queueLineBuffer[$channel] . $buffer);
             $queueLineBuffer[$channel] = (string) array_pop($complete);

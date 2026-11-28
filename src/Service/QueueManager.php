@@ -94,11 +94,12 @@ class QueueManager
         $conn = $this->entityManager->getConnection();
         $conn->beginTransaction();
         try {
+            if ($blockedId === null && (int) $conn->fetchOne("SELECT COUNT(*) FROM job_queue WHERE status='waiting' AND attempts>0") > 0) { $conn->commit(); return null; }
             $activeCount = (int) $conn->fetchOne("SELECT COUNT(*) FROM job_queue WHERE status IN ('progressing', 'cancelling')");
             if ($activeCount > 0 || $this->pendingWaitingCancellations() !== []) { $conn->commit(); return null; }
             $id = $blockedId !== null
-                ? $conn->fetchOne("SELECT id FROM job_queue WHERE id = :id AND status = 'waiting' LIMIT 1", ['id' => $blockedId])
-                : $conn->fetchOne("SELECT id FROM job_queue WHERE status = 'waiting' ORDER BY created_at ASC, id ASC LIMIT 1");
+                ? $conn->fetchOne("SELECT id FROM job_queue WHERE id = :id AND status = 'waiting' AND error_message = 'manual_retry_authorized_v1' LIMIT 1", ['id' => $blockedId])
+                : $conn->fetchOne("SELECT id FROM job_queue WHERE status = 'waiting' AND attempts = 0 ORDER BY created_at ASC, id ASC LIMIT 1");
             if ($id === false || $id === null) { $conn->commit(); return null; }
             $this->entityManager->clear();
             $job = $this->entityManager->find(JobQueue::class, (int) $id);
@@ -106,7 +107,7 @@ class QueueManager
             $this->jobLifecycleStateMachine->apply($job, 'start');
             $job->setProgress(0)->setWorkerPid(null)->incrementAttempts();
             $updated = $conn->executeStatement(
-                "UPDATE job_queue SET status = :status, progress = 0, worker_pid = NULL, attempts = :attempts, updated_at = :now WHERE id = :id AND status = 'waiting'",
+                "UPDATE job_queue SET status = :status, progress = 0, worker_pid = NULL, error_message = NULL, attempts = :attempts, updated_at = :now WHERE id = :id AND status = 'waiting'",
                 ['status' => $job->getStatus(), 'attempts' => $job->getAttempts(), 'now' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'), 'id' => (int) $id]
             );
             $conn->commit();
@@ -175,6 +176,7 @@ class QueueManager
             $this->entityManager->flush();
             return $job;
         }
+        if ($hasError && $job->getStatus() === JobQueue::STATUS_PROGRESSING) { $this->persistKoBarrier($id, 'worker_failed'); }
         $transition = $hasError ? 'fail' : 'complete';
         if (!$this->jobLifecycleStateMachine->can($job, $transition)) { return $job; }
         $this->jobLifecycleStateMachine->apply($job, $transition);
@@ -187,12 +189,15 @@ class QueueManager
     public function markCompletedIfActive(int $id): ?JobQueue { $this->entityManager->clear(); $job = $this->entityManager->find(JobQueue::class, $id); if (!$job instanceof JobQueue) { return null; } return $job->isTerminal() ? $job : $this->markEnded($id, false, null); }
     public function markCompleted(int $id): ?JobQueue { return $this->markEnded($id, false, null); }
     public function markFailed(int $id, ?string $errorMessage = null): ?JobQueue { return $this->markEnded($id, true, $errorMessage); }
-    public function retry(int $id): ?JobQueue
+    public function retry(int $id, bool $manual = false): ?JobQueue
     {
+        if (!$manual) return null;
+        $pause = json_decode((string) @file_get_contents(QueueBarrierPaths::pause(dirname(__DIR__, 2))), true);
+        if (!is_array($pause) || ($pause['schema'] ?? null) !== 'ezs.queue.pause_on_ko.v1' || ($pause['global_job_id'] ?? null) !== $id) return null;
         $conn = $this->entityManager->getConnection();
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
         $updated = $conn->executeStatement(
-            "UPDATE job_queue SET status = 'waiting', progress = 0, has_error = 0, error_message = NULL, worker_pid = NULL, updated_at = :now WHERE id = :id AND status = 'ended' AND has_error = 1",
+            "UPDATE job_queue SET status = 'waiting', progress = 0, has_error = 0, error_message = 'manual_retry_authorized_v1', worker_pid = NULL, updated_at = :now WHERE id = :id AND status = 'ended' AND has_error = 1",
             ['now' => $now, 'id' => $id]
         );
         $this->entityManager->clear();
@@ -294,6 +299,25 @@ class QueueManager
         }
     }
 
+    /** Fail closed before releasing the active slot. Never overwrite another blocker. */
+    private function persistKoBarrier(int $id, string $reason): void
+    {
+        $path = QueueBarrierPaths::pause(dirname(__DIR__, 2));
+        if (is_file($path)) {
+            $record = json_decode((string) file_get_contents($path), true);
+            if (!is_array($record) || ($record['schema'] ?? null) !== 'ezs.queue.pause_on_ko.v1' || ($record['global_job_id'] ?? null) !== $id) {
+                throw new \RuntimeException('queue_existing_barrier_conflict');
+            }
+            return;
+        }
+        $f = fopen($path, 'x');
+        if ($f === false) throw new \RuntimeException('queue_barrier_create_failed');
+        try {
+            $data = json_encode(['schema'=>'ezs.queue.pause_on_ko.v1','global_job_id'=>$id,'reason'=>$reason,'at_utc'=>gmdate('c')], JSON_THROW_ON_ERROR)."\n";
+            if (fwrite($f, $data) !== strlen($data) || !fflush($f) || (function_exists('fsync') && !fsync($f))) throw new \RuntimeException('queue_barrier_write_failed');
+        } finally { fclose($f); }
+    }
+
     public function recoverInterruptedJobs(int $staleTimeoutSeconds = 0): int
     {
         $conn = $this->entityManager->getConnection();
@@ -314,7 +338,9 @@ class QueueManager
                 $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'cancelled', worker_pid = NULL, has_error = 0, error_message = 'Annulé', updated_at = :now WHERE id = :id AND status = 'cancelling'", ['now' => $now, 'id' => $id]);
                 continue;
             }
-            $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'waiting', progress = 0, worker_pid = NULL, updated_at = :now WHERE id = :id AND status = 'progressing'", ['now' => $now, 'id' => $id]);
+            $this->persistKoBarrier($id, 'executor_interrupted');
+            $recovered += (int) $conn->executeStatement("UPDATE job_queue SET status = 'ended', has_error = 1, error_message = 'executor_interrupted', worker_pid = NULL, updated_at = :now WHERE id = :id AND status = 'progressing'", ['now' => $now, 'id' => $id]);
+            EzsFifoTrace::log('EZS_INTERRUPTED_KO', ['global_job_id'=>$id]);
         }
         $this->entityManager->clear();
         return $recovered;

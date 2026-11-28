@@ -62,9 +62,16 @@ switch ($Action.ToLower()) {
     "stop" {
         Write-Host "[EZS] Arret de la plateforme..." -ForegroundColor Yellow
         Get-FrankenProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-        Get-OrchestratorQueueProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Get-OrchestratorQueueProcess | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop }
         Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match "EZStudio_plateforme" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
         Start-Sleep -Seconds 1
+        if (Get-OrchestratorQueueProcess) { throw 'EZS_CONSUMER_STOP_FAILED' }
+        $previousApp = $env:APP_ID
+        try {
+            $env:APP_ID = 'orchestrator'
+            & $phpBin -d opcache.enable_cli=0 "$PlatformRoot\bin\console" orchestrator:queue:consume --seal-interrupted
+            if ($LASTEXITCODE -ne 0) { throw 'EZS_STOP_SEAL_FAILED' }
+        } finally { $env:APP_ID = $previousApp }
         Remove-Item -Path "$PlatformRoot\apps\ezs_lab\var\cache\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Host "[EZS] Plateforme arretee." -ForegroundColor Green
     }
