@@ -221,7 +221,7 @@
       {% if selected_song and selected_profile_run and selected_profile_run.state == 'done' %}
         <button type="button" data-profile-chatgpt="{{ path('profile_expertise_chatgpt') }}" data-song="{{ selected_song.id }}" data-run="{{ selected_profile_run.id }}">Expertiser</button>
 
-        <script src="/js/ezs-profile-chatgpt.js?v=fifo-r1" defer></script>
+        <script src="/js/ezs-profile-chatgpt.js?v=monitor-r1" defer></script>
       {% endif %}
       {% if selected_song %}{% include 'workbench/_expertise_action.html.twig' with {expertise_export_url: path('profile_expertise_export', {song: selected_song.id, run: selected_profile_run.id ?? null}|filter(v => v is not null)), expertise_label: 'Bridge Brave', expertise_mode: 'individual'} only %}{% endif %}
         {% if selected_song and selected_profile_run and selected_profile_run.state == 'done' %}

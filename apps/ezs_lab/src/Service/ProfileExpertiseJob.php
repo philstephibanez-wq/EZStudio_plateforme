@@ -110,7 +110,18 @@ final class ProfileExpertiseJob extends Command
         $process->setTimeout(590);
         $timedOut = false;
         try {
-            $process->run();
+            $stageBuffer = '';
+            $process->run(static function (string $type, string $chunk) use ($ctx, &$stageBuffer): void {
+                if ($type !== Process::ERR) return;
+                $lines = explode("\n", $stageBuffer . $chunk);
+                $stageBuffer = (string) array_pop($lines);
+                if (strlen($stageBuffer) > 2048) $stageBuffer = '';
+                foreach ($lines as $line) {
+                    if (preg_match('/\AEZS_STAGE ([a-z_]+)\z/D', rtrim($line,"\r"), $m)) {
+                        \Shared\Quota\AttemptLedger::progress($ctx,$m[1]);
+                    }
+                }
+            });
         } catch (\Symfony\Component\Process\Exception\ProcessTimedOutException $error) {
             $timedOut = true;
         }

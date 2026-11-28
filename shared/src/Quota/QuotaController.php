@@ -15,7 +15,7 @@ final class QuotaController {
         $token=$session->get('_ezs_quota_csrf');
         if (!is_string($token)) { $token=bin2hex(random_bytes(32)); $session->set('_ezs_quota_csrf',$token); }
         require_once __DIR__.'/AttemptLedger.php';
-        try { $data=QuotaReading::load($this->path()); return $this->answer(['scopes'=>QuotaReading::view($data,time()),'csrf'=>$token,'statistics'=>AttemptLedger::stats(AttemptLedger::rows($this->root,$this->environment === 'test'))]); }
+        try { $rows=AttemptLedger::rows($this->root,$this->environment === 'test'); $data=QuotaReading::load($this->path()); if ($this->environment !== 'test') { require_once __DIR__.'/CodexQuotaProvider.php'; unset($data['five_hours'],$data['weekly']); $data=array_replace($data,CodexQuotaProvider::read($this->root)); } return $this->answer(['scopes'=>QuotaReading::view($data,time()),'csrf'=>$token,'active'=>array_values(array_map(static fn($v)=>array_intersect_key($v,array_flip(['job','song','run','revision','stage','stage_at','started_at'])),array_filter($rows??[],static fn($v)=>($v['status']??null)==='open'))),'statistics'=>AttemptLedger::stats($rows)]); }
         catch (\Throwable) { return $this->answer(['error'=>'unavailable'],503); }
     }
     #[Route('/chatgpt/quota/observation', name:'ezs_quota_observation', methods:['POST'])]

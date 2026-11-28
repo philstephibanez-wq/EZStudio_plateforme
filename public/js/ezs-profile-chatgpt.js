@@ -236,6 +236,36 @@
             revision.disabled = !reports.length;
         }
     });
+
+    // Observe global FIFO attempts without submitting any new job.
+    let monitored = false;
+    let reading = false;
+    async function readPersisted() {
+        if (reading || button.disabled) return;
+        reading = true;
+        try {
+            const data = await queueRequest({read:'1'});
+            if (valid(data) && !reports.some(r => r.jsonl === data.jsonl)) {
+                reports.push(data); renderReport(data); choices();
+                status.textContent = 'Réponse disponible dans Fiche JSONL';
+            }
+        } catch (_) {} finally { reading = false; }
+    }
+    window.addEventListener('ezs-expertise-monitor', event => {
+        if (button.disabled) return;
+        const a = event.detail.find(x => String(x.song) === button.dataset.song && String(x.run) === button.dataset.run);
+        if (a) {
+            monitored = true; panel.hidden = false;
+            const phase = a.stage === 'result' ? 2 : ['search'].includes(a.stage) ? 2 : ['oauth','registration','models','model_select','session_lock'].includes(a.stage) ? 1 : 0;
+            draw(phase);
+            status.textContent = (a.stage === 'result' ? 'Enregistrement' : labels[order[phase]]) + ' · ' + Math.max(0,Math.floor(Date.now()/1000-a.started_at)) + ' s';
+        } else if (monitored) {
+            monitored = false;
+            status.textContent = 'Exécution terminée ou interrompue · Vérification du rapport';
+            readPersisted();
+        }
+    });
+    setInterval(() => { if (!document.hidden && !monitored) readPersisted(); }, 5000);
     queueRequest({read: '1'}).then(data => {
         if (valid(data) && !button.disabled && !reports.some(report => report.jsonl === data.jsonl)) {
             reports.push(data);

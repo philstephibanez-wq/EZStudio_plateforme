@@ -44,6 +44,15 @@ final class AttemptLedger {
         }
         return $out;
     }
+    public static function progress(?array $ctx,string $stage): void {
+        if($ctx===null || !in_array($stage,['export','session_lock','registration','oauth','models','model_select','search','result'],true)) return;
+        try {
+            $row=$ctx['row'];
+            $row['stage']=$stage;
+            $row['stage_at']=time();
+            self::write($ctx['file'],$row);
+        } catch (\Throwable) { error_log('EZS_MONITORING_STAGE_WRITE_FAILED'); }
+    }
     public static function finish(?array $ctx,string $status,?string $code,string $stderr=''): void {
         if($ctx===null) return;
         try {

@@ -89,7 +89,7 @@
                                 <td>{{ ezs.state_badge(job.state, job.has_error) }}</td>
                                 <td>
                                     {% if job.category == 'Expertise' and job.state == 'progressing' and job.progress == 0 %}
-                                    <div class="d-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span><span class="small">En cours</span></div>
+                                    <div class="d-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span><span class="small" data-ezs-expertise-job="{{ job.id }}">En cours</span></div>
                                     {% else %}
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="progress flex-grow-1" style="height: 8px;">
